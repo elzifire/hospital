@@ -1,66 +1,154 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Hospital — Sistem Informasi Manajemen Rumah Sakit
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Aplikasi web untuk mengelola administrasi rumah sakit: pengguna & hak akses (RBAC), data master (PNPP, satker, penyakit kronis), jadwal dokter & poli, serta import/export data Excel/CSV dengan antrean (queue) Redis.
 
-## About Laravel
+Dibangun dengan **Laravel 12**, **Tailwind CSS 4**, **Alpine.js**, dan **SweetAlert2**.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Daftar Isi
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+- [Tech Stack](#tech-stack)
+- [Fitur](#fitur)
+- [Kebutuhan Sistem](#kebutuhan-sistem)
+- [Instalasi](#instalasi)
+- [Konfigurasi Queue (Redis)](#konfigurasi-queue-redis)
+- [Akun Default](#akun-default)
+- [Import & Export](#import--export)
+- [Struktur Direktori](#struktur-direktori)
+- [Lisensi](#lisensi)
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Tech Stack
 
-## Learning Laravel
+| Lapisan    | Teknologi |
+|------------|-----------|
+| Backend    | Laravel 12 (PHP 8.2+) |
+| Database   | PostgreSQL (default di `.env`), kompatibel dengan MySQL/SQLite |
+| RBAC       | [spatie/laravel-permission](https://spatie.be/docs/laravel-permission) |
+| Frontend   | Blade, Tailwind CSS 4, Alpine.js, SweetAlert2 |
+| Spreadsheet| [phpoffice/phpspreadsheet](https://github.com/PHPOffice/PhpSpreadsheet) |
+| Queue      | Redis (via `predis/predis`) |
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## Fitur
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+- **Autentikasi** — login/logout, profil pribadi (ganti nama & password dengan verifikasi password lama).
+- **Manajemen Pengguna** — CRUD user + assign role.
+- **Manajemen Role & Permission** — role terproteksi (superadmin), permission grouping.
+- **Data Master**:
+  - **PNPP** — data pegawai/pasien (NIP, No. BPJS, satker, usia dihitung dari tanggal lahir, jenis kelamin, penyakit kronis, riwayat kunjungan).
+  - **Satker** — satuan kerja.
+  - **Penyakit Kronis** — master jenis penyakit.
+- **Jadwal Dokter & Poli**:
+  - **Poli** — poliklinik (1 dokter = 1 poli).
+  - **Dokter** — data dokter + spesialisasi.
+  - **Jadwal** — slot hari & jam praktik per dokter.
+- **Import & Export (Excel/CSV)** — semua data master bisa diimport/diexport, dengan pratinjau yang **bisa diedit langsung** sebelum diproses. Import berjalan di background melalui **Redis queue**.
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## Kebutuhan Sistem
 
-## Laravel Sponsors
+- PHP >= 8.2 dengan ekstensi `pdo_pgsql` (atau `pdo_mysql`/`pdo_sqlite`), `mbstring`, `openssl`, `gd`, `zip`, `xml`.
+- Composer 2.
+- Node.js + npm (untuk build asset Vite).
+- Redis server (untuk queue import/export).
+- PostgreSQL (atau database lain sesuai konfigurasi).
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+## Instalasi
 
-### Premium Partners
+```bash
+# 1. Clone & masuk direktori proyek
+git clone <repo-url> hospital
+cd hospital
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
+# 2. Install dependensi PHP
+composer install
 
-## Contributing
+# 3. Salin environment & set konfigurasi
+cp .env.example .env
+php artisan key:generate
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+# 4. Sesuaikan .env (koneksi database, Redis, dll.)
+#    DB_CONNECTION=pgsql  (atau mysql/sqlite)
+#    REDIS_CLIENT=predis
+#    QUEUE_CONNECTION=redis
 
-## Code of Conduct
+# 5. Migrasi & seed data awal
+php artisan migrate --seed
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+# 6. Install & build asset frontend
+npm install
+npm run build
 
-## Security Vulnerabilities
+# 7. Jalankan server
+php artisan serve
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+## Konfigurasi Queue (Redis)
 
-## License
+Import/export data berjalan di background menggunakan queue Redis. Pastikan:
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+1. Redis berjalan: `redis-server`
+2. Pada `.env`:
+   ```
+   QUEUE_CONNECTION=redis
+   REDIS_CLIENT=predis
+   REDIS_HOST=127.0.0.1
+   REDIS_PORT=6379
+   REDIS_QUEUE=default
+   REDIS_QUEUE_CONNECTION=default
+   ```
+3. Jalankan worker:
+   ```bash
+   php artisan queue:work
+   ```
+
+## Akun Default
+
+Setelah `php artisan db:seed`, tersedia akun berikut (password: `password`):
+
+| Role       | Email                 |
+|------------|-----------------------|
+| Superadmin | `superadmin@gmail.com` |
+| Admin      | `admin@gmail.com`      |
+| User       | `user@gmail.com`       |
+
+## Import & Export
+
+Setiap entitas data master memiliki halaman **Import** dan **Export** tersendiri.
+
+**Import:**
+1. Buka menu entitas → tombol **Import**.
+2. Unduh **Template Excel/CSV** (berisi header + 1 baris contoh).
+3. Isi file sesuai template, lalu upload (mendukung `.xlsx`, `.xls`, `.csv`).
+4. Pada **pratinjau**, data bisa **diedit langsung** dengan mengklik sel tabel.
+5. Klik **Proses Import** → data diproses di background (Redis queue), status diperbarui otomatis.
+
+**Export:**
+1. Buka menu entitas → tombol **Export**.
+2. Unduh seluruh data sebagai **Excel (.xlsx)** atau **CSV**.
+
+**Aturan kolom/relasi** (import):
+- `satker`, `penyakit`, `poli` → kode (opsional) + nama (wajib).
+- `dokter` → nama (wajib) + poli (nama, harus sudah ada) + spesialisasi (opsional).
+- `jadwal` → dokter (nama, harus sudah ada) + hari (Senin–Minggu) + jam mulai/selesai (`HH:mm`).
+- `pnpp` → nama (wajib) + NIP/No. BPJS (opsional, unik) + satker (nama) + penyakit kronis (dipisah koma).
+
+## Struktur Direktori
+
+```
+app/
+├─ Http/Controllers/Admin/   # User, Role, Permission, Profile, Pnpp, Satker,
+│                            # PenyakitKronis, Poli, Dokter, Jadwal,
+│                            # MasterImport, MasterExport
+├─ Jobs/ImportMasterJob.php  # Import background (queue)
+├─ Models/                   # User, Satker, Pnpp, PenyakitKronis, Kunjungan,
+│                            # Poli, Dokter, Jadwal
+└─ Support/                  # MasterRegistry, SheetHelper, CsvHelper
+database/
+├─ migrations/               # Skema database
+└─ seeders/                  # RolePermission, User, MasterData, MasterPermission
+resources/views/
+├─ layouts/app.blade.php     # Layout utama (sidebar + topbar)
+└─ admin/                    # Halaman-halaman modul
+```
+
+## Lisensi
+
+Proyek ini bersifat internal. Lisensi: [MIT](https://opensource.org/licenses/MIT).

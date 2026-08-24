@@ -2,9 +2,12 @@
 
 namespace Database\Seeders;
 
+use App\Models\Dokter;
+use App\Models\Jadwal;
 use App\Models\Kunjungan;
 use App\Models\PenyakitKronis;
 use App\Models\Pnpp;
+use App\Models\Poli;
 use App\Models\Satker;
 use Illuminate\Database\Seeder;
 
@@ -89,6 +92,50 @@ class MasterDataSeeder extends Seeder
                 foreach ($kunjungan as $k) {
                     $pnpp->kunjungans()->create($k);
                 }
+            }
+        }
+
+        // ===== Poli, Dokter & Jadwal =====
+        $polis = [
+            ['kode' => 'UMUM', 'nama' => 'Poli Umum'],
+            ['kode' => 'GIGI',  'nama' => 'Poli Gigi'],
+            ['kode' => 'PDLM',  'nama' => 'Poli Penyakit Dalam'],
+            ['kode' => 'ANAK',  'nama' => 'Poli Anak'],
+        ];
+        foreach ($polis as $data) {
+            Poli::firstOrCreate(['kode' => $data['kode']], $data);
+        }
+
+        $poliUmum = Poli::where('kode', 'UMUM')->first();
+        $poliGigi = Poli::where('kode', 'GIGI')->first();
+        $poliDalam = Poli::where('kode', 'PDLM')->first();
+        $poliAnak = Poli::where('kode', 'ANAK')->first();
+
+        $dokters = [
+            ['poli_id' => $poliUmum?->id,  'nama' => 'dr. Rina Pratiwi',   'spesialisasi' => 'Dokter Umum'],
+            ['poli_id' => $poliGigi?->id,  'nama' => 'drg. Andi Saputra',  'spesialisasi' => 'Dokter Gigi'],
+            ['poli_id' => $poliDalam?->id, 'nama' => 'dr. Bambang Haryanto', 'spesialisasi' => 'Spesialis Penyakit Dalam'],
+            ['poli_id' => $poliAnak?->id,  'nama' => 'dr. Sari Wulandari', 'spesialisasi' => 'Spesialis Anak'],
+        ];
+        foreach ($dokters as $data) {
+            Dokter::firstOrCreate(['nama' => $data['nama']], $data);
+        }
+
+        $drRina    = Dokter::where('nama', 'dr. Rina Pratiwi')->first();
+        $drgAndi   = Dokter::where('nama', 'drg. Andi Saputra')->first();
+        $drBambang = Dokter::where('nama', 'dr. Bambang Haryanto')->first();
+        $drSari    = Dokter::where('nama', 'dr. Sari Wulandari')->first();
+
+        $jadwals = [
+            ['dokter_id' => $drRina?->id,    'hari' => 'Senin', 'jam_mulai' => '08:00', 'jam_selesai' => '12:00'],
+            ['dokter_id' => $drRina?->id,    'hari' => 'Rabu',  'jam_mulai' => '08:00', 'jam_selesai' => '14:00'],
+            ['dokter_id' => $drgAndi?->id,   'hari' => 'Selasa','jam_mulai' => '09:00', 'jam_selesai' => '13:00'],
+            ['dokter_id' => $drBambang?->id, 'hari' => 'Kamis', 'jam_mulai' => '08:00', 'jam_selesai' => '11:00'],
+            ['dokter_id' => $drSari?->id,    'hari' => 'Jumat', 'jam_mulai' => '08:00', 'jam_selesai' => '12:00'],
+        ];
+        foreach ($jadwals as $data) {
+            if ($data['dokter_id'] && ! Jadwal::where($data)->exists()) {
+                Jadwal::create($data);
             }
         }
     }

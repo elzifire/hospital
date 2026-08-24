@@ -11,6 +11,11 @@ use App\Http\Controllers\Admin\PnppController;
 use App\Http\Controllers\Admin\SatkerController;
 use App\Http\Controllers\Admin\PenyakitKronisController;
 use App\Http\Controllers\Admin\KunjunganController;
+use App\Http\Controllers\Admin\PoliController;
+use App\Http\Controllers\Admin\DokterController;
+use App\Http\Controllers\Admin\JadwalController;
+use App\Http\Controllers\Admin\MasterImportController;
+use App\Http\Controllers\Admin\MasterExportController;
 
 /*
 |--------------------------------------------------------------------------
@@ -58,6 +63,20 @@ Route::middleware('auth')->group(function () {
             Route::resource('satker', SatkerController::class)->except('show');
             Route::resource('penyakit', PenyakitKronisController::class)->except('show');
             Route::resource('pnpp', PnppController::class)->except('show');
+
+            // Poli, Dokter & Jadwal
+            Route::resource('poli', PoliController::class)->except('show');
+            Route::resource('dokter', DokterController::class)->except('show');
+            Route::resource('jadwal', JadwalController::class)->except('show');
+
+            // Import & Export data master (semua entitas, per entitas halaman tersendiri)
+            Route::get('master/{entity}/import', [MasterImportController::class, 'index'])->name('master.import');
+            Route::post('master/{entity}/import/upload', [MasterImportController::class, 'upload'])->name('master.import.upload');
+            Route::post('master/{entity}/import/confirm', [MasterImportController::class, 'confirm'])->name('master.import.confirm');
+            Route::post('master/{entity}/import/cancel', [MasterImportController::class, 'cancel'])->name('master.import.cancel');
+            Route::get('master/{entity}/export', [MasterExportController::class, 'index'])->name('master.export');
+            Route::get('master/{entity}/export/download', [MasterExportController::class, 'download'])->name('master.export.download');
+            Route::get('master/{entity}/template', [MasterExportController::class, 'template'])->name('master.template');
 
             // Riwayat kunjungan per PNPP
             Route::get('pnpp/{pnpp}/kunjungan', [PnppController::class, 'kunjungan'])->name('pnpp.kunjungan');
