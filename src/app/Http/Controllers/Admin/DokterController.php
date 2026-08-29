@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Dokter;
 use App\Models\Poli;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class DokterController extends Controller
 {
@@ -28,7 +29,7 @@ class DokterController extends Controller
     {
         $data = $this->validated($request);
 
-        $dokter = Dokter::create($data);
+        $dokter = DB::transaction(fn () => Dokter::create($data));
 
         return redirect()->route('admin.dokter.index')
             ->with('success', "Dokter \"{$dokter->nama}\" berhasil ditambahkan.");
@@ -43,7 +44,7 @@ class DokterController extends Controller
 
     public function update(Request $request, Dokter $dokter)
     {
-        $dokter->update($this->validated($request));
+        DB::transaction(fn () => $dokter->update($this->validated($request)));
 
         return redirect()->route('admin.dokter.index')
             ->with('success', "Dokter \"{$dokter->nama}\" berhasil diperbarui.");

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
 
@@ -45,11 +46,15 @@ class RoleController extends Controller
             'permissions.*' => ['exists:permissions,name'],
         ]);
 
-        $role = Role::create(['name' => $request->name]);
+        $role = DB::transaction(function () use ($request) {
+            $role = Role::create(['name' => $request->name]);
 
-        if ($request->has('permissions')) {
-            $role->syncPermissions($request->permissions);
-        }
+            if ($request->has('permissions')) {
+                $role->syncPermissions($request->permissions);
+            }
+
+            return $role;
+        });
 
         return redirect()->route('admin.roles.index')
             ->with('success', "Role \"{$role->name}\" berhasil dibuat.");
@@ -78,8 +83,10 @@ class RoleController extends Controller
             'permissions.*' => ['exists:permissions,name'],
         ]);
 
-        $role->update(['name' => $request->name]);
-        $role->syncPermissions($request->permissions ?? []);
+        DB::transaction(function () use ($request, $role) {
+            $role->update(['name' => $request->name]);
+            $role->syncPermissions($request->permissions ?? []);
+        });
 
         return redirect()->route('admin.roles.index')
             ->with('success', "Role \"{$role->name}\" berhasil diperbarui.");

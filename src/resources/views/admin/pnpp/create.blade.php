@@ -40,7 +40,7 @@
                             </div>
 
                             <div>
-                                <label for="nip" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">NIP</label>
+                                <label for="nip" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">NIP/NRP</label>
                                 <input type="text" name="nip" id="nip" value="{{ old('nip') }}" x-model="nip" placeholder="18 digit NIP"
                                        class="block w-full rounded-xl border-0 py-2.5 px-3.5 text-sm text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-sky-500 transition @error('nip') ring-rose-300 focus:ring-rose-500 @enderror">
                                 @error('nip')<p class="mt-1.5 text-xs font-medium text-rose-600">{{ $message }}</p>@enderror

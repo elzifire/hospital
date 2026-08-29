@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
 
@@ -33,7 +34,7 @@ class ProfileController extends Controller
             'name' => ['required', 'string', 'max:255'],
         ]);
 
-        $user->update($validated);
+        DB::transaction(fn () => $user->update($validated));
 
         return redirect()
             ->route('admin.profile.edit')
@@ -54,9 +55,11 @@ class ProfileController extends Controller
             'password'        => ['required', Password::defaults(), 'confirmed'],
         ]);
 
-        $user->update([
-            'password' => Hash::make($validated['password']),
-        ]);
+        DB::transaction(function () use ($user, $validated) {
+            $user->update([
+                'password' => Hash::make($validated['password']),
+            ]);
+        });
 
         return redirect()
             ->route('admin.profile.edit')

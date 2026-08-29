@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Satker;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class SatkerController extends Controller
 {
@@ -27,7 +28,7 @@ class SatkerController extends Controller
             'nama' => ['required', 'string', 'max:255'],
         ]);
 
-        $satker = Satker::create($data);
+        $satker = DB::transaction(fn () => Satker::create($data));
 
         return redirect()->route('admin.satker.index')
             ->with('success', "Satker \"{$satker->nama}\" berhasil ditambahkan.");
@@ -45,7 +46,7 @@ class SatkerController extends Controller
             'nama' => ['required', 'string', 'max:255'],
         ]);
 
-        $satker->update($data);
+        DB::transaction(fn () => $satker->update($data));
 
         return redirect()->route('admin.satker.index')
             ->with('success', "Satker \"{$satker->nama}\" berhasil diperbarui.");

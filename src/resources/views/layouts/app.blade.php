@@ -5,31 +5,27 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>@yield('title', 'Dashboard') — {{ config('app.name', 'Hospital') }}</title>
+    <title>@yield('title', 'Dashboard') — {{ config('app.name', 'RS BHAYANGKARA BOGOR') }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
-    <style>[x-cloak]{display:none !important;}</style>
+    <style>
+
+    [x-cloak]{display:none !important;}
+        *, *::before, *::after ,body{
+            font-family: 'Montserrat', sans-serif;
+            
+        }
+        /* Animasi hamburger -> X */
+        #sidebar-toggle.open .bar-1{ transform: translateY(7px) rotate(45deg); }
+        #sidebar-toggle.open .bar-2{ transform: scaleX(0); opacity: 0; }
+        #sidebar-toggle.open .bar-3{ transform: translateY(-7px) rotate(-45deg); }
+    </style>
 </head>
-<body class="h-full bg-gray-100 font-sans antialiased"
-      x-data="{
-          sidebarOpen: false,
-          sidebarHidden: false,
-          init() {
-              try { this.sidebarHidden = localStorage.getItem('sidebarHidden') === 'true' } catch (e) {}
-          },
-          toggleSidebar() {
-              if (window.innerWidth >= 1024) {
-                  this.sidebarHidden = !this.sidebarHidden
-                  try { localStorage.setItem('sidebarHidden', this.sidebarHidden) } catch (e) {}
-              } else {
-                  this.sidebarOpen = !this.sidebarOpen
-              }
-          },
-          closeMobileSidebar() { this.sidebarOpen = false }
-      }"
-      @keydown.escape.window="closeMobileSidebar()"
-      :class="{ 'overflow-hidden': sidebarOpen }">
+<body class="h-full bg-gray-100 font-sans antialiased">
 
     <div class="flex h-full">
 
@@ -90,18 +86,7 @@
                         ],
                     ],
                 ],
-                [
-                    'label' => 'Akun',
-                    'items' => [
-                        [
-                            'label'  => 'Profil Saya',
-                            'route'  => 'admin.profile.edit',
-                            'active' => request()->routeIs('admin.profile.*'),
-                            'icon'   => ['M17.982 18.725A7.488 7.488 0 0 0 12 15.75a7.488 7.488 0 0 0-5.982 2.975m11.963 0a9 9 0 1 0-11.963 0m11.963 0A8.966 8.966 0 0 1 12 21a8.966 8.966 0 0 1-5.982-2.275M15 9.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z'],
-                            'roles'  => [],
-                        ],
-                    ],
-                ],
+                
                 [
                     'label' => 'Data Master',
                     'items' => [
@@ -149,33 +134,37 @@
                         ],
                     ],
                 ],
+                [
+                    'label' => 'Akun',
+                    'items' => [
+                        [
+                            'label'  => 'Profil Saya',
+                            'route'  => 'admin.profile.edit',
+                            'active' => request()->routeIs('admin.profile.*'),
+                            'icon'   => ['M17.982 18.725A7.488 7.488 0 0 0 12 15.75a7.488 7.488 0 0 0-5.982 2.975m11.963 0a9 9 0 1 0-11.963 0m11.963 0A8.966 8.966 0 0 1 12 21a8.966 8.966 0 0 1-5.982-2.275M15 9.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z'],
+                            'roles'  => [],
+                        ],
+                    ],
+                ],
             ];
         @endphp
 
         {{-- Sidebar overlay (mobile) --}}
-        <div x-show="sidebarOpen" x-transition:enter="transition-opacity ease-linear duration-300"
-             x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
-             x-transition:leave="transition-opacity ease-linear duration-300"
-             x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
-             class="fixed inset-0 z-40 bg-black/50 lg:hidden" @click="sidebarOpen = false">
+        <div id="sidebar-overlay" onclick="closeSidebar()"
+             class="fixed inset-0 z-40 hidden bg-black/50 lg:hidden">
         </div>
 
         {{-- Sidebar --}}
-        <aside :class="[
-                   sidebarOpen ? 'translate-x-0' : '-translate-x-full',
-                   sidebarHidden ? 'lg:w-0 lg:translate-x-0' : 'lg:w-64 lg:translate-x-0'
-               ]"
+        <aside id="sidebar"
                class="fixed inset-y-0 left-0 z-50 flex w-64 flex-col overflow-hidden bg-slate-900 text-white transition-all duration-300 ease-in-out lg:static lg:z-auto">
 
             {{-- Logo / Brand + tombol tutup (mobile) --}}
             <div class="flex h-16 flex-shrink-0 items-center justify-between border-b border-slate-700/70 px-5">
                 <div class="flex items-center gap-3">
-                    <svg class="h-8 w-8 text-sky-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0 0 12 9.75c-2.551 0-5.056.2-7.5.582V21" />
-                    </svg>
-                    <span class="text-lg font-bold tracking-wide">Hospital</span>
+                    <img src="{{ asset('image/RSB.png') }}" alt="Logo" class="h-10 w-10 rounded-2xl object-cover" />
+                    <span class="text-base font-bold">RS BHAYANGKARA BOGOR</span>
                 </div>
-                <button type="button" @click="closeMobileSidebar()" title="Tutup menu" aria-label="Tutup menu"
+                <button type="button" onclick="closeSidebar()" title="Tutup menu" aria-label="Tutup menu"
                         class="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-800 hover:text-white lg:hidden">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
@@ -201,7 +190,7 @@
                             <ul class="space-y-1">
                                 @foreach ($visibleItems as $item)
                                     <li>
-                                        <a href="{{ route($item['route']) }}" @click="closeMobileSidebar()" title="{{ $item['label'] }}"
+                                        <a href="{{ route($item['route']) }}" onclick="closeSidebar()" title="{{ $item['label'] }}"
                                            class="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition {{ $item['active'] ? 'bg-sky-600 text-white shadow-sm' : 'text-slate-300 hover:bg-slate-800 hover:text-white' }}">
                                             <svg class="h-5 w-5 flex-shrink-0 transition-colors {{ $item['active'] ? '' : 'text-slate-400 group-hover:text-white' }}" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                                                 @foreach ($item['icon'] as $d)
@@ -237,12 +226,12 @@
             {{-- Top bar --}}
             <header class="flex h-16 items-center justify-between border-b border-gray-200 bg-white px-4 shadow-sm lg:px-6">
                 {{-- Toggle sidebar: drawer di mobile, collapse di desktop --}}
-                <button type="button" @click="toggleSidebar()" title="Buka/tutup sidebar" aria-label="Toggle sidebar"
-                        class="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400">
+                <button type="button" id="sidebar-toggle" onclick="toggleSidebar()" title="Buka/tutup sidebar" aria-label="Toggle sidebar"
+                        class="rounded-lg p-2 text-sky-600 transition hover:bg-sky-50 hover:text-sky-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400">
                     <span class="flex h-6 w-6 flex-col items-center justify-center gap-[5px]">
-                        <span class="block h-0.5 w-5 rounded-full bg-current transition-all duration-300" :class="sidebarOpen ? 'translate-y-[7px] rotate-45' : ''"></span>
-                        <span class="block h-0.5 w-5 rounded-full bg-current transition-all duration-300" :class="sidebarOpen ? 'scale-x-0 opacity-0' : ''"></span>
-                        <span class="block h-0.5 w-5 rounded-full bg-current transition-all duration-300" :class="sidebarOpen ? '-translate-y-[7px] -rotate-45' : ''"></span>
+                        <span class="bar-1 block h-0.5 w-5 rounded-full bg-current transition-all duration-300"></span>
+                        <span class="bar-2 block h-0.5 w-5 rounded-full bg-current transition-all duration-300"></span>
+                        <span class="bar-3 block h-0.5 w-5 rounded-full bg-current transition-all duration-300"></span>
                     </span>
                 </button>
 
@@ -302,6 +291,38 @@
     </form>
 
     <script>
+        // ===== Sidebar (vanilla JS — works di semua device) =====
+        let sidebarOpen = false;
+
+        function isMobile() { return window.innerWidth < 1024; }
+
+        function applySidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            const toggle  = document.getElementById('sidebar-toggle');
+            if (!sidebar) return;
+
+            const openCls   = ['translate-x-0', 'lg:ml-0'];
+            const closedCls = ['-translate-x-full', 'lg:translate-x-0', 'lg:-ml-64'];
+
+            sidebar.classList.remove(...openCls, ...closedCls);
+            sidebar.classList.add(...(sidebarOpen ? openCls : closedCls));
+
+            if (overlay) overlay.classList.toggle('hidden', !(sidebarOpen && isMobile()));
+            if (toggle)  toggle.classList.toggle('open', sidebarOpen);
+            document.body.classList.toggle('overflow-hidden', sidebarOpen && isMobile());
+        }
+
+        function toggleSidebar() { sidebarOpen = !sidebarOpen; applySidebar(); }
+        function closeSidebar() { sidebarOpen = false; applySidebar(); }
+
+        // Inisialisasi: tertutup di mobile, terbuka di desktop
+        sidebarOpen = !isMobile();
+        applySidebar();
+
+        window.addEventListener('resize', applySidebar);
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSidebar(); });
+
         // ===== SweetAlert: Toast notifikasi (sukses / error dari session flash) =====
         const Toast = Swal.mixin({
             toast: true,

@@ -7,6 +7,7 @@ use App\Models\Pnpp;
 use App\Models\PenyakitKronis;
 use App\Models\Satker;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class PnppController extends Controller
 {
@@ -50,8 +51,12 @@ class PnppController extends Controller
     {
         $data = $this->validated($request);
 
-        $pnpp = Pnpp::create($data);
-        $pnpp->penyakit()->sync($request->input('penyakit', []));
+        $pnpp = DB::transaction(function () use ($request, $data) {
+            $pnpp = Pnpp::create($data);
+            $pnpp->penyakit()->sync($request->input('penyakit', []));
+
+            return $pnpp;
+        });
 
         return redirect()->route('admin.pnpp.index')
             ->with('success', "Data PNPP \"{$pnpp->nama}\" berhasil ditambahkan.");
@@ -77,8 +82,10 @@ class PnppController extends Controller
     {
         $data = $this->validated($request, $pnpp);
 
-        $pnpp->update($data);
-        $pnpp->penyakit()->sync($request->input('penyakit', []));
+        DB::transaction(function () use ($request, $pnpp, $data) {
+            $pnpp->update($data);
+            $pnpp->penyakit()->sync($request->input('penyakit', []));
+        });
 
         return redirect()->route('admin.pnpp.index')
             ->with('success', "Data PNPP \"{$pnpp->nama}\" berhasil diperbarui.");

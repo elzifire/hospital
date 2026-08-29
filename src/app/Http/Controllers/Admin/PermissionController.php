@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Permission;
 
 class PermissionController extends Controller
@@ -35,7 +36,7 @@ class PermissionController extends Controller
             'name' => ['required', 'string', 'max:255', 'unique:permissions,name'],
         ]);
 
-        $permission = Permission::create(['name' => $request->name]);
+        $permission = DB::transaction(fn () => Permission::create(['name' => $request->name]));
 
         return redirect()->route('admin.permissions.index')
             ->with('success', "Permission \"{$permission->name}\" berhasil dibuat.");
@@ -60,7 +61,7 @@ class PermissionController extends Controller
             'name' => ['required', 'string', 'max:255', 'unique:permissions,name,' . $permission->id],
         ]);
 
-        $permission->update(['name' => $request->name]);
+        DB::transaction(fn () => $permission->update(['name' => $request->name]));
 
         return redirect()->route('admin.permissions.index')
             ->with('success', "Permission \"{$permission->name}\" berhasil diperbarui.");

@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Spatie\Permission\Models\Role;
 
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 
 class UserController extends Controller
@@ -52,16 +53,20 @@ class UserController extends Controller
             'role'     => ['nullable', 'string', 'exists:roles,name'],
         ]);
 
-        $user = User::create([
-            'name'              => $request->name,
-            'email'             => $request->email,
-            'password'          => $request->password,
-            'email_verified_at' => $request->boolean('verified') ? now() : null,
-        ]);
+        $user = DB::transaction(function () use ($request) {
+            $user = User::create([
+                'name'              => $request->name,
+                'email'             => $request->email,
+                'password'          => $request->password,
+                'email_verified_at' => $request->boolean('verified') ? now() : null,
+            ]);
 
-        if ($request->filled('role')) {
-            $user->assignRole($request->role);
-        }
+            if ($request->filled('role')) {
+                $user->assignRole($request->role);
+            }
+
+            return $user;
+        });
 
         return redirect()->route('admin.users.index')
             ->with('success', "User \"{$user->name}\" berhasil ditambahkan.");
@@ -87,7 +92,7 @@ class UserController extends Controller
             'role' => ['required', 'string', 'exists:roles,name'],
         ]);
 
-        $user->syncRoles([$request->role]);
+        DB::transaction(fn () => $user->syncRoles([$request->role]));
 
         return redirect()->route('admin.users.index')
             ->with('success', "Role untuk \"{$user->name}\" berhasil diperbarui menjadi \"{$request->role}\".");

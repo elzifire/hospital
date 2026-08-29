@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Kunjungan;
 use App\Models\Pnpp;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class KunjunganController extends Controller
 {
@@ -20,7 +21,7 @@ class KunjunganController extends Controller
             'diagnosa'          => ['nullable', 'string', 'max:1000'],
         ]);
 
-        $pnpp->kunjungans()->create($data);
+        DB::transaction(fn () => $pnpp->kunjungans()->create($data));
 
         return redirect()->route('admin.pnpp.kunjungan', $pnpp)
             ->with('success', 'Riwayat kunjungan berhasil ditambahkan.');

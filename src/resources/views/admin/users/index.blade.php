@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'Manage Users')
-@section('page-title', 'Manage Users')
+@section('title', 'Manajemen Pengguna')
+@section('page-title', 'Manajemen Pengguna')
 
 @section('content')
 <div x-data="userTable()" class="space-y-6">

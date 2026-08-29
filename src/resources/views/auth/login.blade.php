@@ -6,12 +6,11 @@
 <div class="w-full max-w-md">
     {{-- Logo & Title --}}
     <div class="mb-8 text-center">
-        <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-sky-500/20 backdrop-blur-sm">
-            <svg class="h-9 w-9 text-sky-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0 0 12 9.75c-2.551 0-5.056.2-7.5.582V21" />
-            </svg>
+        <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl backdrop-blur-sm">
+            
+            <img src="{{ asset('image/RSB.png') }}" alt="Logo" class="h-16 w-16 rounded-2xl object-cover">
         </div>
-        <h2 class="mt-4 text-2xl font-bold text-white">Hospital Management</h2>
+        <h2 class="mt-4 text-2xl font-bold text-white"><span>RUMAH SAKIT BHAYANGKARA BOGOR</span></h2>
         <p class="mt-1 text-sm text-slate-400">Silakan login untuk melanjutkan</p>
     </div>
 
@@ -78,7 +77,7 @@
 
     {{-- Footer --}}
     <p class="mt-6 text-center text-xs text-slate-500">
-        &copy; {{ date('Y') }} Hospital Management System. All rights reserved.
+        &copy; {{ date('Y') }} RUMAH SAKIT BHAYANGKARA BOGOR. All rights reserved.
     </p>
 </div>
 @endsection

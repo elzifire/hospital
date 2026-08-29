@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Poli;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class PoliController extends Controller
 {
@@ -27,7 +28,7 @@ class PoliController extends Controller
             'nama' => ['required', 'string', 'max:255'],
         ]);
 
-        $poli = Poli::create($data);
+        $poli = DB::transaction(fn () => Poli::create($data));
 
         return redirect()->route('admin.poli.index')
             ->with('success', "Poli \"{$poli->nama}\" berhasil ditambahkan.");
@@ -45,7 +46,7 @@ class PoliController extends Controller
             'nama' => ['required', 'string', 'max:255'],
         ]);
 
-        $poli->update($data);
+        DB::transaction(fn () => $poli->update($data));
 
         return redirect()->route('admin.poli.index')
             ->with('success', "Poli \"{$poli->nama}\" berhasil diperbarui.");

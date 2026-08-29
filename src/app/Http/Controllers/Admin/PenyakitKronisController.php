@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\PenyakitKronis;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class PenyakitKronisController extends Controller
 {
@@ -27,7 +28,7 @@ class PenyakitKronisController extends Controller
             'nama' => ['required', 'string', 'max:255'],
         ]);
 
-        $penyakit = PenyakitKronis::create($data);
+        $penyakit = DB::transaction(fn () => PenyakitKronis::create($data));
 
         return redirect()->route('admin.penyakit.index')
             ->with('success', "Penyakit \"{$penyakit->nama}\" berhasil ditambahkan.");
@@ -45,7 +46,7 @@ class PenyakitKronisController extends Controller
             'nama' => ['required', 'string', 'max:255'],
         ]);
 
-        $penyakit->update($data);
+        DB::transaction(fn () => $penyakit->update($data));
 
         return redirect()->route('admin.penyakit.index')
             ->with('success', "Penyakit \"{$penyakit->nama}\" berhasil diperbarui.");

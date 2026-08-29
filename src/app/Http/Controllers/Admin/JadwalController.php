@@ -7,6 +7,7 @@ use App\Models\Dokter;
 use App\Models\Jadwal;
 use App\Models\Poli;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class JadwalController extends Controller
 {
@@ -37,10 +38,10 @@ class JadwalController extends Controller
     {
         $data = $this->validated($request);
 
-        $jadwal = Jadwal::create($data);
+        $jadwal = DB::transaction(fn () => Jadwal::create($data));
 
         return redirect()->route('admin.jadwal.index')
-            ->with('success', "Jadwal berhasil ditambahkan.");
+            ->with('success', "Jadwal \"{$jadwal->dokter->nama} - {$jadwal->hari}\" berhasil ditambahkan.");
     }
 
     public function edit(Jadwal $jadwal)
@@ -52,7 +53,7 @@ class JadwalController extends Controller
 
     public function update(Request $request, Jadwal $jadwal)
     {
-        $jadwal->update($this->validated($request));
+        DB::transaction(fn () => $jadwal->update($this->validated($request)));
 
         return redirect()->route('admin.jadwal.index')
             ->with('success', 'Jadwal berhasil diperbarui.');
