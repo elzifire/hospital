@@ -9,6 +9,7 @@ import devicesRoutes from './src/routes/devices.js';
 import broadcastRoutes from './src/routes/broadcast.js';
 import outreachRoutes from './src/routes/outreach.js';
 import webhookRoutes from './src/routes/webhook.js';
+import logsRoutes from './src/routes/logs.js';
 
 import { initBroadcastWorker } from './src/queue/broadcastWorker.js';
 import { initCronJobs } from './src/cron/scheduler.js';
@@ -36,6 +37,7 @@ app.use('/api/devices', devicesRoutes);
 app.use('/api/broadcasts', broadcastRoutes);
 app.use('/api/outreach', outreachRoutes);
 app.use('/api/webhook', webhookRoutes);
+app.use('/api/logs', logsRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

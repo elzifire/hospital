@@ -4,7 +4,7 @@ let activeQrPollInterval = null;
 let currentQrDeviceId = null;
 
 function switchTab(tabId) {
-  const tabs = ['devices', 'broadcast', 'outreach', 'docs'];
+  const tabs = ['devices', 'broadcast', 'outreach', 'logs', 'docs'];
   tabs.forEach(t => {
     const section = document.getElementById(`tab${t.charAt(0).toUpperCase() + t.slice(1)}`);
     const btn = document.getElementById(`tabBtn${t.charAt(0).toUpperCase() + t.slice(1)}`);
@@ -27,6 +27,9 @@ function switchTab(tabId) {
   if (tabId === 'outreach') {
     loadOutreachStats();
     loadOutreachMessages();
+  }
+  if (tabId === 'logs') {
+    loadLogs();
   }
 }
 

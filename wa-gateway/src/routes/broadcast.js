@@ -40,7 +40,68 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST /api/broadcasts - Create campaign
+// POST /api/broadcasts/schedule - Create scheduled campaign with future start date
+router.post('/schedule', async (req, res) => {
+  try {
+    const {
+      device_id,
+      title,
+      message,
+      media_url,
+      scheduled_at,
+      delay_min_ms,
+      delay_max_ms,
+      recipients,
+    } = req.body;
+
+    if (!scheduled_at) {
+      return res.status(400).json({
+        success: false,
+        message: 'Parameter scheduled_at (tanggal & jam mulai) wajib diisi untuk penjadwalan.',
+      });
+    }
+
+    const scheduledDate = new Date(scheduled_at);
+    if (isNaN(scheduledDate.getTime())) {
+      return res.status(400).json({
+        success: false,
+        message: 'Format scheduled_at tidak valid. Gunakan format ISO (contoh: 2026-09-01T08:30:00).',
+      });
+    }
+
+    // Verify device ownership
+    const devCheck = await query('SELECT id FROM wa_devices WHERE id = $1 AND user_id = $2', [
+      device_id,
+      req.user.id,
+    ]);
+    if (devCheck.rows.length === 0) {
+      return res.status(400).json({ success: false, message: 'Device tidak valid atau bukan milik Anda.' });
+    }
+
+    const broadcast = await createBroadcastCampaign({
+      userId: req.user.id,
+      deviceId: device_id,
+      title,
+      message,
+      mediaUrl: media_url,
+      scheduledAt: scheduledDate,
+      delayMinMs: delay_min_ms || 1500,
+      delayMaxMs: delay_max_ms || 3500,
+      recipients,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: `Kampanye broadcast berhasil dijadwalkan untuk ${new Date(broadcast.scheduled_at).toLocaleString('id-ID')}. Pesan akan dikirim secara acak humanis.`,
+      broadcast,
+    });
+  } catch (error) {
+    console.error('Error creating scheduled broadcast:', error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// POST /api/broadcasts - Create immediate / standard campaign
 router.post('/', async (req, res) => {
   try {
     const {

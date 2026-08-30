@@ -2,6 +2,7 @@ import express from 'express';
 import { query } from '../config/database.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { providerManager } from '../providers/manager.js';
+import { createLog } from '../services/logService.js';
 
 const router = express.Router();
 
@@ -212,9 +213,23 @@ router.post('/:id/send-test', async (req, res) => {
     const provider = await providerManager.get(deviceId);
     const sendResult = await provider.sendMessage(to, message);
 
+    await createLog({
+      userId: req.user.id,
+      deviceId,
+      type: 'direct',
+      level: 'success',
+      action: 'MESSAGE_SENT',
+      recipient: to,
+      message: message.substring(0, 200),
+      details: {
+        isTest: true,
+        messageId: sendResult.messageId,
+      },
+    });
+
     return res.json({
       success: true,
-      message: 'Pesan tes berhasil dikirim.',
+      message: 'Pesan tes berhasil dikirim langsung (NOW).',
       data: sendResult,
     });
   } catch (error) {

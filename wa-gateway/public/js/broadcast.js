@@ -20,6 +20,10 @@ async function loadDeviceOptionsForBroadcast() {
           ${d.name} [${d.provider.toUpperCase()}] ${d.live_status === 'connected' ? '✅ Terhubung' : '⚠️ Terputus'}
         </option>
       `).join('');
+
+      if (data.devices[0]) {
+        updateDeviceQuotaDisplay(data.devices[0].id);
+      }
     }
   } catch (err) {
     console.error('Error loading devices for broadcast:', err);

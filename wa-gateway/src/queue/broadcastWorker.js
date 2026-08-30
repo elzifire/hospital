@@ -3,6 +3,7 @@ import { getRedisConfig } from '../config/redis.js';
 import { query } from '../config/database.js';
 import { providerManager } from '../providers/manager.js';
 import { BROADCAST_QUEUE_NAME } from './broadcastQueue.js';
+import { createLog } from '../services/logService.js';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -31,6 +32,7 @@ export function initBroadcastWorker() {
         broadcastId,
         recipientId,
         deviceId,
+        userId,
         phoneNumber,
         name,
         templateMessage,
@@ -48,7 +50,7 @@ export function initBroadcastWorker() {
         [job.id, recipientId]
       );
 
-      // 2. Anti-ban random delay
+      // 2. Anti-ban small jitter
       const randomDelay = Math.floor(Math.random() * (delayMaxMs - delayMinMs + 1)) + delayMinMs;
       await sleep(randomDelay);
 
@@ -83,6 +85,23 @@ export function initBroadcastWorker() {
           [broadcastId]
         );
 
+        // 8. Log success in wa_logs
+        await createLog({
+          userId,
+          deviceId,
+          broadcastId,
+          type: 'broadcast',
+          level: 'success',
+          action: 'MESSAGE_SENT',
+          recipient: phoneNumber,
+          message: finalMessage.substring(0, 200),
+          details: {
+            recipientId,
+            recipientName: name,
+            messageId: sendResult.messageId,
+          },
+        });
+
         console.log(`[Worker] ✅ Message successfully sent to ${phoneNumber}`);
         return { success: true, recipientId, sendResult };
       } catch (err) {
@@ -100,9 +119,25 @@ export function initBroadcastWorker() {
           [broadcastId]
         );
 
+        // Log failure in wa_logs
+        await createLog({
+          userId,
+          deviceId,
+          broadcastId,
+          type: 'broadcast',
+          level: 'error',
+          action: 'MESSAGE_FAILED',
+          recipient: phoneNumber,
+          message: err.message,
+          details: {
+            recipientId,
+            recipientName: name,
+          },
+        });
+
         throw err;
       } finally {
-        // 8. Check if all recipients for this broadcast have completed
+        // 9. Check if all recipients for this broadcast have completed
         await checkAndUpdateBroadcastCompletion(broadcastId);
       }
     },
@@ -110,8 +145,8 @@ export function initBroadcastWorker() {
       connection: getRedisConfig(),
       concurrency,
       limiter: {
-        max: 30,
-        duration: 10000, // max 30 messages per 10s per worker
+        max: 20,
+        duration: 10000,
       },
     }
   );

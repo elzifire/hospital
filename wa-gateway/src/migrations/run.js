@@ -93,6 +93,29 @@ async function runMigrations() {
       CREATE INDEX IF NOT EXISTS idx_outreach_is_read ON outreach_messages(is_read);
     `);
 
+    // 5. wa_logs table
+    console.log('Creating table: wa_logs');
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS wa_logs (
+        id SERIAL PRIMARY KEY,
+        user_id BIGINT,
+        device_id INTEGER REFERENCES wa_devices(id) ON DELETE SET NULL,
+        broadcast_id INTEGER REFERENCES broadcasts(id) ON DELETE SET NULL,
+        type VARCHAR(50) NOT NULL DEFAULT 'system',  -- 'broadcast' | 'direct' | 'outreach' | 'device' | 'system' | 'auth'
+        level VARCHAR(20) NOT NULL DEFAULT 'info',    -- 'info' | 'warn' | 'error' | 'success'
+        action VARCHAR(100) NOT NULL,                -- 'MESSAGE_SENT', 'MESSAGE_FAILED', 'DEVICE_CONNECTED', etc.
+        recipient VARCHAR(50),                       -- target phone number if applicable
+        message TEXT,
+        details JSONB DEFAULT '{}'::jsonb,
+        ip_address VARCHAR(50),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+      CREATE INDEX IF NOT EXISTS idx_wa_logs_user_id ON wa_logs(user_id);
+      CREATE INDEX IF NOT EXISTS idx_wa_logs_device_id ON wa_logs(device_id);
+      CREATE INDEX IF NOT EXISTS idx_wa_logs_type ON wa_logs(type);
+      CREATE INDEX IF NOT EXISTS idx_wa_logs_created_at ON wa_logs(created_at);
+    `);
+
     await client.query('COMMIT');
     console.log('✅ Migrations completed successfully!');
   } catch (error) {
