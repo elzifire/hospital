@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - WhatsApp Gateway</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/css/app.css">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              100: '#dcfce7',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d',
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col">
+
+  <!-- Top Navbar -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white shadow-md shadow-emerald-200">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+          </svg>
+        </div>
+        <div>
+          <h1 class="text-base font-bold text-slate-800 leading-tight">WA Gateway</h1>
+          <p class="text-xs text-emerald-600 font-medium flex items-center space-x-1">
+            <span class="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
+            <span>Redis Queue & Multi-Provider Active</span>
+          </p>
+        </div>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="hidden md:flex items-center space-x-1 bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-semibold">
+        <button id="tabBtnDevices" onclick="switchTab('devices')" class="px-3.5 py-1.5 rounded-lg transition-all bg-white text-emerald-700 shadow-sm">
+          📱 Devices & Providers
+        </button>
+        <button id="tabBtnBroadcast" onclick="switchTab('broadcast')" class="px-3.5 py-1.5 rounded-lg transition-all text-slate-600 hover:text-slate-900">
+          🚀 Broadcast (Redis)
+        </button>
+        <button id="tabBtnOutreach" onclick="switchTab('outreach')" class="px-3.5 py-1.5 rounded-lg transition-all text-slate-600 hover:text-slate-900 flex items-center space-x-1">
+          <span>📥 Outreach Inbox</span>
+          <span id="unreadBadge" class="hidden px-1.5 py-0.2 bg-red-500 text-white rounded-full text-[10px]">0</span>
+        </button>
+        <button id="tabBtnDocs" onclick="switchTab('docs')" class="px-3.5 py-1.5 rounded-lg transition-all text-slate-600 hover:text-slate-900">
+          📖 Laravel Guide
+        </button>
+      </nav>
+
+      <!-- User Info & Logout -->
+      <div class="flex items-center space-x-3">
+        <div class="hidden sm:block text-right">
+          <p id="userName" class="text-xs font-bold text-slate-800">Admin</p>
+          <p id="userEmail" class="text-[11px] text-slate-400">admin@hospital.com</p>
+        </div>
+        <button onclick="logout()" title="Keluar" class="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all border border-slate-200">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Mobile Tab Bar -->
+  <div class="md:hidden bg-white border-b border-slate-200 px-4 py-2 flex space-x-2 overflow-x-auto text-xs font-semibold">
+    <button onclick="switchTab('devices')" class="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 whitespace-nowrap">📱 Devices</button>
+    <button onclick="switchTab('broadcast')" class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 whitespace-nowrap">🚀 Broadcast</button>
+    <button onclick="switchTab('outreach')" class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 whitespace-nowrap">📥 Outreach</button>
+    <button onclick="switchTab('docs')" class="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 whitespace-nowrap">📖 Laravel</button>
+  </div>
+
+  <!-- Main Content Container -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full">
+
+    <!-- ======================================================== -->
+    <!-- TAB 1: DEVICES & PROVIDERS -->
+    <!-- ======================================================== -->
+    <section id="tabDevices" class="space-y-6">
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-xl font-bold text-slate-800">Manajemen Device & Provider</h2>
+          <p class="text-xs text-slate-500 mt-0.5">Hubungkan sesi WhatsApp via Baileys (QR Code) atau API Gateway seperti Fonnte.</p>
+        </div>
+        <button onclick="openAddDeviceModal()" class="inline-flex items-center space-x-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-semibold rounded-xl shadow-md shadow-emerald-200 transition-all">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+          </svg>
+          <span>Tambah Device Baru</span>
+        </button>
+      </div>
+
+      <!-- Devices Grid -->
+      <div id="devicesContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <!-- Injected via JS -->
+      </div>
+    </section>
+
+    <!-- ======================================================== -->
+    <!-- TAB 2: BROADCAST CAMPAIGN (REDIS QUEUE) -->
+    <!-- ======================================================== -->
+    <section id="tabBroadcast" class="hidden space-y-6">
+      <!-- Metrics Overview -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+          <p class="text-xs font-medium text-slate-400">Total Kampanye</p>
+          <h3 id="statTotalCampaigns" class="text-2xl font-bold text-slate-800 mt-1">0</h3>
+        </div>
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+          <p class="text-xs font-medium text-slate-400">Total Pesan</p>
+          <h3 id="statTotalMessages" class="text-2xl font-bold text-slate-800 mt-1">0</h3>
+        </div>
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+          <p class="text-xs font-medium text-emerald-600">Berhasil Terkirim</p>
+          <h3 id="statTotalSent" class="text-2xl font-bold text-emerald-600 mt-1">0</h3>
+        </div>
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+          <p class="text-xs font-medium text-red-500">Gagal</p>
+          <h3 id="statTotalFailed" class="text-2xl font-bold text-red-500 mt-1">0</h3>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        <!-- New Campaign Form -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm lg:col-span-1">
+          <h3 class="text-sm font-bold text-slate-800 mb-4 flex items-center space-x-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+            <span>Buat Broadcast Baru</span>
+          </h3>
+
+          <form id="broadcastForm" class="space-y-4 text-xs">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Pilih Device Pengirim</label>
+              <select id="bcDeviceSelect" required class="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                <!-- Injected via JS -->
+              </select>
+            </div>
+
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Judul Kampanye</label>
+              <input type="text" id="bcTitle" required placeholder="Contoh: Pengingat Kontrol Pasien" class="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+            </div>
+
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Template Pesan</label>
+              <p class="text-[11px] text-slate-400 mb-1.5">Gunakan <code class="text-emerald-700 bg-emerald-50 px-1 rounded">{name}</code> untuk nama penerima.</p>
+              <textarea id="bcMessage" required rows="4" placeholder="Halo {name}, jadwal kontrol Anda di RS Harapan Sehat adalah besok..." class="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"></textarea>
+            </div>
+
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">URL Gambar / Media (Opsional)</label>
+              <input type="url" id="bcMediaUrl" placeholder="https://example.com/brosur.jpg" class="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+            </div>
+
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Daftar Penerima</label>
+              <p class="text-[11px] text-slate-400 mb-1.5">Format per baris: <code class="bg-slate-100 px-1 rounded">08123456789, Nama Pasien</code></p>
+              <textarea id="bcRecipients" required rows="5" placeholder="081234567890, Budi Santoso&#10;089876543210, Siti Rahma" class="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none font-mono"></textarea>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">Min Delay (ms)</label>
+                <input type="number" id="bcDelayMin" value="1500" class="w-full py-1.5 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+              </div>
+              <div>
+                <label class="block font-semibold text-slate-700 mb-1">Max Delay (ms)</label>
+                <input type="number" id="bcDelayMax" value="3500" class="w-full py-1.5 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+              </div>
+            </div>
+
+            <button type="submit" id="btnSubmitBc" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-semibold rounded-xl text-xs shadow-md shadow-emerald-200 transition-all flex items-center justify-center space-x-2">
+              <span>🚀 Masukkan ke Antrian Redis</span>
+            </button>
+          </form>
+        </div>
+
+        <!-- Campaign History & Live Queue Monitor -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm lg:col-span-2 space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-bold text-slate-800 flex items-center space-x-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-blue-500 animate-ping"></span>
+              <span>Live Campaign & Queue Monitor</span>
+            </h3>
+            <button onclick="loadBroadcasts()" class="text-xs text-slate-500 hover:text-emerald-600 flex items-center space-x-1">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+              </svg>
+              <span>Refresh</span>
+            </button>
+          </div>
+
+          <div id="broadcastsList" class="space-y-4">
+            <!-- Injected via JS -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================== -->
+    <!-- TAB 3: OUTREACH INBOX (PESAN BALASAN & WEBHOOK) -->
+    <!-- ======================================================== -->
+    <section id="tabOutreach" class="hidden space-y-6">
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-xl font-bold text-slate-800">Inbox Outreach (Pesan Masuk)</h2>
+          <p class="text-xs text-slate-500 mt-0.5">Tangkap pesan balasan dari user / pasien, teruskan otomatis ke Laravel Webhook.</p>
+        </div>
+        <div class="flex items-center space-x-2">
+          <select id="outreachDeviceFilter" onchange="loadOutreachMessages()" class="py-1.5 px-3 bg-white border border-slate-200 rounded-xl text-xs text-slate-700">
+            <option value="">Semua Device</option>
+          </select>
+          <button onclick="loadOutreachMessages()" class="p-2 bg-white border border-slate-200 rounded-xl text-slate-500 hover:text-emerald-600">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Messages Table / List -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-slate-600">
+            <thead class="bg-slate-50 text-slate-400 uppercase font-semibold border-b border-slate-100 text-[10px] tracking-wider">
+              <tr>
+                <th class="py-3 px-4">Pengirim</th>
+                <th class="py-3 px-4">Device</th>
+                <th class="py-3 px-4">Isi Pesan</th>
+                <th class="py-3 px-4">Waktu</th>
+                <th class="py-3 px-4">Webhook Laravel</th>
+                <th class="py-3 px-4 text-right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="outreachMessagesTable" class="divide-y divide-slate-100">
+              <!-- Injected via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================== -->
+    <!-- TAB 4: LARAVEL INTEGRATION GUIDE -->
+    <!-- ======================================================== -->
+    <section id="tabDocs" class="hidden space-y-6">
+      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+        <h2 class="text-lg font-bold text-slate-800 mb-2">Panduan Integrasi dengan Laravel</h2>
+        <p class="text-xs text-slate-500 mb-6">WA Gateway ini siap dihubungkan langsung dengan backend Laravel Anda melalui HTTP Client atau Guzzle.</p>
+
+        <div class="space-y-6 text-xs text-slate-700">
+          <!-- Snippet 1 -->
+          <div>
+            <h3 class="font-bold text-slate-800 text-sm mb-1.5">1. Kirim Pesan / Broadcast dari Laravel</h3>
+            <p class="text-slate-500 mb-2">Gunakan endpoint <code class="bg-slate-100 text-emerald-700 px-1 py-0.5 rounded font-mono">POST /api/broadcasts</code>:</p>
+            <pre class="bg-slate-900 text-slate-100 p-4 rounded-xl font-mono text-[11px] overflow-x-auto leading-relaxed">
+use Illuminate\Support\Facades\Http;
+
+$response = Http::withToken($jwtToken)->post('http://localhost:3000/api/broadcasts', [
+    'device_id' => 1,
+    'title' => 'Pengingat Obat Pasien',
+    'message' => 'Halo {name}, mohon jangan lupa minum obat sesuai resep dokter.',
+    'recipients' => [
+        ['phone_number' => '08123456789', 'name' => 'Ahmad'],
+        ['phone_number' => '08987654321', 'name' => 'Dewi'],
+    ],
+    'delay_min_ms' => 1500,
+    'delay_max_ms' => 3000,
+]);
+            </pre>
+          </div>
+
+          <!-- Snippet 2 -->
+          <div>
+            <h3 class="font-bold text-slate-800 text-sm mb-1.5">2. Menangkap Webhook Pesan Masuk (Outreach) di Laravel</h3>
+            <p class="text-slate-500 mb-2">Buat route di <code class="bg-slate-100 text-slate-800 px-1 py-0.5 rounded font-mono">routes/api.php</code> Laravel untuk menerima payload saat pasien membalas:</p>
+            <pre class="bg-slate-900 text-slate-100 p-4 rounded-xl font-mono text-[11px] overflow-x-auto leading-relaxed">
+Route::post('/wa/webhook', function (\Illuminate\Http\Request $request) {
+    $sender = $request->input('from');
+    $name = $request->input('sender_name');
+    $message = $request->input('message');
+
+    \Log::info("Pesan masuk dari {$sender} ({$name}): {$message}");
+
+    // Logika balasan otomatis / simpan ke chat pasien
+    return response()->json(['status' => 'success']);
+});
+            </pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ======================================================== -->
+  <!-- MODALS -->
+  <!-- ======================================================== -->
+
+  <!-- Modal: Add Device -->
+  <div id="addDeviceModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-base font-bold text-slate-800">Tambah Device Baru</h3>
+        <button onclick="closeModal('addDeviceModal')" class="text-slate-400 hover:text-slate-600">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+
+      <form id="addDeviceForm" class="space-y-4 text-xs">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Nama Device</label>
+          <input type="text" id="newDevName" required placeholder="Contoh: WhatsApp CS Rumah Sakit" class="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Pilih Provider</label>
+          <select id="newDevProvider" onchange="toggleProviderConfig()" class="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+            <option value="baileys">WhatsApp Socket Direct (@whiskeysockets/baileys)</option>
+            <option value="fonnte">Fonnte Gateway API (API Token)</option>
+          </select>
+        </div>
+
+        <div id="fonnteConfigFields" class="hidden space-y-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
+          <label class="block font-semibold text-slate-700">Fonnte API Token</label>
+          <input type="text" id="newDevFonnteToken" placeholder="Masukkan token Fonnte..." class="w-full py-2 px-3 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Laravel Webhook URL (Opsional)</label>
+          <input type="url" id="newDevWebhook" placeholder="http://localhost:8000/api/wa/webhook" class="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+        </div>
+
+        <div class="flex justify-end space-x-2 pt-2">
+          <button type="button" onclick="closeModal('addDeviceModal')" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold">Batal</button>
+          <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold">Simpan Device</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Live QR Code Scanner -->
+  <div id="qrModal" class="hidden fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-6 text-center shadow-2xl border border-slate-100">
+      <div class="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg>
+      </div>
+
+      <h3 class="text-base font-bold text-slate-800" id="qrModalDeviceName">Scan QR Code WhatsApp</h3>
+      <p class="text-xs text-slate-500 mt-1 mb-4">Buka WhatsApp di HP ➔ Perangkat Tertaut ➔ Tautkan Perangkat.</p>
+
+      <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 inline-block mb-4">
+        <div id="qrContainer" class="w-56 h-56 flex items-center justify-center">
+          <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+        </div>
+      </div>
+
+      <p id="qrStatusText" class="text-xs font-semibold text-emerald-600 animate-pulse">Menunggu Scan...</p>
+
+      <div class="mt-4">
+        <button onclick="closeQrModal()" class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold">Tutup</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Test Message -->
+  <div id="testMsgModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-base font-bold text-slate-800">Kirim Pesan Tes</h3>
+        <button onclick="closeModal('testMsgModal')" class="text-slate-400 hover:text-slate-600">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+
+      <form id="testMsgForm" class="space-y-4 text-xs">
+        <input type="hidden" id="testDeviceId">
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Nomor Tujuan</label>
+          <input type="text" id="testTo" required placeholder="08123456789" class="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Pesan</label>
+          <textarea id="testMsg" required rows="3" class="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none">Halo! Ini adalah pesan tes dari WA Gateway Hospital.</textarea>
+        </div>
+        <div class="flex justify-end space-x-2 pt-2">
+          <button type="button" onclick="closeModal('testMsgModal')" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold">Batal</button>
+          <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold">Kirim Sekarang</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Quick Reply Outreach -->
+  <div id="replyModal" class="hidden fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-base font-bold text-slate-800">Balas Pesan Pasien</h3>
+        <button onclick="closeModal('replyModal')" class="text-slate-400 hover:text-slate-600">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+
+      <form id="replyForm" class="space-y-4 text-xs">
+        <input type="hidden" id="replyMessageId">
+        <div>
+          <p class="text-slate-500 mb-1">Kepada: <strong id="replyToLabel" class="text-slate-800"></strong></p>
+          <div id="replyOriginalMsg" class="p-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-600 italic"></div>
+        </div>
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">Pesan Balasan</label>
+          <textarea id="replyText" required rows="4" placeholder="Tuliskan balasan Anda..." class="w-full py-2 px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"></textarea>
+        </div>
+        <div class="flex justify-end space-x-2 pt-2">
+          <button type="button" onclick="closeModal('replyModal')" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-semibold">Batal</button>
+          <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold">Kirim Balasan</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="/js/auth.js"></script>
+  <script src="/js/devices.js"></script>
+  <script src="/js/broadcast.js"></script>
+  <script src="/js/outreach.js"></script>
+</body>
+</html>

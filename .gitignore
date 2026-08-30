@@ -1,2 +1,7 @@
 doc/RUMAH SAKIT BHAYANGKARA BOGOR.docx
 doc/RUMAH SAKIT BHAYANGKARA BOGOR.pdf
+
+# wa-gateway/.env
+wa-gateway/.env
+wa-gateway/node_modules/
+wa-gateway/wa_auth/*
