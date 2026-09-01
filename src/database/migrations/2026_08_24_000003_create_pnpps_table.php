@@ -15,6 +15,11 @@ return new class extends Migration
             $table->id();
             $table->string('nama');
             $table->string('nip')->unique()->nullable();
+            $table->string('status_kepegawaian')->nullable()->comment('Anggota Polri, PNS, TNI, ASN Polri');
+            $table->string('pangkat')->nullable();
+            $table->string('jabatan')->nullable();
+            $table->string('email')->nullable();
+            
             $table->string('no_bpjs')->unique()->nullable();
             $table->foreignId('satker_id')->nullable()->constrained('satkers')->nullOnDelete();
             $table->string('no_hp')->nullable();
