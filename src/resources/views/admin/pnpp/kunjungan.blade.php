@@ -33,8 +33,8 @@
                     <p class="font-mono text-xs text-slate-400">{{ $pnpp->nip ?? 'NIP —' }}</p>
 
                     <div class="mt-2.5 flex flex-wrap items-center justify-center gap-1.5">
-                        <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold capitalize ring-1 ring-inset {{ $pnpp->jenis_kelamin === 'L' ? 'bg-sky-50 text-sky-700 ring-sky-600/20' : 'bg-rose-50 text-rose-700 ring-rose-600/20' }}">
-                            {{ $pnpp->jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan' }}
+                        <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold capitalize ring-1 ring-inset {{ $pnpp->jenis_kelamin === 'L' ? 'bg-sky-50 text-sky-700 ring-sky-600/20' : ($pnpp->jenis_kelamin === 'P' ? 'bg-rose-50 text-rose-700 ring-rose-600/20' : 'bg-slate-100 text-slate-500 ring-slate-300') }}">
+                            {{ $pnpp->jenis_kelamin === 'L' ? 'Laki-laki' : ($pnpp->jenis_kelamin === 'P' ? 'Perempuan' : '—') }}
                         </span>
                         @if ($pnpp->usia !== null)
                             <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600">{{ $pnpp->usia }} tahun</span>

@@ -45,12 +45,12 @@
     {{-- ===== Status Import (dari queue) ===== --}}
     @if ($status)
         @php $s = $status; @endphp
-        @if (in_array($s['status'], ['pending', 'processing'], true))
+        @if (in_array($s['status'], ['pending', 'processing', 'preview_pending', 'preview_processing'], true))
             <div class="flex items-center gap-4 rounded-2xl bg-sky-50 p-5 ring-1 ring-sky-200">
                 <svg class="h-8 w-8 animate-spin text-sky-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                 <div>
-                    <p class="text-sm font-bold text-sky-800">Import sedang diproses...</p>
-                    <p class="text-xs text-sky-600">Data sedang diimport lewat queue (Redis). Halaman ini akan diperbarui otomatis.</p>
+                    <p class="text-sm font-bold text-sky-800">Sedang diproses...</p>
+                    <p class="text-xs text-sky-600">Data sedang diproses lewat queue (Redis). Halaman ini akan diperbarui otomatis.</p>
                 </div>
             </div>
         @elseif ($s['status'] === 'completed')
@@ -83,11 +83,11 @@
                     </div>
                 @endif
             </div>
-        @elseif ($s['status'] === 'failed')
+        @elseif (in_array($s['status'], ['failed', 'preview_failed'], true))
             <div class="flex items-start gap-3 rounded-2xl bg-rose-50 p-5 ring-1 ring-rose-200">
                 <svg class="mt-0.5 h-5 w-5 flex-shrink-0 text-rose-500" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>
                 <div>
-                    <p class="text-sm font-bold text-rose-800">Import gagal</p>
+                    <p class="text-sm font-bold text-rose-800">Proses gagal</p>
                     <p class="mt-0.5 text-xs text-rose-600">{{ $s['message'] ?? 'Terjadi kesalahan.' }}</p>
                 </div>
             </div>
@@ -144,6 +144,7 @@
                                                         <template x-for="opt in fieldOptions(h)" :key="opt">
                                                             <option :value="opt" x-text="opt"></option>
                                                         </template>
+                                                        <option x-show="rows[i].values[h] && !fieldOptions(h).includes(rows[i].values[h])" :value="rows[i].values[h]" x-text="rows[i].values[h]"></option>
                                                     </select>
                                                 </template>
 
@@ -314,7 +315,7 @@
                 this.rows[i].values[h] = this.splitTags(this.rows[i].values[h]).filter(t => t !== tag).join(', ');
             },
             cellInvalid(i, h) {
-                if (h !== 'NIP' && h !== 'No. BPJS') return false;
+                if (h !== 'No. BPJS') return false;
                 const v = (this.rows[i].values[h] || '').trim();
                 return v !== '' && !/^\d+$/.test(v);
             },
@@ -358,7 +359,7 @@
     </script>
 @endif
 
-@if ($status && in_array($status['status'], ['pending', 'processing'], true))
+@if ($status && in_array($status['status'], ['pending', 'processing', 'preview_pending', 'preview_processing'], true))
     <script>setTimeout(() => window.location.reload(), 3000);</script>
 @endif
 @endsection

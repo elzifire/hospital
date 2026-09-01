@@ -37,6 +37,7 @@ class ImportMasterJob implements ShouldQueue
         $config = MasterRegistry::config($this->entity);
         $modelClass = $config['model'];
         $sync = $config['sync'] ?? null;
+        $resolve = $config['resolve'] ?? null;
 
         $path = "imports/{$this->token}.rows.json";
 
@@ -72,6 +73,10 @@ class ImportMasterJob implements ShouldQueue
                     continue;
                 }
 
+                if ($resolve !== null) {
+                    $result = $resolve($result);
+                }
+
                 try {
                     $model = $modelClass::updateOrCreate($result['unique'], $result['data']);
 
@@ -96,6 +101,12 @@ class ImportMasterJob implements ShouldQueue
             }
 
             Storage::disk('local')->delete($path);
+
+            foreach (Storage::disk('local')->files('imports') as $file) {
+                if (str_starts_with(basename($file), $this->token . '.')) {
+                    Storage::disk('local')->delete($file);
+                }
+            }
 
             $this->setStatus([
                 'status'  => 'completed',

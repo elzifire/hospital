@@ -128,7 +128,8 @@ Setiap entitas data master memiliki halaman **Import** dan **Export** tersendiri
 - `satker`, `penyakit`, `poli` → kode (opsional) + nama (wajib).
 - `dokter` → nama (wajib) + poli (nama, harus sudah ada) + spesialisasi (opsional).
 - `jadwal` → dokter (nama, harus sudah ada) + hari (Senin–Minggu) + jam mulai/selesai (`HH:mm`).
-- `pnpp` → nama (wajib) + NIP/No. BPJS (opsional, unik) + satker (nama) + penyakit kronis (dipisah koma).
+- `pnpp` → nama & NIP/NRP (wajib; NIP/NRP menjadi kunci unik, bila sama datanya diperbarui) + status kepegawaian, pangkat, jabatan, satker (nama — otomatis dibuat bila belum ada), satuan kerja, bagian, email, alamat, No. BPJS (13 digit), No. HP, tanggal lahir, jenis kelamin (boleh kosong), status aktif, dan penyakit kronis (dipisah koma).
+- NIP/NRP diterima sebagai teks bebas (tidak dinormalkan ke digit); No. BPJS otomatis dinormalkan ke 13 digit (notasi ilmiah/float Excel ikut dikonversi); No. HP dinormalkan ke format `08…`.
 
 ## Struktur Direktori
 

@@ -59,14 +59,22 @@ class MasterRegistry
 
         return match ($entity) {
             'pnpp' => [
-                'Nama'            => $text,
-                'NIP'             => $text,
-                'No. BPJS'        => $text,
-                'Satker'          => $select(Satker::orderBy('nama')->pluck('nama')->all()),
-                'No. HP'          => $text,
-                'Tanggal Lahir'   => $text,
-                'Jenis Kelamin'   => $select(['L', 'P']),
-                'Penyakit Kronis' => $multi(PenyakitKronis::orderBy('nama')->pluck('nama')->all()),
+                'Nama'               => $text,
+                'NIP/NRP'            => $text,
+                'Status Kepegawaian' => $select(['Anggota Polri', 'PNS', 'TNI', 'ASN Polri']),
+                'Pangkat'            => $text,
+                'Jabatan'            => $text,
+                'Satker'             => $select(Satker::orderBy('nama')->pluck('nama')->all()),
+                'Satuan Kerja'       => $text,
+                'Bagian'             => $text,
+                'Email'              => $text,
+                'Alamat'             => $text,
+                'No. BPJS'           => $text,
+                'No. HP'             => $text,
+                'Tanggal Lahir'      => $text,
+                'Jenis Kelamin'      => $select(['L', 'P']),
+                'Status Aktif'       => $select(['aktif', 'nonaktif']),
+                'Penyakit Kronis'    => $multi(PenyakitKronis::orderBy('nama')->pluck('nama')->all()),
             ],
             'dokter' => [
                 'Nama'         => $text,
@@ -149,19 +157,28 @@ class MasterRegistry
                 'label'   => 'PNPP',
                 'model'   => Pnpp::class,
                 'eager'   => ['satker', 'penyakit'],
-                'headers' => ['Nama', 'NIP', 'No. BPJS', 'Satker', 'No. HP', 'Tanggal Lahir', 'Jenis Kelamin', 'Penyakit Kronis'],
-                'sample'  => ['Budi Santoso', '198501012010011001', '0001234567890', 'Dinas Kesehatan', '081234567890', '1985-01-01', 'L', 'Hipertensi, Diabetes Melitus'],
+                'headers' => ['Nama', 'NIP/NRP', 'Status Kepegawaian', 'Pangkat', 'Jabatan', 'Satker', 'Satuan Kerja', 'Bagian', 'Email', 'Alamat', 'No. BPJS', 'No. HP', 'Tanggal Lahir', 'Jenis Kelamin', 'Status Aktif', 'Penyakit Kronis'],
+                'sample'  => ['Budi Santoso', '198501012010011001', 'Anggota Polri', 'Bripka', 'Bintara', 'Dinas Kesehatan', 'Dinas Kesehatan', 'Bagian Umum', 'budi@contoh.id', 'Jl. Merdeka No. 1', '0001234567890', '081234567890', '1985-01-01', 'L', 'aktif', 'Hipertensi, Diabetes Melitus'],
                 'toRow'   => fn (Pnpp $m) => [
                     $m->nama,
                     $m->nip ?? '',
-                    $m->no_bpjs ?? '',
+                    $m->status_kepegawaian ?? '',
+                    $m->pangkat ?? '',
+                    $m->jabatan ?? '',
                     $m->satker?->nama ?? '',
+                    $m->satuan_kerja ?? '',
+                    $m->bagian ?? '',
+                    $m->email ?? '',
+                    $m->alamat ?? '',
+                    $m->no_bpjs ?? '',
                     $m->no_hp ?? '',
                     $m->tanggal_lahir?->format('Y-m-d') ?? '',
-                    $m->jenis_kelamin,
+                    $m->jenis_kelamin ?? '',
+                    $m->status_aktif ?? 'aktif',
                     $m->penyakit->pluck('nama')->implode(', '),
                 ],
                 'parse'   => fn (array $r) => self::parsePnpp($r),
+                'resolve' => fn (array $result) => self::resolvePnppSatker($result),
                 'sync'    => fn (Pnpp $model, array $relations) => $model->penyakit()->sync($relations['penyakit'] ?? []),
             ],
         ];
@@ -271,44 +288,51 @@ class MasterRegistry
     private static function parsePnpp(array $row): array
     {
         $nama        = self::field($row, 'Nama');
-        $nip         = self::field($row, 'NIP');
-        $noBpjs      = self::field($row, 'No. BPJS');
+        $nip         = self::field($row, 'NIP/NRP');
+        $statusKep   = self::field($row, 'Status Kepegawaian');
+        $pangkat     = self::field($row, 'Pangkat');
+        $jabatan     = self::field($row, 'Jabatan');
         $satkerName  = self::field($row, 'Satker');
-        $noHp        = self::field($row, 'No. HP');
+        $satuanKerja = self::field($row, 'Satuan Kerja');
+        $bagian      = self::field($row, 'Bagian');
+        $email       = self::field($row, 'Email');
+        $alamat      = self::field($row, 'Alamat');
+        $noBpjs      = self::normalizeDigits(self::field($row, 'No. BPJS'));
+        $noHp        = self::normalizePhone(self::field($row, 'No. HP'));
         $tglLahir    = self::normalizeDate(self::field($row, 'Tanggal Lahir'));
         $jk          = self::normalizeJk(self::field($row, 'Jenis Kelamin'));
+        $statusAktif = self::field($row, 'Status Aktif');
         $penyakitRaw = self::field($row, 'Penyakit Kronis');
         $errors      = [];
-
-        $satkerId = null;
 
         if ($nama === '') {
             $errors[] = 'Nama wajib diisi';
         }
 
+        if ($nip === '') {
+            $errors[] = 'NIP/NRP wajib diisi';
+        }
+
+        $satkerId = null;
         if ($satkerName !== '') {
             $satker = Satker::where('nama', $satkerName)->first();
-            if (! $satker) {
-                $errors[] = "Satker \"{$satkerName}\" tidak ditemukan";
-            } else {
+            if ($satker) {
                 $satkerId = $satker->id;
             }
+        }
+
+        $finalSatuanKerja = $satuanKerja !== '' ? $satuanKerja : ($satkerName !== '' ? $satkerName : null);
+
+        if ($email !== '' && ! filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $errors[] = 'Email tidak valid';
         }
 
         if (self::field($row, 'Tanggal Lahir') !== '' && $tglLahir === null) {
             $errors[] = 'Tanggal Lahir tidak valid (format YYYY-MM-DD)';
         }
 
-        if ($jk === null) {
-            $errors[] = 'Jenis Kelamin tidak valid (gunakan L atau P)';
-        }
-
-        if ($nip !== '' && ! preg_match('/^\d{18}$/', $nip)) {
-            $errors[] = 'NIP harus 18 digit angka (pastikan kolom NIP di Excel berformat Text, bukan angka/notasi ilmiah)';
-        }
-
-        if ($noBpjs !== '' && ! preg_match('/^\d{13}$/', $noBpjs)) {
-            $errors[] = 'No. BPJS harus 13 digit angka (pastikan kolom No. BPJS di Excel berformat Text)';
+        if ($noBpjs !== null && strlen($noBpjs) !== 13) {
+            $errors[] = 'No. BPJS harus 13 digit angka (pastikan kolom berformat Text, bukan angka/notasi ilmiah)';
         }
 
         $penyakitIds = [];
@@ -322,24 +346,46 @@ class MasterRegistry
             }
         }
 
-        $unique = $nip !== ''
-            ? ['nip' => $nip]
-            : ($noBpjs !== '' ? ['no_bpjs' => $noBpjs] : ['nama' => $nama, 'tanggal_lahir' => $tglLahir]);
+        $statusAktifValue = in_array($statusAktif, ['aktif', 'nonaktif'], true) ? $statusAktif : 'aktif';
 
         return [
             'data'      => [
-                'nama'          => $nama,
-                'nip'           => $nip !== '' ? $nip : null,
-                'no_bpjs'       => $noBpjs !== '' ? $noBpjs : null,
-                'satker_id'     => $satkerId,
-                'no_hp'         => $noHp !== '' ? $noHp : null,
-                'tanggal_lahir' => $tglLahir,
-                'jenis_kelamin' => $jk,
+                'nama'               => $nama,
+                'nip'                => $nip !== '' ? $nip : null,
+                'status_kepegawaian' => $statusKep !== '' ? $statusKep : null,
+                'pangkat'            => $pangkat !== '' ? $pangkat : null,
+                'jabatan'            => $jabatan !== '' ? $jabatan : null,
+                'satuan_kerja'       => $finalSatuanKerja,
+                'bagian'             => $bagian !== '' ? $bagian : null,
+                'email'              => $email !== '' ? $email : null,
+                'alamat'             => $alamat !== '' ? $alamat : null,
+                'no_bpjs'            => $noBpjs,
+                'satker_id'          => $satkerId,
+                'no_hp'              => $noHp,
+                'tanggal_lahir'      => $tglLahir,
+                'jenis_kelamin'      => $jk,
+                'status_aktif'       => $statusAktifValue,
             ],
-            'unique'    => $unique,
-            'relations' => ['penyakit' => $penyakitIds],
+            'unique'    => ['nip' => $nip],
+            'relations' => ['penyakit' => $penyakitIds, 'satker_name' => $satkerName],
             'errors'    => $errors,
         ];
+    }
+
+    private static function resolvePnppSatker(array $result): array
+    {
+        $name = $result['relations']['satker_name'] ?? null;
+
+        if ($name !== null && $name !== '') {
+            $satker = Satker::firstOrCreate(['nama' => $name], ['nama' => $name]);
+            $result['data']['satker_id'] = $satker->id;
+
+            if (empty($result['data']['satuan_kerja'])) {
+                $result['data']['satuan_kerja'] = $name;
+            }
+        }
+
+        return $result;
     }
 
     // ------------------------------------------------------------------
@@ -396,5 +442,47 @@ class MasterRegistry
             in_array($value, ['p', 'pr', 'perempuan', 'wanita', 'female', 'f'], true) => 'P',
             default => null,
         };
+    }
+
+    /**
+     * Normalisasi nilai numerik (NIP/NRP, No. BPJS) menjadi string digit murni.
+     * Menangani notasi ilmiah (E+) & float dari Excel secara best-effort.
+     */
+    public static function normalizeDigits(?string $value): ?string
+    {
+        $value = trim((string) $value);
+        if ($value === '') {
+            return null;
+        }
+
+        if (stripos($value, 'e') !== false) {
+            $value = sprintf('%.0f', (float) $value);
+        } elseif (is_numeric($value) && str_contains($value, '.')) {
+            $value = sprintf('%.0f', (float) $value);
+        }
+
+        $digits = preg_replace('/\D/', '', $value);
+
+        return $digits !== '' ? $digits : null;
+    }
+
+    /**
+     * Normalisasi nomor telepon: strip non-digit, ubah 62… menjadi 0…,
+     * dan pastikan diawali 0.
+     */
+    public static function normalizePhone(?string $value): ?string
+    {
+        $digits = self::normalizeDigits($value);
+        if ($digits === null) {
+            return null;
+        }
+
+        if (str_starts_with($digits, '62')) {
+            $digits = '0' . substr($digits, 2);
+        } elseif (! str_starts_with($digits, '0')) {
+            $digits = '0' . $digits;
+        }
+
+        return $digits;
     }
 }

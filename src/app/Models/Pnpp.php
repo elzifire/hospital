@@ -12,11 +12,19 @@ class Pnpp extends Model
     protected $fillable = [
         'nama',
         'nip',
+        'status_kepegawaian',
+        'pangkat',
+        'jabatan',
+        'satuan_kerja',
+        'bagian',
+        'email',
+        'alamat',
         'no_bpjs',
         'satker_id',
         'no_hp',
         'tanggal_lahir',
         'jenis_kelamin',
+        'status_aktif',
     ];
 
     protected function casts(): array

@@ -18,13 +18,16 @@ return new class extends Migration
             $table->string('status_kepegawaian')->nullable()->comment('Anggota Polri, PNS, TNI, ASN Polri');
             $table->string('pangkat')->nullable();
             $table->string('jabatan')->nullable();
+            $table->string('satuan_kerja')->nullable();
+            $table->string('bagian')->nullable()->comment('Bagian/Departemen/Unit');
             $table->string('email')->nullable();
-            
+            $table->string('alamat')->nullable();
             $table->string('no_bpjs')->unique()->nullable();
             $table->foreignId('satker_id')->nullable()->constrained('satkers')->nullOnDelete();
             $table->string('no_hp')->nullable();
             $table->date('tanggal_lahir')->nullable();
-            $table->enum('jenis_kelamin', ['L', 'P']);
+            $table->enum('jenis_kelamin', ['L', 'P'])->nullable()->comment('L = Laki-laki, P = Perempuan');
+            $table->enum('status_aktif', ['aktif', 'nonaktif'])->default('aktif')->comment('aktif, nonaktif');
             $table->timestamps();
         });
     }

@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\ImportMasterJob;
+use App\Jobs\PreviewImportJob;
 use App\Support\MasterRegistry;
-use App\Support\SheetHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
@@ -20,82 +20,53 @@ class MasterImportController extends Controller
     {
         $this->resolve($entity);
 
-        $status = null;
-        $token  = session('import_token');
+        $status  = null;
+        $preview = null;
+        $token   = session('import_token');
 
         if ($token && Cache::has(ImportMasterJob::cacheKey($token))) {
             $status = Cache::get(ImportMasterJob::cacheKey($token));
         }
 
+        if ($token
+            && ($status['status'] ?? null) === 'preview_ready'
+            && Storage::disk('local')->exists("imports/{$token}.preview.json")) {
+            $preview = json_decode(Storage::disk('local')->get("imports/{$token}.preview.json"), true);
+        }
+
         return view('admin.import.index', [
             'entity'  => $entity,
             'config'  => MasterRegistry::config($entity),
-            'preview' => null,
-            'token'   => null,
+            'preview' => $preview,
+            'token'   => $preview ? $token : null,
             'status'  => $status,
         ]);
     }
 
     /**
-     * Upload file (xlsx/xls/csv), lalu tampilkan preview yang bisa diedit.
+     * Upload file (xlsx/xls/csv) → parsing/pratinjau diproses di background (queue).
      */
     public function upload(string $entity, Request $request)
     {
         $this->resolve($entity);
-        $config = MasterRegistry::config($entity);
 
         $request->validate([
             'file' => ['required', 'file', 'mimes:xlsx,xls,csv,txt', 'max:4096'],
         ]);
 
         $token = (string) Str::uuid();
+        $ext   = strtolower($request->file('file')->getClientOriginalExtension()) ?: 'xlsx';
 
-        $parsed = SheetHelper::readToRows($request->file('file')->getRealPath());
+        $request->file('file')->storeAs('imports', "{$token}.{$ext}", 'local');
 
-        // Validasi header harus sama persis dengan template.
-        $missing = array_diff($config['headers'], $parsed['headers']);
-        $extra   = array_diff($parsed['headers'], $config['headers']);
+        Cache::put(ImportMasterJob::cacheKey($token), ['status' => 'preview_pending'], now()->addHours(2));
+        PreviewImportJob::dispatch($entity, $token, $ext);
 
-        if ($missing !== [] || $extra !== []) {
-            return redirect()
-                ->route('admin.master.import', $entity)
-                ->withErrors(['file' => 'Format kolom tidak sesuai. Unduh template untuk melihat susunan kolom yang benar.']);
-        }
+        session(['import_token' => $token]);
 
-        $valid = 0;
-        $invalid = 0;
-        $previewRows = [];
-
-        foreach ($parsed['rows'] as $i => $row) {
-            $result = ($config['parse'])($row);
-            $ok = empty($result['errors']);
-            $ok ? $valid++ : $invalid++;
-
-            $values = [];
-            foreach ($config['headers'] as $header) {
-                $values[$header] = $row[$header] ?? '';
-            }
-
-            $previewRows[] = [
-                'values' => $values,
-                'errors' => $result['errors'],
-            ];
-        }
-
-        $preview = [
-            'total'   => $valid + $invalid,
-            'valid'   => $valid,
-            'invalid' => $invalid,
-            'rows'    => $previewRows,
-        ];
-
-        return view('admin.import.index', [
-            'entity'  => $entity,
-            'config'  => $config,
-            'preview' => $preview,
-            'token'   => $token,
-            'status'  => null,
-        ]);
+        return redirect()
+            ->route('admin.master.import', $entity)
+            ->with('success', 'Pratinjau sedang diproses di background (queue). Halaman ini akan diperbarui otomatis.');
     }
 
     /**
@@ -135,7 +106,11 @@ class MasterImportController extends Controller
 
         $token = $request->input('token');
         if ($token) {
-            Storage::disk('local')->delete("imports/{$token}.rows.json");
+            foreach (Storage::disk('local')->files('imports') as $file) {
+                if (str_starts_with(basename($file), $token . '.')) {
+                    Storage::disk('local')->delete($file);
+                }
+            }
         }
 
         session()->forget('import_token');

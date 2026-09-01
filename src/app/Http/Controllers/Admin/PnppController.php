@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Pnpp;
 use App\Models\PenyakitKronis;
 use App\Models\Satker;
+use App\Support\MasterRegistry;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -14,19 +15,48 @@ class PnppController extends Controller
     /**
      * Daftar data PNPP.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $pnpps = Pnpp::with('satker', 'penyakit', 'latestKunjungan')
-            ->withCount('kunjungans')
-            ->orderBy('nama')
-            ->get();
+        $query = Pnpp::with('satker', 'penyakit', 'latestKunjungan')
+            ->withCount('kunjungans');
 
         $counts = [
-            'total'     => $pnpps->count(),
-            'laki'      => $pnpps->where('jenis_kelamin', 'L')->count(),
-            'perempuan' => $pnpps->where('jenis_kelamin', 'P')->count(),
-            'kronis'    => $pnpps->filter(fn (Pnpp $p) => $p->penyakit->isNotEmpty())->count(),
+            'total'     => Pnpp::count(),
+            'laki'      => Pnpp::where('jenis_kelamin', 'L')->count(),
+            'perempuan' => Pnpp::where('jenis_kelamin', 'P')->count(),
+            'kronis'    => Pnpp::whereHas('penyakit')->count(),
         ];
+
+        if ($search = $request->query('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('nama', 'like', "%{$search}%")
+                    ->orWhere('nip', 'like', "%{$search}%")
+                    ->orWhere('no_bpjs', 'like', "%{$search}%");
+            });
+        }
+
+        if ($satker = $request->query('satker')) {
+            $query->where('satker_id', $satker);
+        }
+
+        if ($jk = $request->query('jk')) {
+            $query->where('jenis_kelamin', $jk);
+        }
+
+        if ($request->query('kronis') === 'yes') {
+            $query->whereHas('penyakit');
+        } elseif ($request->query('kronis') === 'no') {
+            $query->whereDoesntHave('penyakit');
+        }
+
+        match ($request->query('sort', 'az')) {
+            'za'     => $query->orderByDesc('nama'),
+            'newest' => $query->orderByDesc('created_at'),
+            'oldest' => $query->orderBy('created_at'),
+            default  => $query->orderBy('nama'),
+        };
+
+        $pnpps = $query->paginate((int) $request->query('per_page', 10))->withQueryString();
 
         $satkers = Satker::orderBy('nama')->get();
 
@@ -115,16 +145,29 @@ class PnppController extends Controller
 
     private function validated(Request $request, ?Pnpp $pnpp = null): array
     {
+        $request->merge([
+            'no_bpjs' => MasterRegistry::normalizeDigits($request->input('no_bpjs')),
+            'no_hp'   => MasterRegistry::normalizePhone($request->input('no_hp')),
+        ]);
+
         return $request->validate([
-            'nama'          => ['required', 'string', 'max:255'],
-            'nip'           => ['nullable', 'string', 'max:50', 'unique:pnpps,nip' . ($pnpp ? ',' . $pnpp->id : '')],
-            'no_bpjs'       => ['nullable', 'string', 'max:50', 'unique:pnpps,no_bpjs' . ($pnpp ? ',' . $pnpp->id : '')],
-            'satker_id'     => ['nullable', 'integer', 'exists:satkers,id'],
-            'no_hp'         => ['nullable', 'string', 'max:20'],
-            'tanggal_lahir' => ['nullable', 'date'],
-            'jenis_kelamin' => ['required', 'in:L,P'],
-            'penyakit'      => ['nullable', 'array'],
-            'penyakit.*'    => ['integer', 'exists:penyakit_kronis,id'],
+            'nama'               => ['required', 'string', 'max:255'],
+            'nip'                => ['nullable', 'string', 'max:50', 'unique:pnpps,nip' . ($pnpp ? ',' . $pnpp->id : '')],
+            'status_kepegawaian' => ['nullable', 'string', 'max:100'],
+            'pangkat'            => ['nullable', 'string', 'max:100'],
+            'jabatan'            => ['nullable', 'string', 'max:100'],
+            'satuan_kerja'       => ['nullable', 'string', 'max:255'],
+            'bagian'             => ['nullable', 'string', 'max:100'],
+            'email'              => ['nullable', 'string', 'email', 'max:255'],
+            'alamat'             => ['nullable', 'string', 'max:500'],
+            'no_bpjs'            => ['nullable', 'string', 'max:50', 'unique:pnpps,no_bpjs' . ($pnpp ? ',' . $pnpp->id : '')],
+            'satker_id'          => ['nullable', 'integer', 'exists:satkers,id'],
+            'no_hp'              => ['nullable', 'string', 'max:20'],
+            'tanggal_lahir'      => ['nullable', 'date'],
+            'jenis_kelamin'      => ['nullable', 'in:L,P'],
+            'status_aktif'       => ['nullable', 'in:aktif,nonaktif'],
+            'penyakit'           => ['nullable', 'array'],
+            'penyakit.*'         => ['integer', 'exists:penyakit_kronis,id'],
         ]);
     }
 }

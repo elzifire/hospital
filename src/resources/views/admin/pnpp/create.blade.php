@@ -47,6 +47,33 @@
                             </div>
 
                             <div>
+                                <label for="status_kepegawaian" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Status Kepegawaian</label>
+                                <select name="status_kepegawaian" id="status_kepegawaian" x-model="statusKepegawaian"
+                                        class="block w-full rounded-xl border-0 py-2.5 px-3.5 text-sm text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-inset focus:ring-sky-500 transition cursor-pointer @error('status_kepegawaian') ring-rose-300 focus:ring-rose-500 @enderror">
+                                    <option value="">— Pilih —</option>
+                                    <option value="Anggota Polri" @selected(old('status_kepegawaian') == 'Anggota Polri')>Anggota Polri</option>
+                                    <option value="PNS" @selected(old('status_kepegawaian') == 'PNS')>PNS</option>
+                                    <option value="TNI" @selected(old('status_kepegawaian') == 'TNI')>TNI</option>
+                                    <option value="ASN Polri" @selected(old('status_kepegawaian') == 'ASN Polri')>ASN Polri</option>
+                                </select>
+                                @error('status_kepegawaian')<p class="mt-1.5 text-xs font-medium text-rose-600">{{ $message }}</p>@enderror
+                            </div>
+
+                            <div>
+                                <label for="pangkat" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Pangkat</label>
+                                <input type="text" name="pangkat" id="pangkat" value="{{ old('pangkat') }}" x-model="pangkat" placeholder="cth. Bripka / III/c"
+                                       class="block w-full rounded-xl border-0 py-2.5 px-3.5 text-sm text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-sky-500 transition @error('pangkat') ring-rose-300 focus:ring-rose-500 @enderror">
+                                @error('pangkat')<p class="mt-1.5 text-xs font-medium text-rose-600">{{ $message }}</p>@enderror
+                            </div>
+
+                            <div>
+                                <label for="jabatan" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Jabatan</label>
+                                <input type="text" name="jabatan" id="jabatan" value="{{ old('jabatan') }}" x-model="jabatan" placeholder="cth. Bintara"
+                                       class="block w-full rounded-xl border-0 py-2.5 px-3.5 text-sm text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-sky-500 transition @error('jabatan') ring-rose-300 focus:ring-rose-500 @enderror">
+                                @error('jabatan')<p class="mt-1.5 text-xs font-medium text-rose-600">{{ $message }}</p>@enderror
+                            </div>
+
+                            <div>
                                 <label for="no_bpjs" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">No. BPJS</label>
                                 <input type="text" name="no_bpjs" id="no_bpjs" value="{{ old('no_bpjs') }}" x-model="noBpjs" placeholder="13 digit BPJS"
                                        class="block w-full rounded-xl border-0 py-2.5 px-3.5 text-sm text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-sky-500 transition @error('no_bpjs') ring-rose-300 focus:ring-rose-500 @enderror">
@@ -55,7 +82,7 @@
 
                             <div>
                                 <label for="satker_id" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Satker</label>
-                                <select name="satker_id" id="satker_id" x-model="satkerId"
+                                <select name="satker_id" id="satker_id" x-model="satkerId" @change="if (!satuanKerja) satuanKerja = satkerName"
                                         class="block w-full rounded-xl border-0 py-2.5 px-3.5 text-sm text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-inset focus:ring-sky-500 transition cursor-pointer @error('satker_id') ring-rose-300 focus:ring-rose-500 @enderror">
                                     <option value="">— Pilih Satker —</option>
                                     @foreach ($satkers as $satker)
@@ -66,10 +93,38 @@
                             </div>
 
                             <div>
+                                <label for="satuan_kerja" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Satuan Kerja</label>
+                                <input type="text" name="satuan_kerja" id="satuan_kerja" value="{{ old('satuan_kerja') }}" x-model="satuanKerja" placeholder="cth. Dinas Kesehatan"
+                                       class="block w-full rounded-xl border-0 py-2.5 px-3.5 text-sm text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-sky-500 transition @error('satuan_kerja') ring-rose-300 focus:ring-rose-500 @enderror">
+                                @error('satuan_kerja')<p class="mt-1.5 text-xs font-medium text-rose-600">{{ $message }}</p>@enderror
+                            </div>
+
+                            <div>
+                                <label for="bagian" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Bagian</label>
+                                <input type="text" name="bagian" id="bagian" value="{{ old('bagian') }}" x-model="bagian" placeholder="cth. Bagian Umum"
+                                       class="block w-full rounded-xl border-0 py-2.5 px-3.5 text-sm text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-sky-500 transition @error('bagian') ring-rose-300 focus:ring-rose-500 @enderror">
+                                @error('bagian')<p class="mt-1.5 text-xs font-medium text-rose-600">{{ $message }}</p>@enderror
+                            </div>
+
+                            <div>
                                 <label for="no_hp" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">No. HP</label>
                                 <input type="text" name="no_hp" id="no_hp" value="{{ old('no_hp') }}" x-model="noHp" placeholder="cth. 081234567890"
                                        class="block w-full rounded-xl border-0 py-2.5 px-3.5 text-sm text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-sky-500 transition @error('no_hp') ring-rose-300 focus:ring-rose-500 @enderror">
                                 @error('no_hp')<p class="mt-1.5 text-xs font-medium text-rose-600">{{ $message }}</p>@enderror
+                            </div>
+
+                            <div>
+                                <label for="email" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Email</label>
+                                <input type="email" name="email" id="email" value="{{ old('email') }}" x-model="email" placeholder="cth. budi@contoh.id"
+                                       class="block w-full rounded-xl border-0 py-2.5 px-3.5 text-sm text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-sky-500 transition @error('email') ring-rose-300 focus:ring-rose-500 @enderror">
+                                @error('email')<p class="mt-1.5 text-xs font-medium text-rose-600">{{ $message }}</p>@enderror
+                            </div>
+
+                            <div class="sm:col-span-2">
+                                <label for="alamat" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Alamat</label>
+                                <input type="text" name="alamat" id="alamat" value="{{ old('alamat') }}" x-model="alamat" placeholder="cth. Jl. Merdeka No. 1"
+                                       class="block w-full rounded-xl border-0 py-2.5 px-3.5 text-sm text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-sky-500 transition @error('alamat') ring-rose-300 focus:ring-rose-500 @enderror">
+                                @error('alamat')<p class="mt-1.5 text-xs font-medium text-rose-600">{{ $message }}</p>@enderror
                             </div>
 
                             <div>
@@ -81,22 +136,32 @@
                             </div>
 
                             <div>
-                                <label class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Jenis Kelamin <span class="text-rose-500">*</span></label>
+                                <label class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Jenis Kelamin</label>
                                 <div class="grid grid-cols-2 gap-2.5">
                                     <label class="relative flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 p-2.5 transition-all duration-200"
                                            :class="jk === 'L' ? 'border-sky-600 bg-sky-50/60 ring-1 ring-sky-600/20' : 'border-slate-200 hover:border-sky-300'">
-                                        <input type="radio" name="jenis_kelamin" value="L" x-model="jk" class="sr-only" required>
+                                        <input type="radio" name="jenis_kelamin" value="L" x-model="jk" class="sr-only">
                                         <svg class="h-4 w-4 text-sky-500" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" /></svg>
                                         <span class="text-sm font-bold text-slate-700">Laki-laki</span>
                                     </label>
                                     <label class="relative flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 p-2.5 transition-all duration-200"
                                            :class="jk === 'P' ? 'border-rose-600 bg-rose-50/60 ring-1 ring-rose-600/20' : 'border-slate-200 hover:border-rose-300'">
-                                        <input type="radio" name="jenis_kelamin" value="P" x-model="jk" class="sr-only" required>
+                                        <input type="radio" name="jenis_kelamin" value="P" x-model="jk" class="sr-only">
                                         <svg class="h-4 w-4 text-rose-500" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" /></svg>
                                         <span class="text-sm font-bold text-slate-700">Perempuan</span>
                                     </label>
                                 </div>
                                 @error('jenis_kelamin')<p class="mt-1.5 text-xs font-medium text-rose-600">{{ $message }}</p>@enderror
+                            </div>
+
+                            <div>
+                                <label for="status_aktif" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Status Aktif</label>
+                                <select name="status_aktif" id="status_aktif" x-model="statusAktif"
+                                        class="block w-full rounded-xl border-0 py-2.5 px-3.5 text-sm text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-inset focus:ring-sky-500 transition cursor-pointer @error('status_aktif') ring-rose-300 focus:ring-rose-500 @enderror">
+                                    <option value="aktif" @selected(old('status_aktif', 'aktif') == 'aktif')>Aktif</option>
+                                    <option value="nonaktif" @selected(old('status_aktif') == 'nonaktif')>Nonaktif</option>
+                                </select>
+                                @error('status_aktif')<p class="mt-1.5 text-xs font-medium text-rose-600">{{ $message }}</p>@enderror
                             </div>
                         </div>
                     </div>
@@ -179,8 +244,16 @@
                                     <dd class="truncate font-mono font-semibold text-slate-700" x-text="noBpjs || '—'"></dd>
                                 </div>
                                 <div class="flex justify-between gap-3">
+                                    <dt class="text-slate-400">Status Kepegawaian</dt>
+                                    <dd class="truncate font-semibold text-slate-700" x-text="statusKepegawaian || '—'"></dd>
+                                </div>
+                                <div class="flex justify-between gap-3">
                                     <dt class="text-slate-400">Satker</dt>
                                     <dd class="truncate font-semibold text-slate-700" x-text="satkerName"></dd>
+                                </div>
+                                <div class="flex justify-between gap-3">
+                                    <dt class="text-slate-400">Satuan Kerja</dt>
+                                    <dd class="truncate font-semibold text-slate-700" x-text="satuanKerja || '—'"></dd>
                                 </div>
                                 <div class="flex justify-between gap-3">
                                     <dt class="text-slate-400">No. HP</dt>
@@ -212,11 +285,19 @@
         Alpine.data('pnppForm', () => ({
             nama: @js(old('nama')),
             nip: @js(old('nip')),
+            statusKepegawaian: @js(old('status_kepegawaian')),
+            pangkat: @js(old('pangkat')),
+            jabatan: @js(old('jabatan')),
             noBpjs: @js(old('no_bpjs')),
             satkerId: @js(old('satker_id', '')),
+            satuanKerja: @js(old('satuan_kerja')),
+            bagian: @js(old('bagian')),
+            email: @js(old('email')),
+            alamat: @js(old('alamat')),
             noHp: @js(old('no_hp')),
             tanggalLahir: @js(old('tanggal_lahir')),
             jk: @js(old('jenis_kelamin', '')),
+            statusAktif: @js(old('status_aktif', 'aktif')),
             penyakit: @js(old('penyakit', [])),
             saving: false,
             satkers: @js($satkers->map(fn ($s) => ['id' => $s->id, 'nama' => $s->nama])->values()),

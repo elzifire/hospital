@@ -51,7 +51,10 @@ class MasterDataSeeder extends Seeder
         $pnpps = [
             [
                 'nama' => 'Budi Santoso', 'nip' => '198501012010011001', 'no_bpjs' => '0001234567890',
-                'satker_id' => $dinkes?->id, 'no_hp' => '081234567890',
+                'satker_id' => $dinkes?->id, 'satuan_kerja' => 'Dinas Kesehatan',
+                'status_kepegawaian' => 'Anggota Polri', 'pangkat' => 'Bripka', 'jabatan' => 'Bintara',
+                'bagian' => 'Bagian Umum', 'email' => 'budi@contoh.id', 'alamat' => 'Jl. Merdeka No. 1',
+                'status_aktif' => 'aktif', 'no_hp' => '081234567890',
                 'tanggal_lahir' => '1985-01-01', 'jenis_kelamin' => 'L',
                 'penyakit' => [$hipertensi?->id, $dm?->id],
                 'kunjungan' => [
@@ -61,7 +64,10 @@ class MasterDataSeeder extends Seeder
             ],
             [
                 'nama' => 'Siti Aminah', 'nip' => '199003152015122002', 'no_bpjs' => '0001234567891',
-                'satker_id' => $bpjs?->id, 'no_hp' => '081298765432',
+                'satker_id' => $bpjs?->id, 'satuan_kerja' => 'BPJS Kesehatan',
+                'status_kepegawaian' => 'PNS', 'pangkat' => 'Penata Muda', 'jabatan' => 'Staf',
+                'bagian' => 'Bagian Pelayanan', 'email' => 'siti@contoh.id', 'alamat' => 'Jl. Ahmad Yani No. 2',
+                'status_aktif' => 'aktif', 'no_hp' => '081298765432',
                 'tanggal_lahir' => '1990-03-15', 'jenis_kelamin' => 'P',
                 'penyakit' => [$asma?->id],
                 'kunjungan' => [
@@ -70,7 +76,10 @@ class MasterDataSeeder extends Seeder
             ],
             [
                 'nama' => 'Agus Wijaya', 'nip' => '197812302008121003', 'no_bpjs' => '0001234567892',
-                'satker_id' => $kemkes?->id, 'no_hp' => '082112345678',
+                'satker_id' => $kemkes?->id, 'satuan_kerja' => 'Kementerian Kesehatan',
+                'status_kepegawaian' => 'TNI', 'pangkat' => 'Sersan Satu', 'jabatan' => 'Babinsa',
+                'bagian' => 'Bagian Kesehatan', 'email' => 'agus@contoh.id', 'alamat' => 'Jl. Sudirman No. 3',
+                'status_aktif' => 'aktif', 'no_hp' => '082112345678',
                 'tanggal_lahir' => '1978-12-30', 'jenis_kelamin' => 'L',
                 'penyakit' => [$jantung?->id, $hipertensi?->id],
                 'kunjungan' => [
