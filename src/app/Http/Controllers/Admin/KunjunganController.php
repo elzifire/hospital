@@ -11,6 +11,14 @@ use Illuminate\Support\Facades\DB;
 class KunjunganController extends Controller
 {
     /**
+     * Halaman daftar kunjungan (referensi UI — belum ada logic).
+     */
+    public function index()
+    {
+        return view('admin.kunjungan.index');
+    }
+
+    /**
      * Tambah catatan kunjungan untuk satu PNPP.
      */
     public function store(Request $request, Pnpp $pnpp)

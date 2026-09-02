@@ -16,6 +16,10 @@ use App\Http\Controllers\Admin\DokterController;
 use App\Http\Controllers\Admin\JadwalController;
 use App\Http\Controllers\Admin\MasterImportController;
 use App\Http\Controllers\Admin\MasterExportController;
+use App\Http\Controllers\Admin\DigitalReminderController;
+use App\Http\Controllers\Admin\FollowUpController;
+use App\Http\Controllers\Admin\OutreachController;
+use App\Http\Controllers\Admin\MonitoringController;
 
 /*
 |--------------------------------------------------------------------------
@@ -43,6 +47,26 @@ Route::middleware('auth')->group(function () {
     // Admin Prefix Group
     Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+
+        // Modul Broadcasting & Layanan (halaman referensi UI)
+        Route::get('kunjungan', [KunjunganController::class, 'index'])->name('kunjungan.index');
+        Route::get('monitoring', [MonitoringController::class, 'index'])->name('monitoring.index');
+
+        Route::get('digital-reminder', [DigitalReminderController::class, 'index'])->name('digital-reminder.index');
+        Route::get('digital-reminder/template', [DigitalReminderController::class, 'template'])->name('digital-reminder.template');
+        Route::get('digital-reminder/create', [DigitalReminderController::class, 'create'])->name('digital-reminder.create');
+        Route::get('digital-reminder/{id}/edit', [DigitalReminderController::class, 'edit'])->name('digital-reminder.edit');
+        Route::get('digital-reminder/import', [DigitalReminderController::class, 'import'])->name('digital-reminder.import');
+
+        Route::get('follow-up', [FollowUpController::class, 'index'])->name('follow-up.index');
+        Route::get('follow-up/create', [FollowUpController::class, 'create'])->name('follow-up.create');
+        Route::get('follow-up/{id}/edit', [FollowUpController::class, 'edit'])->name('follow-up.edit');
+        Route::get('follow-up/import', [FollowUpController::class, 'import'])->name('follow-up.import');
+
+        Route::get('outreach', [OutreachController::class, 'index'])->name('outreach.index');
+        Route::get('outreach/create', [OutreachController::class, 'create'])->name('outreach.create');
+        Route::get('outreach/{id}/edit', [OutreachController::class, 'edit'])->name('outreach.edit');
+        Route::get('outreach/import', [OutreachController::class, 'import'])->name('outreach.import');
 
         // Profil (self-service): ubah nama & password milik sendiri.
         // Tidak pakai middleware role → semua user login bisa akses datanya sendiri.
