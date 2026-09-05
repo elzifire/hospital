@@ -1,15 +1,15 @@
 @extends('layouts.app')
 
-@section('title', 'Import Pesan Masuk')
-@section('page-title', 'Import Pesan Masuk')
+@section('title', 'Import Pesan Outreach')
+@section('page-title', 'Import Pesan Outreach')
 
 @section('content')
 @php
-    $headers = ['Nama', 'No. HP', 'Balasan', 'Pertanyaan', 'Waktu'];
+    $headers = ['Nama', 'No. HP', 'Pesan', 'Jadwal Kirim'];
     $rows = [
-        ['Budi Santoso', '081234567890', 'Ya, saya akan datang.', 'Konfirmasi kehadiran kontrol', '2026-09-02 07:32'],
-        ['Siti Aminah',  '081298765432', 'Tidak bisa, ada keperluan.', 'Konfirmasi kehadiran kontrol', '2026-09-02 08:05'],
-        ['Agus Wijaya',  '081377445566', 'Insya Allah hadir.', 'Konfirmasi kehadiran kontrol', '2026-09-02 09:40'],
+        ['Budi Santoso', '081234567890', 'Jadwal kontrol Anda di Poli Umum pada 12/09/2026.', '2026-09-10 07:30'],
+        ['Siti Aminah',  '081298765432', 'Pengingat kontrol asma besok pukul 09:00.',           '2026-09-10 08:00'],
+        ['Agus Wijaya',  '081377445566', 'Hasil pemeriksaan jantung Anda sudah tersedia.',      '2026-09-10 09:15'],
     ];
 @endphp
 <div class="mx-auto max-w-5xl space-y-6">
@@ -21,8 +21,8 @@
             <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
             <span class="font-semibold text-slate-600">Import</span>
         </nav>
-        <h2 class="text-xl font-bold tracking-tight text-slate-900">Import Pesan Masuk</h2>
-        <p class="mt-0.5 text-sm text-slate-500">Unggah file Excel/CSV berisi balasan WhatsApp dari PNPP.</p>
+        <h2 class="text-xl font-bold tracking-tight text-slate-900">Import Pesan Outreach</h2>
+        <p class="mt-0.5 text-sm text-slate-500">Unggah file Excel/CSV berisi daftar penerima pesan WhatsApp yang akan dikirim.</p>
     </div>
 
     {{-- ===== Upload Card ===== --}}
@@ -80,7 +80,7 @@
             </div>
         </div>
         <div class="overflow-x-auto">
-            <table class="w-full min-w-[720px] text-left">
+                    <table class="w-full min-w-[640px] text-left">
                 <thead>
                     <tr class="border-b border-slate-100 text-[11px] uppercase tracking-wider text-slate-400">
                         <th class="px-4 py-3 font-semibold" style="width:44px">#</th>

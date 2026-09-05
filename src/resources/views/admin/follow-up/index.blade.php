@@ -26,12 +26,12 @@
     ];
 
     $rows = [
-        ['nama' => 'Budi Santoso', 'nip' => '198501012010011001', 'prioritas' => 'Tinggi', 'jadwal' => 'Hari ini, 14:00', 'petugas' => 'Ayu Lestari',  'status' => 'Menunggu'],
-        ['nama' => 'Agus Wijaya',  'nip' => '197812302008121003', 'prioritas' => 'Tinggi', 'jadwal' => 'Hari ini, 15:30', 'petugas' => 'Bimo Saputra', 'status' => 'Terlambat'],
-        ['nama' => 'Siti Aminah',  'nip' => '199003152015122002', 'prioritas' => 'Sedang', 'jadwal' => 'Besok, 09:00',   'petugas' => 'Citra Dewi',   'status' => 'Menunggu'],
-        ['nama' => 'Dewi Lestari', 'nip' => '198802102010042004', 'prioritas' => 'Rendah', 'jadwal' => 'Besok, 10:00',   'petugas' => 'Ayu Lestari',  'status' => 'Selesai'],
-        ['nama' => 'Rudi Hartono', 'nip' => '199105052016051005', 'prioritas' => 'Sedang', 'jadwal' => 'Besok, 13:00',   'petugas' => 'Bimo Saputra', 'status' => 'Menunggu'],
-        ['nama' => 'Lina Marlina', 'nip' => '199311122017112006', 'prioritas' => 'Tinggi', 'jadwal' => 'Hari ini, 11:30', 'petugas' => 'Citra Dewi',  'status' => 'Selesai'],
+        ['nama' => 'Budi Santoso', 'nip' => '198501012010011001', 'terakhir_kirim' => 'Kemarin, 07:30', 'jadwal' => 'Hari ini, 14:00', 'petugas' => 'Ayu Lestari',  'status' => 'Menunggu'],
+        ['nama' => 'Agus Wijaya',  'nip' => '197812302008121003', 'terakhir_kirim' => '2 hari lalu',   'jadwal' => 'Hari ini, 15:30', 'petugas' => 'Bimo Saputra', 'status' => 'Terlambat'],
+        ['nama' => 'Siti Aminah',  'nip' => '199003152015122002', 'terakhir_kirim' => 'Kemarin, 09:00', 'jadwal' => 'Besok, 09:00',   'petugas' => 'Citra Dewi',   'status' => 'Menunggu'],
+        ['nama' => 'Dewi Lestari', 'nip' => '198802102010042004', 'terakhir_kirim' => '3 hari lalu',   'jadwal' => 'Besok, 10:00',   'petugas' => 'Ayu Lestari',  'status' => 'Selesai'],
+        ['nama' => 'Rudi Hartono', 'nip' => '199105052016051005', 'terakhir_kirim' => 'Kemarin, 10:30','jadwal' => 'Besok, 13:00',   'petugas' => 'Bimo Saputra', 'status' => 'Menunggu'],
+        ['nama' => 'Lina Marlina', 'nip' => '199311122017112006', 'terakhir_kirim' => 'Kemarin, 11:00','jadwal' => 'Hari ini, 11:30', 'petugas' => 'Citra Dewi',  'status' => 'Selesai'],
     ];
 
     $prioritasStyle = [
@@ -58,7 +58,7 @@
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
             <h2 class="text-xl font-bold tracking-tight text-slate-900">Follow Up</h2>
-            <p class="mt-0.5 text-sm text-slate-500">Pengingat lanjutan (H-1) kepada PNPP via WhatsApp sebelum jadwal kunjungan.</p>
+            <p class="mt-0.5 text-sm text-slate-500">Pengingat ulang bagi PNPP yang belum membalas pesan WhatsApp yang telah dikirim.</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
             <a href="{{ route('admin.follow-up.import') }}" class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-xs transition hover:bg-slate-50">
@@ -114,25 +114,18 @@
                                class="block w-full rounded-xl border-0 bg-white py-2.5 pl-10 pr-9 text-sm text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-sky-500 transition">
                     </div>
 
-                    <div class="flex flex-wrap items-center gap-2">
-                        <select class="rounded-lg border-0 bg-white py-2 pl-3 pr-8 text-xs font-semibold text-slate-700 shadow-xs ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-sky-500 cursor-pointer">
-                            <option>Semua Prioritas</option>
-                            <option>Tinggi</option>
-                            <option>Sedang</option>
-                            <option>Rendah</option>
-                        </select>
-                    </div>
+                    
                 </div>
 
                 {{-- Table --}}
                 <div class="overflow-x-auto">
-                    <table class="w-full min-w-[760px] text-left">
+                    <table class="w-full min-w-[900px] text-left">
                         <thead>
                             <tr class="border-b border-slate-100 text-[11px] uppercase tracking-wider text-slate-400">
                                 <th class="px-6 py-3.5 font-semibold">Pasien</th>
-                                <th class="px-6 py-3.5 font-semibold">Prioritas</th>
+                                <th class="px-6 py-3.5 font-semibold">Terakhir Dikirim</th>
+                                <th class="px-6 py-3.5 font-semibold">Balasan</th>
                                 <th class="px-6 py-3.5 font-semibold">Jadwal</th>
-                                <th class="px-6 py-3.5 font-semibold">Petugas</th>
                                 <th class="px-6 py-3.5 font-semibold">Status</th>
                                 <th class="px-6 py-3.5 text-right font-semibold">Aksi</th>
                             </tr>
@@ -152,15 +145,16 @@
                                         </div>
                                     </td>
                                     <td class="whitespace-nowrap px-6 py-4">
-                                        <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 ring-inset {{ $prioritasStyle[$r['prioritas']] }}">
-                                            {{ $r['prioritas'] }}
+                                        <span class="text-xs font-semibold text-slate-500">{{ $r['terakhir_kirim'] }}</span>
+                                    </td>
+                                    <td class="whitespace-nowrap px-6 py-4">
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-700 ring-1 ring-inset ring-rose-200/70">
+                                            <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>
+                                            Belum Membalas
                                         </span>
                                     </td>
                                     <td class="whitespace-nowrap px-6 py-4">
                                         <span class="text-xs font-semibold text-slate-500">{{ $r['jadwal'] }}</span>
-                                    </td>
-                                    <td class="whitespace-nowrap px-6 py-4">
-                                        <span class="text-sm text-slate-600">{{ $r['petugas'] }}</span>
                                     </td>
                                     <td class="whitespace-nowrap px-6 py-4">
                                         <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 ring-inset {{ $statusStyle[$r['status']] }}">

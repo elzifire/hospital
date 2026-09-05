@@ -24,10 +24,10 @@
 
     $cards = [
         ['key' => 'all',   'label' => 'Total PNPP',  'count' => $counts['total'],     'icon' => 'M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Z', 'color' => 'sky',  'href' => $buildUrl(['jk' => null, 'kronis' => null]), 'active' => ! request('jk') && ! request('kronis')],
-        ['key' => 'L',     'label' => 'Laki-laki',   'count' => $counts['laki'],      'icon' => 'M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z', 'color' => 'sky',  'href' => $buildUrl(['jk' => request('jk') === 'L' ? null : 'L']), 'active' => request('jk') === 'L'],
-        ['key' => 'P',     'label' => 'Perempuan',   'count' => $counts['perempuan'], 'icon' => 'M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z', 'color' => 'rose', 'href' => $buildUrl(['jk' => request('jk') === 'P' ? null : 'P']), 'active' => request('jk') === 'P'],
         ['key' => 'kronis','label' => 'Penyakit Kronis', 'count' => $counts['kronis'], 'icon' => 'M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z', 'color' => 'amber', 'href' => $buildUrl(['kronis' => request('kronis') === 'yes' ? null : 'yes']), 'active' => request('kronis') === 'yes'],
     ];
+
+    // dd($counts['total']);
     $cardColor = [
         'sky'   => ['bg' => 'bg-sky-50',   'text' => 'text-sky-600',   'ring' => 'ring-2 ring-sky-500'],
         'rose'  => ['bg' => 'bg-rose-50',  'text' => 'text-rose-600',  'ring' => 'ring-2 ring-rose-500'],

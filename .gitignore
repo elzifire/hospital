@@ -1,7 +1,11 @@
 doc/RUMAH SAKIT BHAYANGKARA BOGOR.docx
 doc/RUMAH SAKIT BHAYANGKARA BOGOR.pdf
+doc/*
 
 # wa-gateway/.env
 wa-gateway/.env
 wa-gateway/node_modules/
 wa-gateway/wa_auth/*
+
+
+test-php/*

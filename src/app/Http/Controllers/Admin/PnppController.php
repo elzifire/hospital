@@ -22,8 +22,8 @@ class PnppController extends Controller
 
         $counts = [
             'total'     => Pnpp::count(),
-            'laki'      => Pnpp::where('jenis_kelamin', 'L')->count(),
-            'perempuan' => Pnpp::where('jenis_kelamin', 'P')->count(),
+            // 'laki'      => Pnpp::where('jenis_kelamin', 'L')->count(),
+            // 'perempuan' => Pnpp::where('jenis_kelamin', 'P')->count(),
             'kronis'    => Pnpp::whereHas('penyakit')->count(),
         ];
 
@@ -39,9 +39,9 @@ class PnppController extends Controller
             $query->where('satker_id', $satker);
         }
 
-        if ($jk = $request->query('jk')) {
-            $query->where('jenis_kelamin', $jk);
-        }
+        // if ($jk = $request->query('jk')) {
+        //     $query->where('jenis_kelamin', $jk);
+        // }
 
         if ($request->query('kronis') === 'yes') {
             $query->whereHas('penyakit');

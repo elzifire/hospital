@@ -27,12 +27,12 @@
     ];
 
     $rows = [
-        ['waktu' => '08:12', 'nama' => 'Budi Santoso', 'nip' => '198501012010011001', 'satker' => 'Dinas Kesehatan',       'poli' => 'Poli Umum',          'dokter' => 'dr. Rina Pratiwi',    'diagnosa' => 'Hipertensi derajat 1', 'status' => 'Selesai'],
-        ['waktu' => '09:40', 'nama' => 'Siti Aminah',  'nip' => '199003152015122002', 'satker' => 'BPJS Kesehatan',       'poli' => 'Poli Gigi',          'dokter' => 'drg. Andi Saputra',   'diagnosa' => 'Gigi berlubang',       'status' => 'Dalam Proses'],
-        ['waktu' => '10:05', 'nama' => 'Agus Wijaya',  'nip' => '197812302008121003', 'satker' => 'Kementerian Kesehatan','poli' => 'Poli Penyakit Dalam', 'dokter' => 'dr. Bambang Haryanto','diagnosa' => 'Angina pektoris',      'status' => 'Selesai'],
-        ['waktu' => '11:20', 'nama' => 'Dewi Lestari', 'nip' => '198802102010042004', 'satker' => 'Dinas Pendidikan',     'poli' => 'Poli Anak',          'dokter' => 'dr. Sari Wulandari',  'diagnosa' => 'ISPA',                 'status' => 'Dalam Proses'],
-        ['waktu' => '13:00', 'nama' => 'Rudi Hartono', 'nip' => '199105052016051005', 'satker' => 'Dinas Kesehatan',      'poli' => 'Poli Umum',          'dokter' => 'dr. Rina Pratiwi',    'diagnosa' => 'Kontrol rutin',        'status' => 'Terjadwal'],
-        ['waktu' => '14:30', 'nama' => 'Lina Marlina', 'nip' => '199311122017112006', 'satker' => 'BPJS Kesehatan',       'poli' => 'Poli Umum',          'dokter' => 'dr. Rina Pratiwi',    'diagnosa' => 'Asam urat',            'status' => 'Terjadwal'],
+        ['waktu' => '08:12', 'nama' => 'Budi Santoso', 'nip' => '198501012010011001', 'satker' => 'Dinas Kesehatan',       'poli' => ['Poli Umum', 'Poli Jantung'],      'dokter' => 'dr. Rina Pratiwi',     'diagnosa' => 'Hipertensi derajat 1', 'status' => 'Selesai'],
+        ['waktu' => '09:40', 'nama' => 'Siti Aminah',  'nip' => '199003152015122002', 'satker' => 'BPJS Kesehatan',       'poli' => ['Poli Gigi'],                        'dokter' => 'drg. Andi Saputra',    'diagnosa' => 'Gigi berlubang',       'status' => 'Dalam Proses'],
+        ['waktu' => '10:05', 'nama' => 'Agus Wijaya',  'nip' => '197812302008121003', 'satker' => 'Kementerian Kesehatan','poli' => ['Poli Penyakit Dalam'],              'dokter' => 'dr. Bambang Haryanto', 'diagnosa' => 'Angina pektoris',      'status' => 'Selesai'],
+        ['waktu' => '11:20', 'nama' => 'Dewi Lestari', 'nip' => '198802102010042004', 'satker' => 'Dinas Pendidikan',     'poli' => ['Poli Anak', 'Poli Umum'],           'dokter' => 'dr. Sari Wulandari',   'diagnosa' => 'ISPA',                 'status' => 'Dalam Proses'],
+        ['waktu' => '13:00', 'nama' => 'Rudi Hartono', 'nip' => '199105052016051005', 'satker' => 'Dinas Kesehatan',      'poli' => ['Poli Umum'],                        'dokter' => 'dr. Rina Pratiwi',     'diagnosa' => 'Kontrol rutin',        'status' => 'Terjadwal'],
+        ['waktu' => '14:30', 'nama' => 'Lina Marlina', 'nip' => '199311122017112006', 'satker' => 'BPJS Kesehatan',       'poli' => ['Poli Umum', 'Poli Gigi'],           'dokter' => 'dr. Rina Pratiwi',     'diagnosa' => 'Asam urat',            'status' => 'Terjadwal'],
     ];
 
     $statusStyle = [
@@ -41,11 +41,11 @@
         'Terjadwal'    => 'bg-amber-50 text-amber-700 ring-amber-200/70',
     ];
 
-    $antrian = [
-        ['jam' => '15:00', 'nama' => 'Tono Sutrisno', 'poli' => 'Poli Umum', 'status' => 'Menunggu'],
-        ['jam' => '15:30', 'nama' => 'Maya Putri',    'poli' => 'Poli Gigi',  'status' => 'Menunggu'],
-        ['jam' => '16:00', 'nama' => 'Bambang Eko',   'poli' => 'Poli Penyakit Dalam', 'status' => 'Menunggu'],
-        ['jam' => '16:30', 'nama' => 'Sari Wulandari','poli' => 'Poli Anak',  'status' => 'Menunggu'],
+    $perPoli = [
+        ['poli' => 'Poli Umum',           'jumlah' => 18, 'bar' => 'bg-sky-500',     'width' => 'w-full'],
+        ['poli' => 'Poli Gigi',           'jumlah' => 9,  'bar' => 'bg-emerald-500', 'width' => 'w-1/2'],
+        ['poli' => 'Poli Penyakit Dalam', 'jumlah' => 8,  'bar' => 'bg-violet-500',  'width' => 'w-2/5'],
+        ['poli' => 'Poli Anak',           'jumlah' => 7,  'bar' => 'bg-amber-500',   'width' => 'w-1/3'],
     ];
 @endphp
 <div class="space-y-6">
@@ -54,7 +54,7 @@
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
             <h2 class="text-xl font-bold tracking-tight text-slate-900">Kunjungan</h2>
-            <p class="mt-0.5 text-sm text-slate-500">Pantau seluruh kunjungan berobat PNPP secara real-time.</p>
+            <p class="mt-0.5 text-sm text-slate-500">Catat kunjungan pasien ke RS — satu pasien bisa mengunjungi beberapa poli.</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
             <a href="#" class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-xs transition hover:bg-slate-50">
@@ -109,7 +109,7 @@
                         <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
                             <svg class="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>
                         </div>
-                        <input type="text" placeholder="Cari nama, NIP, atau no. rekam medis..."
+                        <input type="text" placeholder="Cari nama atau NIP"
                                class="block w-full rounded-xl border-0 bg-white py-2.5 pl-10 pr-9 text-sm text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-sky-500 transition">
                     </div>
 
@@ -125,6 +125,7 @@
                             <option>Poli Anak</option>
                         </select>
                     </div>
+
                 </div>
 
                 {{-- Table --}}
@@ -135,7 +136,7 @@
                                 <th class="px-6 py-3.5 font-semibold">Waktu</th>
                                 <th class="px-6 py-3.5 font-semibold">Pasien (PNPP)</th>
                                 <th class="px-6 py-3.5 font-semibold">Poli / Dokter</th>
-                                <th class="px-6 py-3.5 font-semibold">Diagnosa</th>
+                                <th class="px-6 py-3.5 font-semibold">Home Visit</th>
                                 <th class="px-6 py-3.5 font-semibold">Status</th>
                                 <th class="px-6 py-3.5 text-right font-semibold">Aksi</th>
                             </tr>
@@ -158,12 +159,20 @@
                                         </div>
                                     </td>
                                     <td class="px-6 py-4">
-                                        <p class="text-sm font-semibold text-slate-700">{{ $r['poli'] }}</p>
-                                        <p class="text-xs text-slate-400">{{ $r['dokter'] }}</p>
+                                        <div class="flex flex-wrap gap-1.5">
+                                            @foreach ($r['poli'] as $poli)
+                                                <span class="inline-flex items-center rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-semibold text-sky-700 ring-1 ring-inset ring-sky-200/70">{{ $poli }}</span>
+                                            @endforeach
+                                        </div>
+                                        <p class="mt-1 text-xs text-slate-400">{{ $r['dokter'] }}</p>
                                     </td>
-                                    <td class="px-6 py-4">
-                                        <span class="text-sm text-slate-600">{{ $r['diagnosa'] }}</span>
+
+                                    <td class="whitespace-nowrap px-6 py-4">
+                                        <span class="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold">
+                                            -
+                                        </span>
                                     </td>
+                                   
                                     <td class="whitespace-nowrap px-6 py-4">
                                         <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 ring-inset {{ $statusStyle[$r['status']] }}">
                                             {{ $r['status'] }}
@@ -210,26 +219,25 @@
 
         {{-- ===== Sidebar ===== --}}
         <div class="space-y-6">
-            {{-- Antrian Hari Ini --}}
+            {{-- Kunjungan per Poli --}}
             <div class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
                 <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-                    <h3 class="text-base font-bold text-slate-900">Antrian Hari Ini</h3>
-                    <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-1 text-xs font-bold tabular-nums text-sky-700 ring-1 ring-sky-200/70">4</span>
+                    <h3 class="text-base font-bold text-slate-900">Kunjungan per Poli</h3>
+                    <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-1 text-xs font-bold tabular-nums text-sky-700 ring-1 ring-sky-200/70">Hari Ini</span>
                 </div>
-                <ul class="divide-y divide-slate-50">
-                    @foreach ($antrian as $a)
-                        <li class="flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-sky-50/30">
-                            <span class="w-10 flex-shrink-0 rounded-lg bg-slate-100 py-1 text-center text-xs font-bold tabular-nums text-slate-600">{{ $a['jam'] }}</span>
-                            <div class="min-w-0 flex-1">
-                                <p class="truncate text-sm font-bold text-slate-900">{{ $a['nama'] }}</p>
-                                <p class="truncate text-xs text-slate-400">{{ $a['poli'] }}</p>
+                <div class="space-y-4 p-5">
+                    @foreach ($perPoli as $p)
+                        <div>
+                            <div class="mb-1.5 flex items-center justify-between text-xs">
+                                <span class="font-semibold text-slate-600">{{ $p['poli'] }}</span>
+                                <span class="font-bold tabular-nums text-slate-800">{{ $p['jumlah'] }}</span>
                             </div>
-                            <span class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-amber-600">
-                                <span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>{{ $a['status'] }}
-                            </span>
-                        </li>
+                            <div class="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                                <div class="h-full rounded-full {{ $p['bar'] }} {{ $p['width'] }}"></div>
+                            </div>
+                        </div>
                     @endforeach
-                </ul>
+                </div>
             </div>
 
             {{-- Aktivitas Terbaru --}}

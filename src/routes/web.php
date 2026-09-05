@@ -19,7 +19,13 @@ use App\Http\Controllers\Admin\MasterExportController;
 use App\Http\Controllers\Admin\DigitalReminderController;
 use App\Http\Controllers\Admin\FollowUpController;
 use App\Http\Controllers\Admin\OutreachController;
+use App\Http\Controllers\Admin\ResponController;
 use App\Http\Controllers\Admin\MonitoringController;
+use App\Http\Controllers\Admin\SettingController;
+use App\Http\Controllers\Admin\Setting\TemplateCategoryController;
+use App\Http\Controllers\Admin\Setting\MessageTemplateController;
+use App\Http\Controllers\Admin\Setting\TemplateExportController;
+use App\Http\Controllers\Admin\Setting\TemplateImportController;
 
 /*
 |--------------------------------------------------------------------------
@@ -53,10 +59,36 @@ Route::middleware('auth')->group(function () {
         Route::get('monitoring', [MonitoringController::class, 'index'])->name('monitoring.index');
 
         Route::get('digital-reminder', [DigitalReminderController::class, 'index'])->name('digital-reminder.index');
-        Route::get('digital-reminder/template', [DigitalReminderController::class, 'template'])->name('digital-reminder.template');
+        Route::get('digital-reminder/template', fn () => redirect()->route('admin.setting.index'))->name('digital-reminder.template');
         Route::get('digital-reminder/create', [DigitalReminderController::class, 'create'])->name('digital-reminder.create');
         Route::get('digital-reminder/{id}/edit', [DigitalReminderController::class, 'edit'])->name('digital-reminder.edit');
         Route::get('digital-reminder/import', [DigitalReminderController::class, 'import'])->name('digital-reminder.import');
+
+        // Pengaturan Template Pesan & Kategori
+        Route::prefix('setting')->name('setting.')->group(function () {
+            Route::get('/', [SettingController::class, 'index'])->name('index');
+            Route::get('/template', [SettingController::class, 'template'])->name('template');
+
+            // CRUD Kategori
+            Route::post('kategori', [TemplateCategoryController::class, 'store'])->name('kategori.store');
+            Route::put('kategori/{kategori}', [TemplateCategoryController::class, 'update'])->name('kategori.update');
+            Route::delete('kategori/{kategori}', [TemplateCategoryController::class, 'destroy'])->name('kategori.destroy');
+
+            // CRUD Template Pesan
+            Route::post('template', [MessageTemplateController::class, 'store'])->name('template.store');
+            Route::put('template/{template}', [MessageTemplateController::class, 'update'])->name('template.update');
+            Route::delete('template/{template}', [MessageTemplateController::class, 'destroy'])->name('template.destroy');
+            Route::post('template/{template}/duplicate', [MessageTemplateController::class, 'duplicate'])->name('template.duplicate');
+
+            // Export & Import
+            Route::get('export', [TemplateExportController::class, 'download'])->name('export.download');
+            Route::get('export/template', [TemplateExportController::class, 'template'])->name('export.template');
+
+            Route::get('import', [TemplateImportController::class, 'index'])->name('import.index');
+            Route::post('import/upload', [TemplateImportController::class, 'upload'])->name('import.upload');
+            Route::post('import/confirm', [TemplateImportController::class, 'confirm'])->name('import.confirm');
+            Route::post('import/cancel', [TemplateImportController::class, 'cancel'])->name('import.cancel');
+        });
 
         Route::get('follow-up', [FollowUpController::class, 'index'])->name('follow-up.index');
         Route::get('follow-up/create', [FollowUpController::class, 'create'])->name('follow-up.create');
@@ -67,6 +99,10 @@ Route::middleware('auth')->group(function () {
         Route::get('outreach/create', [OutreachController::class, 'create'])->name('outreach.create');
         Route::get('outreach/{id}/edit', [OutreachController::class, 'edit'])->name('outreach.edit');
         Route::get('outreach/import', [OutreachController::class, 'import'])->name('outreach.import');
+
+        // Respon: balasan pesan WhatsApp per nomor telepon (masuk via webhook)
+        Route::get('respon', [ResponController::class, 'index'])->name('respon.index');
+        Route::get('respon/{nomor}', [ResponController::class, 'show'])->name('respon.show');
 
         // Profil (self-service): ubah nama & password milik sendiri.
         // Tidak pakai middleware role → semua user login bisa akses datanya sendiri.
