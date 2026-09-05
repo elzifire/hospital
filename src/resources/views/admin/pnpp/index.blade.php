@@ -33,6 +33,7 @@
         'sky'   => ['bg' => 'bg-sky-50',   'text' => 'text-sky-600',   'ring' => 'ring-2 ring-sky-500'],
         'rose'  => ['bg' => 'bg-rose-50',  'text' => 'text-rose-600',  'ring' => 'ring-2 ring-rose-500'],
         'amber' => ['bg' => 'bg-amber-50', 'text' => 'text-amber-600', 'ring' => 'ring-2 ring-amber-500'],
+        'emerald' => ['bg' => 'bg-emerald-50', 'text' => 'text-emerald-600', 'ring' => 'ring-2 ring-emerald-500'],
     ];
 @endphp
 <div class="space-y-6">
