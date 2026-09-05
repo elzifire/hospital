@@ -87,8 +87,19 @@ class MasterImportController extends Controller
 
         Storage::disk('local')->put("imports/{$token}.rows.json", json_encode($rows));
 
-        Cache::put(ImportMasterJob::cacheKey($token), ['status' => 'pending'], now()->addHours(2));
-        ImportMasterJob::dispatch($entity, $token);
+        $totalChunks = (int) ceil(count($rows) / ImportMasterJob::BATCH_SIZE);
+        Cache::put(ImportMasterJob::cacheKey($token), [
+            'status'       => 'pending',
+            'total'        => count($rows),
+            'total_chunks' => $totalChunks,
+            'processed'    => 0,
+            'created'      => 0,
+            'updated'      => 0,
+            'failed'       => 0,
+            'errors'       => [],
+        ], now()->addHours(2));
+
+        ImportMasterJob::dispatch($entity, $token, 0, $totalChunks);
 
         session(['import_token' => $token]);
 
