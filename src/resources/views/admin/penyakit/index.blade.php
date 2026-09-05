@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'Data Penyakit Kronis')
-@section('page-title', 'Data Penyakit Kronis')
+@section('title', 'Data ' . $jenis['label'])
+@section('page-title', 'Data ' . $jenis['label'])
 
 @section('content')
 <div x-data="penyakitTable()" class="space-y-6">
@@ -9,24 +9,24 @@
     {{-- ===== Header ===== --}}
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-            <h2 class="text-xl font-bold tracking-tight text-slate-900">Data Penyakit Kronis</h2>
-            <p class="mt-0.5 text-sm text-slate-500">Master jenis penyakit kronis yang dihubungkan ke data PNPP.</p>
+            <h2 class="text-xl font-bold tracking-tight text-slate-900">Data {{ $jenis['label'] }}</h2>
+            <p class="mt-0.5 text-sm text-slate-500">Master {{ strtolower($jenis['label']) }} yang dihubungkan ke data PNPP.</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
-            <a href="{{ route('admin.master.import', 'penyakit') }}"
+            <a href="{{ route('admin.master.import', $jenis['import']) }}"
                class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-xs transition hover:bg-slate-50">
                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" /></svg>
                 Import
             </a>
-            <a href="{{ route('admin.master.export', 'penyakit') }}"
+            <a href="{{ route('admin.master.export', $jenis['import']) }}"
                class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-xs transition hover:bg-slate-50">
                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
                 Export
             </a>
-            <a href="{{ route('admin.penyakit.create') }}"
+            <a href="{{ route($jenis['route'] . '.create') }}"
                class="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2">
                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-                Tambah Penyakit
+                Tambah {{ $jenis['label'] }}
             </a>
         </div>
     </div>
@@ -187,8 +187,8 @@
                     nama: @js($p->nama),
                     kode: @js($p->kode),
                     pnppsCount: {{ $p->pnpps_count }},
-                    editUrl: "{{ route('admin.penyakit.edit', $p->id) }}",
-                    deleteUrl: "{{ route('admin.penyakit.destroy', $p->id) }}",
+                    editUrl: "{{ route($jenis['route'] . '.edit', $p->id) }}",
+                    deleteUrl: "{{ route($jenis['route'] . '.destroy', $p->id) }}",
                 }{{ ! $loop->last ? ',' : '' }}
                 @endforeach
             ],

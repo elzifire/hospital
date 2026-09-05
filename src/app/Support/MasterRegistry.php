@@ -5,6 +5,7 @@ namespace App\Support;
 use App\Models\Dokter;
 use App\Models\Jadwal;
 use App\Models\PenyakitKronis;
+use App\Models\PenyakitMenahun;
 use App\Models\Pnpp;
 use App\Models\Poli;
 use App\Models\Satker;
@@ -27,7 +28,7 @@ class MasterRegistry
 {
     public static function entities(): array
     {
-        return ['pnpp', 'satker', 'penyakit', 'poli', 'dokter', 'jadwal'];
+        return ['pnpp', 'satker', 'penyakit', 'penyakit-menahun', 'poli', 'dokter', 'jadwal'];
     }
 
     public static function has(string $entity): bool
@@ -75,6 +76,7 @@ class MasterRegistry
                 'Jenis Kelamin'      => $select(['L', 'P']),
                 'Status Aktif'       => $select(['aktif', 'nonaktif']),
                 'Penyakit Kronis'    => $multi(PenyakitKronis::orderBy('nama')->pluck('nama')->all()),
+                'Penyakit Menahun'   => $multi(PenyakitMenahun::orderBy('nama')->pluck('nama')->all()),
             ],
             'dokter' => [
                 'Nama'         => $text,
@@ -117,6 +119,16 @@ class MasterRegistry
                 'parse'   => fn (array $r) => self::parseKodeNama($r),
             ],
 
+            'penyakit-menahun' => [
+                'label'   => 'Penyakit Menahun',
+                'model'   => PenyakitMenahun::class,
+                'eager'   => [],
+                'headers' => ['Kode', 'Nama'],
+                'sample'  => ['GINJAL', 'Gagal Ginjal Kronis'],
+                'toRow'   => fn (PenyakitMenahun $m) => [$m->kode ?? '', $m->nama],
+                'parse'   => fn (array $r) => self::parseKodeNama($r),
+            ],
+
             'poli' => [
                 'label'   => 'Poli',
                 'model'   => Poli::class,
@@ -156,9 +168,9 @@ class MasterRegistry
             'pnpp' => [
                 'label'   => 'PNPP',
                 'model'   => Pnpp::class,
-                'eager'   => ['satker', 'penyakit'],
-                'headers' => ['Nama', 'NIP/NRP', 'Status Kepegawaian', 'Pangkat', 'Jabatan', 'Satker', 'Satuan Kerja', 'Bagian', 'Email', 'Alamat', 'No. BPJS', 'No. HP', 'Tanggal Lahir', 'Jenis Kelamin', 'Status Aktif', 'Penyakit Kronis'],
-                'sample'  => ['Budi Santoso', '198501012010011001', 'Anggota Polri', 'Bripka', 'Bintara', 'Dinas Kesehatan', 'Dinas Kesehatan', 'Bagian Umum', 'budi@contoh.id', 'Jl. Merdeka No. 1', '0001234567890', '081234567890', '1985-01-01', 'L', 'aktif', 'Hipertensi, Diabetes Melitus'],
+                'eager'   => ['satker', 'penyakit', 'penyakitMenahun'],
+                'headers' => ['Nama', 'NIP/NRP', 'Status Kepegawaian', 'Pangkat', 'Jabatan', 'Satker', 'Satuan Kerja', 'Bagian', 'Email', 'Alamat', 'No. BPJS', 'No. HP', 'Tanggal Lahir', 'Jenis Kelamin', 'Status Aktif', 'Penyakit Kronis', 'Penyakit Menahun'],
+                'sample'  => ['Budi Santoso', '198501012010011001', 'Anggota Polri', 'Bripka', 'Bintara', 'Dinas Kesehatan', 'Dinas Kesehatan', 'Bagian Umum', 'budi@contoh.id', 'Jl. Merdeka No. 1', '0001234567890', '081234567890', '1985-01-01', 'L', 'aktif', 'Hipertensi, Diabetes Melitus', 'Gagal Ginjal Kronis'],
                 'toRow'   => fn (Pnpp $m) => [
                     $m->nama,
                     $m->nip ?? '',
@@ -176,10 +188,14 @@ class MasterRegistry
                     $m->jenis_kelamin ?? '',
                     $m->status_aktif ?? 'aktif',
                     $m->penyakit->pluck('nama')->implode(', '),
+                    $m->penyakitMenahun->pluck('nama')->implode(', '),
                 ],
                 'parse'   => fn (array $r) => self::parsePnpp($r),
                 'resolve' => fn (array $result) => self::resolvePnppSatker($result),
-                'sync'    => fn (Pnpp $model, array $relations) => $model->penyakit()->sync($relations['penyakit'] ?? []),
+                'sync'    => function (Pnpp $model, array $relations): void {
+                    $model->penyakit()->sync($relations['penyakit'] ?? []);
+                    $model->penyakitMenahun()->sync($relations['penyakit_menahun'] ?? []);
+                },
             ],
         ];
     }
@@ -303,6 +319,7 @@ class MasterRegistry
         $jk          = self::normalizeJk(self::field($row, 'Jenis Kelamin'));
         $statusAktif = self::field($row, 'Status Aktif');
         $penyakitRaw = self::field($row, 'Penyakit Kronis');
+        $menahunRaw  = self::field($row, 'Penyakit Menahun');
         $errors      = [];
 
         if ($nama === '') {
@@ -346,6 +363,17 @@ class MasterRegistry
             }
         }
 
+        $penyakitMenahunIds = [];
+        $penyakitMenahunNames = array_values(array_filter(array_map('trim', preg_split('/[,;]/', $menahunRaw))));
+        foreach ($penyakitMenahunNames as $name) {
+            $penyakitMenahun = PenyakitMenahun::where('nama', $name)->first();
+            if (! $penyakitMenahun) {
+                $errors[] = "Penyakit menahun \"{$name}\" tidak ditemukan";
+            } else {
+                $penyakitMenahunIds[] = $penyakitMenahun->id;
+            }
+        }
+
         $statusAktifValue = in_array($statusAktif, ['aktif', 'nonaktif'], true) ? $statusAktif : 'aktif';
 
         return [
@@ -367,7 +395,11 @@ class MasterRegistry
                 'status_aktif'       => $statusAktifValue,
             ],
             'unique'    => ['nip' => $nip],
-            'relations' => ['penyakit' => $penyakitIds, 'satker_name' => $satkerName],
+            'relations' => [
+                'penyakit' => $penyakitIds,
+                'penyakit_menahun' => $penyakitMenahunIds,
+                'satker_name' => $satkerName,
+            ],
             'errors'    => $errors,
         ];
     }

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Pnpp;
 use App\Models\PenyakitKronis;
+use App\Models\PenyakitMenahun;
 use App\Models\Satker;
 use App\Support\MasterRegistry;
 use Illuminate\Http\Request;
@@ -17,7 +18,7 @@ class PnppController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Pnpp::with('satker', 'penyakit', 'latestKunjungan')
+        $query = Pnpp::with('satker', 'penyakit', 'penyakitMenahun', 'latestKunjungan')
             ->withCount('kunjungans');
 
         $counts = [
@@ -25,6 +26,7 @@ class PnppController extends Controller
             // 'laki'      => Pnpp::where('jenis_kelamin', 'L')->count(),
             // 'perempuan' => Pnpp::where('jenis_kelamin', 'P')->count(),
             'kronis'    => Pnpp::whereHas('penyakit')->count(),
+            'menahun'   => Pnpp::whereHas('penyakitMenahun')->count(),
         ];
 
         if ($search = $request->query('search')) {
@@ -49,6 +51,12 @@ class PnppController extends Controller
             $query->whereDoesntHave('penyakit');
         }
 
+        if ($request->query('menahun') === 'yes') {
+            $query->whereHas('penyakitMenahun');
+        } elseif ($request->query('menahun') === 'no') {
+            $query->whereDoesntHave('penyakitMenahun');
+        }
+
         match ($request->query('sort', 'az')) {
             'za'     => $query->orderByDesc('nama'),
             'newest' => $query->orderByDesc('created_at'),
@@ -70,8 +78,9 @@ class PnppController extends Controller
     {
         $satkers   = Satker::orderBy('nama')->get();
         $penyakits = PenyakitKronis::orderBy('nama')->get();
+        $penyakitMenahuns = PenyakitMenahun::orderBy('nama')->get();
 
-        return view('admin.pnpp.create', compact('satkers', 'penyakits'));
+        return view('admin.pnpp.create', compact('satkers', 'penyakits', 'penyakitMenahuns'));
     }
 
     /**
@@ -84,6 +93,7 @@ class PnppController extends Controller
         $pnpp = DB::transaction(function () use ($request, $data) {
             $pnpp = Pnpp::create($data);
             $pnpp->penyakit()->sync($request->input('penyakit', []));
+            $pnpp->penyakitMenahun()->sync($request->input('penyakit_menahun', []));
 
             return $pnpp;
         });
@@ -97,12 +107,13 @@ class PnppController extends Controller
      */
     public function edit(Pnpp $pnpp)
     {
-        $pnpp->load('penyakit');
+        $pnpp->load(['penyakit', 'penyakitMenahun']);
 
         $satkers   = Satker::orderBy('nama')->get();
         $penyakits = PenyakitKronis::orderBy('nama')->get();
+        $penyakitMenahuns = PenyakitMenahun::orderBy('nama')->get();
 
-        return view('admin.pnpp.edit', compact('pnpp', 'satkers', 'penyakits'));
+        return view('admin.pnpp.edit', compact('pnpp', 'satkers', 'penyakits', 'penyakitMenahuns'));
     }
 
     /**
@@ -115,6 +126,7 @@ class PnppController extends Controller
         DB::transaction(function () use ($request, $pnpp, $data) {
             $pnpp->update($data);
             $pnpp->penyakit()->sync($request->input('penyakit', []));
+            $pnpp->penyakitMenahun()->sync($request->input('penyakit_menahun', []));
         });
 
         return redirect()->route('admin.pnpp.index')
@@ -138,7 +150,7 @@ class PnppController extends Controller
      */
     public function kunjungan(Pnpp $pnpp)
     {
-        $pnpp->load(['satker', 'penyakit', 'kunjungans' => fn ($q) => $q->orderByDesc('tanggal_kunjungan')]);
+        $pnpp->load(['satker', 'penyakit', 'penyakitMenahun', 'kunjungans' => fn ($q) => $q->orderByDesc('tanggal_kunjungan')]);
 
         return view('admin.pnpp.kunjungan', compact('pnpp'));
     }
@@ -168,6 +180,8 @@ class PnppController extends Controller
             'status_aktif'       => ['nullable', 'in:aktif,nonaktif'],
             'penyakit'           => ['nullable', 'array'],
             'penyakit.*'         => ['integer', 'exists:penyakit_kronis,id'],
+            'penyakit_menahun'   => ['nullable', 'array'],
+            'penyakit_menahun.*' => ['integer', 'exists:penyakit_menahuns,id'],
         ]);
     }
 }

@@ -9,16 +9,22 @@ use Illuminate\Support\Facades\DB;
 
 class PenyakitKronisController extends Controller
 {
+    private array $jenis = [
+        'label' => 'Penyakit Kronis',
+        'route' => 'admin.penyakit',
+        'import' => 'penyakit',
+    ];
+
     public function index()
     {
         $penyakits = PenyakitKronis::withCount('pnpps')->orderBy('nama')->get();
 
-        return view('admin.penyakit.index', compact('penyakits'));
+        return view('admin.penyakit.index', ['penyakits' => $penyakits, 'jenis' => $this->jenis]);
     }
 
     public function create()
     {
-        return view('admin.penyakit.create');
+        return view('admin.penyakit.create', ['jenis' => $this->jenis]);
     }
 
     public function store(Request $request)
@@ -36,7 +42,7 @@ class PenyakitKronisController extends Controller
 
     public function edit(PenyakitKronis $penyakit)
     {
-        return view('admin.penyakit.edit', compact('penyakit'));
+        return view('admin.penyakit.edit', ['penyakit' => $penyakit, 'jenis' => $this->jenis]);
     }
 
     public function update(Request $request, PenyakitKronis $penyakit)

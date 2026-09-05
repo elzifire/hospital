@@ -25,6 +25,7 @@
     $cards = [
         ['key' => 'all',   'label' => 'Total PNPP',  'count' => $counts['total'],     'icon' => 'M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Z', 'color' => 'sky',  'href' => $buildUrl(['jk' => null, 'kronis' => null]), 'active' => ! request('jk') && ! request('kronis')],
         ['key' => 'kronis','label' => 'Penyakit Kronis', 'count' => $counts['kronis'], 'icon' => 'M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12Z', 'color' => 'amber', 'href' => $buildUrl(['kronis' => request('kronis') === 'yes' ? null : 'yes']), 'active' => request('kronis') === 'yes'],
+        ['key' => 'menahun','label' => 'Penyakit Menahun', 'count' => $counts['menahun'], 'icon' => 'M12 9v3.75m0 3.75h.008v.008H12v-.008ZM10.34 3.94 2.91 17.25a2.25 2.25 0 0 0 1.95 3.375h14.28a2.25 2.25 0 0 0 1.95-3.375L13.66 3.94a1.875 1.875 0 0 0-3.32 0Z', 'color' => 'emerald', 'href' => $buildUrl(['menahun' => request('menahun') === 'yes' ? null : 'yes']), 'active' => request('menahun') === 'yes'],
     ];
 
     // dd($counts['total']);
@@ -111,7 +112,7 @@
                 <select name="kronis" onchange="this.form.submit()" class="rounded-lg border-0 bg-white py-2 pl-3 pr-8 text-xs font-semibold text-slate-700 shadow-xs ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-sky-500 cursor-pointer">
                     <option value="">Semua</option>
                     <option value="yes" @selected(request('kronis') === 'yes')>Ada Penyakit Kronis</option>
-                    <option value="no" @selected(request('kronis') === 'no')>Tanpa Penyakit Kronis</option>
+                        <option value="no" @selected(request('kronis') === 'no')>Tanpa Penyakit Kronis</option>
                 </select>
                 <select name="sort" onchange="this.form.submit()" class="rounded-lg border-0 bg-white py-2 pl-3 pr-8 text-xs font-semibold text-slate-700 shadow-xs ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-sky-500 cursor-pointer">
                     <option value="az" @selected(request('sort', 'az') === 'az')>Nama A–Z</option>
@@ -137,6 +138,7 @@
                         <th class="px-6 py-3.5 font-semibold">Satker</th>
                         <th class="px-6 py-3.5 font-semibold">Usia / JK</th>
                         <th class="px-6 py-3.5 font-semibold">Penyakit Kronis</th>
+                        <th class="px-6 py-3.5 font-semibold">Penyakit Menahun</th>
                         <th class="px-6 py-3.5 font-semibold">Kunjungan</th>
                         <th class="px-6 py-3.5 text-right font-semibold">Aksi</th>
                     </tr>
@@ -189,6 +191,17 @@
                                     </div>
                                 @else
                                     <span class="text-xs text-slate-400">Sehat / —</span>
+                                @endif
+                            </td>
+                            <td class="px-6 py-4">
+                                @if ($p->penyakitMenahun->isNotEmpty())
+                                    <div class="flex flex-wrap gap-1">
+                                        @foreach ($p->penyakitMenahun as $penyakitMenahun)
+                                            <span class="rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 ring-1 ring-emerald-200/70">{{ $penyakitMenahun->nama }}</span>
+                                        @endforeach
+                                    </div>
+                                @else
+                                    <span class="text-xs text-slate-400">—</span>
                                 @endif
                             </td>
                             <td class="whitespace-nowrap px-6 py-4">

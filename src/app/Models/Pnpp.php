@@ -49,6 +49,16 @@ class Pnpp extends Model
         )->withPivot('keterangan');
     }
 
+    public function penyakitMenahun()
+    {
+        return $this->belongsToMany(
+            PenyakitMenahun::class,
+            'pnpp_penyakit',
+            'pnpp_id',
+            'penyakit_menahun_id'
+        )->withPivot('keterangan');
+    }
+
     public function kunjungans()
     {
         return $this->hasMany(Kunjungan::class);

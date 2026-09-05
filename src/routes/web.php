@@ -10,6 +10,7 @@ use App\Http\Controllers\Admin\ProfileController;
 use App\Http\Controllers\Admin\PnppController;
 use App\Http\Controllers\Admin\SatkerController;
 use App\Http\Controllers\Admin\PenyakitKronisController;
+use App\Http\Controllers\Admin\PenyakitMenahunController;
 use App\Http\Controllers\Admin\KunjunganController;
 use App\Http\Controllers\Admin\PoliController;
 use App\Http\Controllers\Admin\DokterController;
@@ -122,6 +123,9 @@ Route::middleware('auth')->group(function () {
         Route::middleware('permission:manage master')->group(function () {
             Route::resource('satker', SatkerController::class)->except('show');
             Route::resource('penyakit', PenyakitKronisController::class)->except('show');
+            Route::resource('penyakit-menahun', PenyakitMenahunController::class)
+                ->except('show')
+                ->parameters(['penyakit-menahun' => 'penyakitMenahun']);
             Route::resource('pnpp', PnppController::class)->except('show');
 
             // Poli, Dokter & Jadwal

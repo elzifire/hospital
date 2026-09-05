@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'Edit Penyakit Kronis')
-@section('page-title', 'Edit Penyakit Kronis')
+@section('title', 'Edit ' . $jenis['label'])
+@section('page-title', 'Edit ' . $jenis['label'])
 
 @section('content')
 <div x-data="{ saving: false }" class="mx-auto max-w-2xl space-y-6">
@@ -9,15 +9,15 @@
     {{-- ===== Header + Breadcrumb ===== --}}
     <div>
         <nav class="mb-2 flex items-center gap-1.5 text-xs font-medium text-slate-400" aria-label="Breadcrumb">
-            <a href="{{ route('admin.penyakit.index') }}" class="rounded transition hover:text-sky-600">Data Penyakit Kronis</a>
+            <a href="{{ route($jenis['route'] . '.index') }}" class="rounded transition hover:text-sky-600">Data {{ $jenis['label'] }}</a>
             <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
             <span class="font-semibold text-slate-600">{{ $penyakit->nama }}</span>
         </nav>
-        <h2 class="text-xl font-bold tracking-tight text-slate-900">Edit Penyakit Kronis</h2>
-        <p class="mt-0.5 text-sm text-slate-500">Perbarui informasi jenis penyakit kronis.</p>
+        <h2 class="text-xl font-bold tracking-tight text-slate-900">Edit {{ $jenis['label'] }}</h2>
+        <p class="mt-0.5 text-sm text-slate-500">Perbarui informasi jenis {{ strtolower($jenis['label']) }}.</p>
     </div>
 
-    <form action="{{ route('admin.penyakit.update', $penyakit->id) }}" method="POST" @submit="saving = true" x-cloak>
+    <form action="{{ route($jenis['route'] . '.update', $penyakit->id) }}" method="POST" @submit="saving = true" x-cloak>
         @csrf
         @method('PUT')
         <div class="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
@@ -42,7 +42,7 @@
             </div>
 
             <div class="flex items-center justify-end gap-3 rounded-b-2xl border-t border-slate-100 bg-slate-50/70 p-4">
-                <a href="{{ route('admin.penyakit.index') }}"
+                <a href="{{ route($jenis['route'] . '.index') }}"
                    class="rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-xs transition hover:bg-slate-50">Batal</a>
                 <button type="submit" :disabled="saving"
                         class="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-6 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">

@@ -152,6 +152,14 @@
                             'permission' => 'manage master',
                         ],
                         [
+                            'label'      => 'Penyakit Menahun',
+                            'route'      => 'admin.penyakit-menahun.index',
+                            'active'     => request()->routeIs('admin.penyakit-menahun.*'),
+                            'icon'       => ['M12 9v3.75m0 3.75h.008v.008H12v-.008ZM10.34 3.94 2.91 17.25a2.25 2.25 0 0 0 1.95 3.375h14.28a2.25 2.25 0 0 0 1.95-3.375L13.66 3.94a1.875 1.875 0 0 0-3.32 0Z'],
+                            'roles'      => [],
+                            'permission' => 'manage master',
+                        ],
+                        [
                             'label'      => 'Instalasi',
                             'route'      => 'admin.poli.index',
                             'active'     => request()->routeIs('admin.poli.*'),

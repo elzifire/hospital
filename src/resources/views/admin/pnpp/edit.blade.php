@@ -203,6 +203,39 @@
                     </div>
                 </div>
 
+                {{-- Penyakit Menahun --}}
+                <div class="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+                    <div class="border-b border-slate-100 p-6">
+                        <h3 class="text-base font-bold text-slate-900">Penyakit Menahun</h3>
+                        <p class="mt-0.5 text-sm text-slate-500">Centang bila ada riwayat penyakit menahun (boleh lebih dari satu).</p>
+                    </div>
+                    <div class="p-6">
+                        @if ($penyakitMenahuns->isEmpty())
+                            <p class="rounded-xl bg-slate-50 p-4 text-sm text-slate-500 ring-1 ring-slate-100">
+                                Belum ada data penyakit menahun. <a href="{{ route('admin.penyakit-menahun.create') }}" class="font-semibold text-sky-600 hover:underline">Tambahkan dulu</a>.
+                            </p>
+                        @else
+                            <div class="flex flex-wrap gap-2.5">
+                                @foreach ($penyakitMenahuns as $penyakitMenahun)
+                                    <label class="cursor-pointer rounded-xl p-3 ring-1 transition-all duration-200"
+                                           :class="penyakitMenahun.includes('{{ $penyakitMenahun->id }}') ? 'bg-emerald-50 ring-2 ring-emerald-500' : 'bg-white ring-slate-200 hover:ring-emerald-300'">
+                                        <input type="checkbox" name="penyakit_menahun[]" value="{{ $penyakitMenahun->id }}" x-model="penyakitMenahun" class="sr-only">
+                                        <span class="flex items-center gap-2">
+                                            <span class="flex h-5 w-5 items-center justify-center rounded-full transition-colors"
+                                                  :class="penyakitMenahun.includes('{{ $penyakitMenahun->id }}') ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400'">
+                                                <svg x-show="penyakitMenahun.includes('{{ $penyakitMenahun->id }}')" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke-width="3" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+                                            </span>
+                                            <span class="text-sm font-semibold text-slate-700">{{ $penyakitMenahun->nama }}</span>
+                                            @if ($penyakitMenahun->kode)<code class="rounded bg-slate-100 px-1 font-mono text-[10px] text-slate-400">{{ $penyakitMenahun->kode }}</code>@endif
+                                        </span>
+                                    </label>
+                                @endforeach
+                            </div>
+                            @error('penyakit_menahun.*')<p class="mt-1.5 text-xs font-medium text-rose-600">{{ $message }}</p>@enderror
+                        @endif
+                    </div>
+                </div>
+
                 {{-- Action bar --}}
                 <div class="flex items-center justify-between gap-3">
                     <a href="{{ route('admin.pnpp.kunjungan', $pnpp) }}"
@@ -311,9 +344,11 @@
             jk: @js(old('jenis_kelamin', $pnpp->jenis_kelamin)),
             statusAktif: @js(old('status_aktif', $pnpp->status_aktif)),
             penyakit: @js(old('penyakit', $pnpp->penyakit->pluck('id')->map(fn ($id) => (string) $id)->all())),
+            penyakitMenahun: @js(old('penyakit_menahun', $pnpp->penyakitMenahun->pluck('id')->map(fn ($id) => (string) $id)->all())),
             saving: false,
             satkers: @js($satkers->map(fn ($s) => ['id' => $s->id, 'nama' => $s->nama])->values()),
             penyakits: @js($penyakits->map(fn ($p) => ['id' => $p->id, 'nama' => $p->nama])->values()),
+            penyakitMenahuns: @js($penyakitMenahuns->map(fn ($p) => ['id' => $p->id, 'nama' => $p->nama])->values()),
 
             get initials() {
                 return this.nama.trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase();
