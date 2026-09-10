@@ -43,7 +43,7 @@ class ImportMasterJob implements ShouldQueue
         $sync = $config['sync'] ?? null;
         $resolve = $config['resolve'] ?? null;
 
-        $path = "imports/{$this->token}.rows.json";
+        $path = "imports/{$this->token}.rows.{$this->chunk}.json";
 
         try {
             $this->updateStatus(['status' => 'processing']);
@@ -58,11 +58,11 @@ class ImportMasterJob implements ShouldQueue
                 throw new \RuntimeException('Data import tidak valid.');
             }
 
-            $totalChunks = $this->totalChunks ?? (int) ceil(count($rows) / self::BATCH_SIZE);
-            $batchRows = array_slice($rows, $this->chunk * self::BATCH_SIZE, self::BATCH_SIZE);
+            $totalChunks = $this->totalChunks ?? 1;
+            $batchRows = $rows;
             $created = 0;
             $updated = 0;
-            $failed  = 0;
+            $failed = 0;
             $errorSamples = [];
 
             foreach ($batchRows as $row) {
@@ -72,10 +72,11 @@ class ImportMasterJob implements ShouldQueue
                     $failed++;
                     if (count($errorSamples) < 20) {
                         $errorSamples[] = [
-                            'row'    => $row,
+                            'row' => $row,
                             'errors' => $result['errors'],
                         ];
                     }
+
                     continue;
                 }
 
@@ -99,7 +100,7 @@ class ImportMasterJob implements ShouldQueue
                     $failed++;
                     if (count($errorSamples) < 20) {
                         $errorSamples[] = [
-                            'row'    => $row,
+                            'row' => $row,
                             'errors' => [$e->getMessage()],
                         ];
                     }
@@ -108,40 +109,40 @@ class ImportMasterJob implements ShouldQueue
 
             $status = $this->updateStatus([
                 'processed' => count($batchRows),
-                'created'   => $created,
-                'updated'   => $updated,
-                'failed'    => $failed,
-                'errors'    => $errorSamples,
+                'created' => $created,
+                'updated' => $updated,
+                'failed' => $failed,
+                'errors' => $errorSamples,
             ]);
 
             if ($this->chunk + 1 < $totalChunks) {
                 self::dispatch($this->entity, $this->token, $this->chunk + 1, $totalChunks);
+
                 return;
             }
 
-            Storage::disk('local')->delete($path);
             foreach (Storage::disk('local')->files('imports') as $file) {
-                if (str_starts_with(basename($file), $this->token . '.')) {
+                if (str_starts_with(basename($file), $this->token.'.')) {
                     Storage::disk('local')->delete($file);
                 }
             }
 
             $this->setStatus([
-                'status'  => 'completed',
+                'status' => 'completed',
                 'created' => $status['created'],
                 'updated' => $status['updated'],
-                'failed'  => $status['failed'],
-                'errors'  => $status['errors'],
+                'failed' => $status['failed'],
+                'errors' => $status['errors'],
             ]);
         } catch (\Throwable $e) {
             Log::error('Import master gagal', [
                 'entity' => $this->entity,
-                'token'  => $this->token,
-                'error'  => $e->getMessage(),
+                'token' => $this->token,
+                'error' => $e->getMessage(),
             ]);
 
             $this->setStatus([
-                'status'  => 'failed',
+                'status' => 'failed',
                 'message' => $e->getMessage(),
             ]);
         }
@@ -149,7 +150,7 @@ class ImportMasterJob implements ShouldQueue
 
     private function updateStatus(array $delta): array
     {
-        return Cache::lock(self::cacheKey($this->token) . ':lock', 10)->block(5, function () use ($delta): array {
+        return Cache::lock(self::cacheKey($this->token).':lock', 10)->block(5, function () use ($delta): array {
             $status = Cache::get(self::cacheKey($this->token), []);
             $status['status'] = $delta['status'] ?? $status['status'] ?? 'processing';
             $status['processed'] = ($status['processed'] ?? 0) + ($delta['processed'] ?? 0);

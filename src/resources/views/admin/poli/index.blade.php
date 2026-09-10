@@ -91,7 +91,7 @@
                     <tr class="border-b border-slate-100 text-[11px] uppercase tracking-wider text-slate-400">
                         <th class="px-6 py-3.5 font-semibold">Poli</th>
                         <th class="px-6 py-3.5 font-semibold">Kode</th>
-                        <th class="px-6 py-3.5 font-semibold">Jumlah Dokter</th>
+                        {{-- <th class="px-6 py-3.5 font-semibold">Jumlah Dokter</th> --}}
                         <th class="px-6 py-3.5 text-right font-semibold">Aksi</th>
                     </tr>
                 </thead>
@@ -114,12 +114,12 @@
                                     <span class="text-xs italic text-slate-400">—</span>
                                 </template>
                             </td>
-                            <td class="whitespace-nowrap px-6 py-4">
+                            {{-- <td class="whitespace-nowrap px-6 py-4">
                                 <span class="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-bold tabular-nums text-slate-600">
                                     <span x-text="p.doktersCount"></span>
                                     <span class="text-[10px] font-medium text-slate-400">dokter</span>
                                 </span>
-                            </td>
+                            </td> --}}
                             <td class="whitespace-nowrap px-6 py-4 text-right">
                                 <div class="flex items-center justify-end gap-1.5 opacity-60 transition-opacity group-hover:opacity-100 lg:opacity-0">
                                     <a :href="p.editUrl" title="Edit Poli"

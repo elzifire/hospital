@@ -3,9 +3,10 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Pnpp;
 use App\Models\PenyakitKronis;
 use App\Models\PenyakitMenahun;
+use App\Models\Pnpp;
+use App\Models\Poli;
 use App\Models\Satker;
 use App\Support\MasterRegistry;
 use Illuminate\Http\Request;
@@ -22,11 +23,11 @@ class PnppController extends Controller
             ->withCount('kunjungans');
 
         $counts = [
-            'total'     => Pnpp::count(),
+            'total' => Pnpp::count(),
             // 'laki'      => Pnpp::where('jenis_kelamin', 'L')->count(),
             // 'perempuan' => Pnpp::where('jenis_kelamin', 'P')->count(),
-            'kronis'    => Pnpp::whereHas('penyakit')->count(),
-            'menahun'   => Pnpp::whereHas('penyakitMenahun')->count(),
+            'kronis' => Pnpp::whereHas('penyakit')->count(),
+            'menahun' => Pnpp::whereHas('penyakitMenahun')->count(),
         ];
 
         if ($search = $request->query('search')) {
@@ -58,10 +59,10 @@ class PnppController extends Controller
         }
 
         match ($request->query('sort', 'az')) {
-            'za'     => $query->orderByDesc('nama'),
+            'za' => $query->orderByDesc('nama'),
             'newest' => $query->orderByDesc('created_at'),
             'oldest' => $query->orderBy('created_at'),
-            default  => $query->orderBy('nama'),
+            default => $query->orderBy('nama'),
         };
 
         $pnpps = $query->paginate((int) $request->query('per_page', 10))->withQueryString();
@@ -76,7 +77,7 @@ class PnppController extends Controller
      */
     public function create()
     {
-        $satkers   = Satker::orderBy('nama')->get();
+        $satkers = Satker::orderBy('nama')->get();
         $penyakits = PenyakitKronis::orderBy('nama')->get();
         $penyakitMenahuns = PenyakitMenahun::orderBy('nama')->get();
 
@@ -109,7 +110,7 @@ class PnppController extends Controller
     {
         $pnpp->load(['penyakit', 'penyakitMenahun']);
 
-        $satkers   = Satker::orderBy('nama')->get();
+        $satkers = Satker::orderBy('nama')->get();
         $penyakits = PenyakitKronis::orderBy('nama')->get();
         $penyakitMenahuns = PenyakitMenahun::orderBy('nama')->get();
 
@@ -146,41 +147,50 @@ class PnppController extends Controller
     }
 
     /**
-     * Halaman riwayat kunjungan untuk satu PNPP.
+     * Halaman riwayat kunjungan untuk satu PNPP (group per tanggal,
+     * satu tanggal bisa beberapa poli).
      */
     public function kunjungan(Pnpp $pnpp)
     {
-        $pnpp->load(['satker', 'penyakit', 'penyakitMenahun', 'kunjungans' => fn ($q) => $q->orderByDesc('tanggal_kunjungan')]);
+        $pnpp->load([
+            'satker',
+            'penyakit',
+            'penyakitMenahun',
+            'kunjungans' => fn ($q) => $q->with('poli:id,nama')->orderByDesc('tanggal_kunjungan'),
+        ]);
 
-        return view('admin.pnpp.kunjungan', compact('pnpp'));
+        return view('admin.pnpp.kunjungan', [
+            'pnpp' => $pnpp,
+            'polis' => Poli::orderBy('nama')->get(['id', 'nama']),
+        ]);
     }
 
     private function validated(Request $request, ?Pnpp $pnpp = null): array
     {
         $request->merge([
             'no_bpjs' => MasterRegistry::normalizeDigits($request->input('no_bpjs')),
-            'no_hp'   => MasterRegistry::normalizePhone($request->input('no_hp')),
+            'no_hp' => MasterRegistry::normalizePhone($request->input('no_hp')),
         ]);
 
         return $request->validate([
-            'nama'               => ['required', 'string', 'max:255'],
-            'nip'                => ['nullable', 'string', 'max:50', 'unique:pnpps,nip' . ($pnpp ? ',' . $pnpp->id : '')],
+            'nama' => ['required', 'string', 'max:255'],
+            'nip' => ['nullable', 'string', 'max:50', 'unique:pnpps,nip'.($pnpp ? ','.$pnpp->id : '')],
             'status_kepegawaian' => ['nullable', 'string', 'max:100'],
-            'pangkat'            => ['nullable', 'string', 'max:100'],
-            'jabatan'            => ['nullable', 'string', 'max:100'],
-            'satuan_kerja'       => ['nullable', 'string', 'max:255'],
-            'bagian'             => ['nullable', 'string', 'max:100'],
-            'email'              => ['nullable', 'string', 'email', 'max:255'],
-            'alamat'             => ['nullable', 'string', 'max:500'],
-            'no_bpjs'            => ['nullable', 'string', 'max:50', 'unique:pnpps,no_bpjs' . ($pnpp ? ',' . $pnpp->id : '')],
-            'satker_id'          => ['nullable', 'integer', 'exists:satkers,id'],
-            'no_hp'              => ['nullable', 'string', 'max:20'],
-            'tanggal_lahir'      => ['nullable', 'date'],
-            'jenis_kelamin'      => ['nullable', 'in:L,P'],
-            'status_aktif'       => ['nullable', 'in:aktif,nonaktif'],
-            'penyakit'           => ['nullable', 'array'],
-            'penyakit.*'         => ['integer', 'exists:penyakit_kronis,id'],
-            'penyakit_menahun'   => ['nullable', 'array'],
+            'pangkat' => ['nullable', 'string', 'max:100'],
+            'jabatan' => ['nullable', 'string', 'max:100'],
+            'satuan_kerja' => ['nullable', 'string', 'max:255'],
+            'bagian' => ['nullable', 'string', 'max:100'],
+            'email' => ['nullable', 'string', 'email', 'max:255'],
+            'alamat' => ['nullable', 'string', 'max:500'],
+            'no_bpjs' => ['nullable', 'string', 'max:50', 'unique:pnpps,no_bpjs'.($pnpp ? ','.$pnpp->id : '')],
+            'satker_id' => ['nullable', 'integer', 'exists:satkers,id'],
+            'no_hp' => ['nullable', 'string', 'max:20'],
+            'tanggal_lahir' => ['nullable', 'date'],
+            'jenis_kelamin' => ['nullable', 'in:L,P'],
+            'status_aktif' => ['nullable', 'in:aktif,nonaktif'],
+            'penyakit' => ['nullable', 'array'],
+            'penyakit.*' => ['integer', 'exists:penyakit_kronis,id'],
+            'penyakit_menahun' => ['nullable', 'array'],
             'penyakit_menahun.*' => ['integer', 'exists:penyakit_menahuns,id'],
         ]);
     }

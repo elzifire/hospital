@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Pnpp;
 use Illuminate\Http\Request;
 
 class DashboardController extends Controller
@@ -13,13 +14,15 @@ class DashboardController extends Controller
     {
         $user = $request->user();
 
+        $pnppCount = Pnpp::count();
         // ============================================================
         // DATA DUMMY DASHBOARD — PROAKTIF RS BHAYANGKARA BOGOR
         // ============================================================
 
         // Statistik kartu teratas
         $stats = [
-            ['label' => 'PNPP DALAM DATABASE',  'value' => '1.026', 'note' => '100% dari target data',      'color' => 'blue',   'icon' => 'users'],
+            ['label' => 'PNPP DALAM DATABASE',  'value' => $pnppCount, 'note' => '100% dari target data',      'color' => 'blue',   'icon' => 'users'],
+            ['label' => 'TARGET PNPP',          'value' => '1.025', 'note' => 'Target data PNPP 2024',       'color' => 'gray',   'icon' => 'target'],
             ['label' => 'PNPP DI-OUTREACH',     'value' => '650',   'note' => '63,4% dari target',          'color' => 'green',  'icon' => 'send'],
             ['label' => 'RESPON PNPP',           'value' => '390',   'note' => '60,0% dari outreach',        'color' => 'orange', 'icon' => 'chat'],
             ['label' => 'FOLLOW-UP',             'value' => '350',   'note' => '89,7% dari respons',         'color' => 'cyan',   'icon' => 'refresh'],
@@ -49,7 +52,7 @@ class DashboardController extends Controller
 
         // Status follow-up (donut)
         $followup = [
-            'total'  => 350,
+            'total' => 350,
             'series' => [
                 ['name' => 'Selesai',     'value' => 220, 'percent' => '62,9%', 'color' => '#22c55e'],
                 ['name' => 'Proses',      'value' => 90,  'percent' => '25,7%', 'color' => '#f59e0b'],
@@ -60,7 +63,7 @@ class DashboardController extends Controller
         // Follow-up hari ini
         $followupToday = [
             'count' => 13,
-            'note'  => 'PNPP perlu ditindaklanjuti',
+            'note' => 'PNPP perlu ditindaklanjuti',
         ];
 
         // Aktivitas terkini
@@ -69,7 +72,7 @@ class DashboardController extends Controller
             ['title' => 'Respon PNPP',         'name' => 'Brigadir Rizky Safiet',  'satker' => 'Polresta Bogor',      'time' => '08:45', 'color' => 'orange', 'icon' => 'chat'],
             ['title' => 'Reminder Terkirim',   'name' => 'Aipda Martha Gumanti',   'satker' => 'Polsek Bogor Utara',  'time' => '08:30', 'color' => 'yellow', 'icon' => 'bell'],
             ['title' => 'Follow-up Selesai',   'name' => 'Brigadir Andi Saputra',  'satker' => 'Polsek Bogor Timur',  'time' => '07:15', 'color' => 'blue',   'icon' => 'check'],
-            ['title' => 'Kunjungan PNPP',      'name' => 'Brigadir Siti Nurhaliza','satker' => 'Polsek Bogor Selatan','time' => '07:00', 'color' => 'purple', 'icon' => 'visit'],
+            ['title' => 'Kunjungan PNPP',      'name' => 'Brigadir Siti Nurhaliza', 'satker' => 'Polsek Bogor Selatan', 'time' => '07:00', 'color' => 'purple', 'icon' => 'visit'],
         ];
 
         // Monitoring target 60 hari
@@ -84,7 +87,7 @@ class DashboardController extends Controller
         // Kunjungan PNPP hari ini
         $kunjunganToday = [
             'total' => 8,
-            'items'   => [
+            'items' => [
                 ['label' => 'IGD',         'value' => 2, 'color' => 'blue'],
                 ['label' => 'Rawat Jalan', 'value' => 6, 'color' => 'cyan'],
                 ['label' => 'Rawat Inap',  'value' => 0, 'color' => 'gray'],
@@ -99,18 +102,18 @@ class DashboardController extends Controller
         ];
 
         return view('dashboard', [
-            'user'             => $user,
-            'role'             => $user->getRoleNames()->first() ?? 'No Role',
-            'permissions'      => $user->getAllPermissions()->pluck('name'),
-            'stats'            => $stats,
-            'trend'            => $trend,
-            'outreach'         => $outreach,
-            'followup'         => $followup,
-            'followupToday'    => $followupToday,
-            'activities'       => $activities,
-            'monitoring'       => $monitoring,
-            'kunjunganToday'   => $kunjunganToday,
-            'alerts'           => $alerts,
+            'user' => $user,
+            'role' => $user->getRoleNames()->first() ?? 'No Role',
+            'permissions' => $user->getAllPermissions()->pluck('name'),
+            'stats' => $stats,
+            'trend' => $trend,
+            'outreach' => $outreach,
+            'followup' => $followup,
+            'followupToday' => $followupToday,
+            'activities' => $activities,
+            'monitoring' => $monitoring,
+            'kunjunganToday' => $kunjunganToday,
+            'alerts' => $alerts,
         ]);
     }
 }

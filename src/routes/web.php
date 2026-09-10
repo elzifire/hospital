@@ -1,32 +1,37 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Auth\AuthController;
-use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\Admin\RoleController;
-use App\Http\Controllers\Admin\PermissionController;
-use App\Http\Controllers\Admin\UserController;
-use App\Http\Controllers\Admin\ProfileController;
-use App\Http\Controllers\Admin\PnppController;
-use App\Http\Controllers\Admin\SatkerController;
+use App\Http\Controllers\Admin\BroadcastLogController;
+use App\Http\Controllers\Admin\DigitalReminderController;
+use App\Http\Controllers\Admin\DokterController;
+use App\Http\Controllers\Admin\FollowUpController;
+use App\Http\Controllers\Admin\JadwalController;
+use App\Http\Controllers\Admin\KunjunganController;
+use App\Http\Controllers\Admin\MasterExportController;
+use App\Http\Controllers\Admin\MasterImportController;
+use App\Http\Controllers\Admin\Monitoring\MonitoringController;
+use App\Http\Controllers\Admin\Monitoring\ReportController;
+use App\Http\Controllers\Admin\Monitoring\ReportExportController;
+use App\Http\Controllers\Admin\OutreachController;
 use App\Http\Controllers\Admin\PenyakitKronisController;
 use App\Http\Controllers\Admin\PenyakitMenahunController;
-use App\Http\Controllers\Admin\KunjunganController;
+use App\Http\Controllers\Admin\PermissionController;
+use App\Http\Controllers\Admin\PnppController;
 use App\Http\Controllers\Admin\PoliController;
-use App\Http\Controllers\Admin\DokterController;
-use App\Http\Controllers\Admin\JadwalController;
-use App\Http\Controllers\Admin\MasterImportController;
-use App\Http\Controllers\Admin\MasterExportController;
-use App\Http\Controllers\Admin\DigitalReminderController;
-use App\Http\Controllers\Admin\FollowUpController;
-use App\Http\Controllers\Admin\OutreachController;
+use App\Http\Controllers\Admin\ProfileController;
 use App\Http\Controllers\Admin\ResponController;
-use App\Http\Controllers\Admin\MonitoringController;
-use App\Http\Controllers\Admin\SettingController;
-use App\Http\Controllers\Admin\Setting\TemplateCategoryController;
+use App\Http\Controllers\Admin\RoleController;
+use App\Http\Controllers\Admin\SatkerController;
+use App\Http\Controllers\Admin\Setting\BroadcastRuleController;
 use App\Http\Controllers\Admin\Setting\MessageTemplateController;
+use App\Http\Controllers\Admin\Setting\TemplateCategoryController;
 use App\Http\Controllers\Admin\Setting\TemplateExportController;
 use App\Http\Controllers\Admin\Setting\TemplateImportController;
+use App\Http\Controllers\Admin\SettingController;
+use App\Http\Controllers\Admin\UserController;
+use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Webhook\WhatsAppWebhookController;
+use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
@@ -47,6 +52,10 @@ Route::middleware('guest')->group(function () {
     Route::post('/login', [AuthController::class, 'login']);
 });
 
+// Webhook WhatsApp (dipanggil WAHA dari luar — tanpa sesi login)
+Route::post('/webhook/whatsapp', [WhatsAppWebhookController::class, 'handle'])
+    ->name('webhook.whatsapp');
+
 // Authenticated routes
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
@@ -55,20 +64,70 @@ Route::middleware('auth')->group(function () {
     Route::prefix('admin')->name('admin.')->group(function () {
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-        // Modul Broadcasting & Layanan (halaman referensi UI)
-        Route::get('kunjungan', [KunjunganController::class, 'index'])->name('kunjungan.index');
-        Route::get('monitoring', [MonitoringController::class, 'index'])->name('monitoring.index');
+        // Modul Kunjungan: riwayat berobat pasien PNPP — satu pasien bisa
+        // mengunjungi beberapa poli dalam satu tanggal (1 baris per poli).
+        Route::middleware('can:manage kunjungan')->group(function () {
+            Route::get('kunjungan', [KunjunganController::class, 'index'])->name('kunjungan.index');
+            Route::get('kunjungan/create', [KunjunganController::class, 'create'])->name('kunjungan.create');
+            Route::post('kunjungan', [KunjunganController::class, 'store'])->name('kunjungan.store');
 
-        Route::get('digital-reminder', [DigitalReminderController::class, 'index'])->name('digital-reminder.index');
-        Route::get('digital-reminder/template', fn () => redirect()->route('admin.setting.index'))->name('digital-reminder.template');
-        Route::get('digital-reminder/create', [DigitalReminderController::class, 'create'])->name('digital-reminder.create');
-        Route::get('digital-reminder/{id}/edit', [DigitalReminderController::class, 'edit'])->name('digital-reminder.edit');
-        Route::get('digital-reminder/import', [DigitalReminderController::class, 'import'])->name('digital-reminder.import');
+            // Riwayat kunjungan satu PNPP (tambah/edit/hapus baris poli).
+            Route::get('pnpp/{pnpp}/kunjungan', [PnppController::class, 'kunjungan'])->name('pnpp.kunjungan');
+            Route::post('pnpp/{pnpp}/kunjungan', [KunjunganController::class, 'storeUntukPasien'])->name('pnpp.kunjungan.store');
+            Route::get('pnpp/{pnpp}/kunjungan/{kunjungan}/edit', [KunjunganController::class, 'edit'])->name('pnpp.kunjungan.edit');
+            Route::put('pnpp/{pnpp}/kunjungan/{kunjungan}', [KunjunganController::class, 'update'])->name('pnpp.kunjungan.update');
+            Route::delete('pnpp/{pnpp}/kunjungan/{kunjungan}', [KunjunganController::class, 'destroy'])->name('pnpp.kunjungan.destroy');
+        });
 
-        // Pengaturan Template Pesan & Kategori
-        Route::prefix('setting')->name('setting.')->group(function () {
+        // Modul Monitoring (laporan): hub kartu + detail laporan per entitas.
+        // Detail & export mendukung pagination sisi server, filter, search,
+        // dan unduhan xlsx/csv yang mengikuti filter aktif. Tiap laporan
+        // terkunci permission fiturnya (lihat MonitoringRegistry).
+        Route::prefix('monitoring')->name('monitoring.')->group(function () {
+            Route::get('/', [MonitoringController::class, 'index'])->name('index');
+            Route::get('report/{entity}', [ReportController::class, 'show'])->name('report.show');
+            Route::get('report/{entity}/export', [ReportExportController::class, 'download'])->name('report.export');
+        });
+
+        // Modul broadcast — tiap modul terkunci permission fiturnya sendiri.
+        // Digital Reminder: CRUD penjadwalan kunjungan (murni jadwal).
+        Route::middleware('can:manage digital-reminder')->group(function () {
+            Route::resource('digital-reminder', DigitalReminderController::class)
+                ->except('show')
+                ->parameters(['digital-reminder' => 'reminder']);
+
+            // Realisasi kunjungan dari sebuah penjadwalan → status selesai.
+            Route::post('digital-reminder/{reminder}/kunjungan', [DigitalReminderController::class, 'catatKunjungan'])
+                ->name('digital-reminder.kunjungan');
+        });
+
+        // Outreach: riwayat & generate pesan undangan jadwal (rule H-7, H-1).
+        Route::middleware('can:manage outreach')->group(function () {
+            Route::get('outreach', [OutreachController::class, 'index'])->name('outreach.index');
+            Route::post('outreach/generate', [OutreachController::class, 'generate'])->name('outreach.generate');
+        });
+
+        // Follow Up: riwayat & generate pesan tindak lanjut (H-1, hari-H, tidak datang).
+        Route::middleware('can:manage follow-up')->group(function () {
+            Route::get('follow-up', [FollowUpController::class, 'index'])->name('follow-up.index');
+            Route::post('follow-up/generate', [FollowUpController::class, 'generate'])->name('follow-up.generate');
+        });
+
+        // Respon: balasan pesan WhatsApp per nomor telepon (masuk via webhook)
+        Route::middleware('can:manage respon')->group(function () {
+            Route::get('respon', [ResponController::class, 'index'])->name('respon.index');
+            Route::get('respon/{nomor}', [ResponController::class, 'show'])->name('respon.show');
+        });
+
+        // Aksi atas riwayat pesan (dipakai lintas modul broadcast):
+        // permission dicek per jenis pesan di dalam controller.
+        Route::delete('broadcast/log/{log}/batalkan', [BroadcastLogController::class, 'batalkan'])->name('broadcast.batalkan');
+
+        // Pengaturan Template Pesan & Kategori (khusus pengelola template)
+        Route::prefix('setting')->name('setting.')->middleware('can:manage template')->group(function () {
             Route::get('/', [SettingController::class, 'index'])->name('index');
             Route::get('/template', [SettingController::class, 'template'])->name('template');
+            Route::put('/aturan/{aturan}', [BroadcastRuleController::class, 'update'])->name('aturan.update');
 
             // CRUD Kategori
             Route::post('kategori', [TemplateCategoryController::class, 'store'])->name('kategori.store');
@@ -91,61 +150,56 @@ Route::middleware('auth')->group(function () {
             Route::post('import/cancel', [TemplateImportController::class, 'cancel'])->name('import.cancel');
         });
 
-        Route::get('follow-up', [FollowUpController::class, 'index'])->name('follow-up.index');
-        Route::get('follow-up/create', [FollowUpController::class, 'create'])->name('follow-up.create');
-        Route::get('follow-up/{id}/edit', [FollowUpController::class, 'edit'])->name('follow-up.edit');
-        Route::get('follow-up/import', [FollowUpController::class, 'import'])->name('follow-up.import');
-
-        Route::get('outreach', [OutreachController::class, 'index'])->name('outreach.index');
-        Route::get('outreach/create', [OutreachController::class, 'create'])->name('outreach.create');
-        Route::get('outreach/{id}/edit', [OutreachController::class, 'edit'])->name('outreach.edit');
-        Route::get('outreach/import', [OutreachController::class, 'import'])->name('outreach.import');
-
-        // Respon: balasan pesan WhatsApp per nomor telepon (masuk via webhook)
-        Route::get('respon', [ResponController::class, 'index'])->name('respon.index');
-        Route::get('respon/{nomor}', [ResponController::class, 'show'])->name('respon.show');
-
         // Profil (self-service): ubah nama & password milik sendiri.
         // Tidak pakai middleware role → semua user login bisa akses datanya sendiri.
         Route::get('profile', [ProfileController::class, 'edit'])->name('profile.edit');
         Route::patch('profile', [ProfileController::class, 'update'])->name('profile.update');
         Route::put('profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password.update');
 
-        // Users Management (Accessible by superadmin and admin)
+        // Manajemen Pengguna
         Route::resource('users', UserController::class)->only(['index', 'create', 'store', 'edit', 'update', 'destroy'])
-            ->middleware('role:superadmin|admin');
+            ->middleware('can:manage users');
 
-        // Roles & Permissions Management (Only accessible by superadmin)
-        Route::resource('roles', RoleController::class)->middleware('role:superadmin');
-        Route::resource('permissions', PermissionController::class)->middleware('role:superadmin');
+        // Manajemen Role & Permission (khusus pemegang "manage roles")
+        Route::resource('roles', RoleController::class)->middleware('can:manage roles');
+        Route::resource('permissions', PermissionController::class)->middleware('can:manage roles');
 
-        // Data Master (PNPP, Satker, Penyakit Kronis) — pemegang permission "manage master"
-        Route::middleware('permission:manage master')->group(function () {
+        // Data Master — tiap entitas terkunci permission fiturnya sendiri.
+        Route::middleware('can:manage pnpp')->group(function () {
+            Route::resource('pnpp', PnppController::class)->except('show');
+        });
+
+        Route::middleware('can:manage satker')->group(function () {
             Route::resource('satker', SatkerController::class)->except('show');
+        });
+
+        Route::middleware('can:manage penyakit')->group(function () {
             Route::resource('penyakit', PenyakitKronisController::class)->except('show');
             Route::resource('penyakit-menahun', PenyakitMenahunController::class)
                 ->except('show')
                 ->parameters(['penyakit-menahun' => 'penyakitMenahun']);
-            Route::resource('pnpp', PnppController::class)->except('show');
-
-            // Poli, Dokter & Jadwal
-            Route::resource('poli', PoliController::class)->except('show');
-            Route::resource('dokter', DokterController::class)->except('show');
-            Route::resource('jadwal', JadwalController::class)->except('show');
-
-            // Import & Export data master (semua entitas, per entitas halaman tersendiri)
-            Route::get('master/{entity}/import', [MasterImportController::class, 'index'])->name('master.import');
-            Route::post('master/{entity}/import/upload', [MasterImportController::class, 'upload'])->name('master.import.upload');
-            Route::post('master/{entity}/import/confirm', [MasterImportController::class, 'confirm'])->name('master.import.confirm');
-            Route::post('master/{entity}/import/cancel', [MasterImportController::class, 'cancel'])->name('master.import.cancel');
-            Route::get('master/{entity}/export', [MasterExportController::class, 'index'])->name('master.export');
-            Route::get('master/{entity}/export/download', [MasterExportController::class, 'download'])->name('master.export.download');
-            Route::get('master/{entity}/template', [MasterExportController::class, 'template'])->name('master.template');
-
-            // Riwayat kunjungan per PNPP
-            Route::get('pnpp/{pnpp}/kunjungan', [PnppController::class, 'kunjungan'])->name('pnpp.kunjungan');
-            Route::post('pnpp/{pnpp}/kunjungan', [KunjunganController::class, 'store'])->name('pnpp.kunjungan.store');
-            Route::delete('pnpp/{pnpp}/kunjungan/{kunjungan}', [KunjunganController::class, 'destroy'])->name('pnpp.kunjungan.destroy');
         });
+
+        Route::middleware('can:manage poli')->group(function () {
+            Route::resource('poli', PoliController::class)->except('show');
+        });
+
+        Route::middleware('can:manage dokter')->group(function () {
+            Route::resource('dokter', DokterController::class)->except('show');
+        });
+
+        Route::middleware('can:manage jadwal')->group(function () {
+            Route::resource('jadwal', JadwalController::class)->except('show');
+        });
+
+        // Import & Export data master: permission per entitas dicek di
+        // controller (MasterRegistry menyimpan permission tiap entitas).
+        Route::get('master/{entity}/import', [MasterImportController::class, 'index'])->name('master.import');
+        Route::post('master/{entity}/import/upload', [MasterImportController::class, 'upload'])->name('master.import.upload');
+        Route::post('master/{entity}/import/confirm', [MasterImportController::class, 'confirm'])->name('master.import.confirm');
+        Route::post('master/{entity}/import/cancel', [MasterImportController::class, 'cancel'])->name('master.import.cancel');
+        Route::get('master/{entity}/export', [MasterExportController::class, 'index'])->name('master.export');
+        Route::get('master/{entity}/export/download', [MasterExportController::class, 'download'])->name('master.export.download');
+        Route::get('master/{entity}/template', [MasterExportController::class, 'template'])->name('master.template');
     });
 });

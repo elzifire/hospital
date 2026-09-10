@@ -2,69 +2,76 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Broadcasting\BroadcastService;
 use App\Http\Controllers\Controller;
-use App\Models\MessageTemplate;
-use App\Models\Pnpp;
-use App\Models\Satker;
+use App\Models\MessageLog;
+use Illuminate\Http\Request;
 
+/**
+ * Modul Follow Up — riwayat pesan tindak lanjut (rule H-1, hari-H, dan
+ * tidak-datang) yang digenerate dari penjadwalan Digital Reminder.
+ */
 class FollowUpController extends Controller
 {
     /**
-     * Halaman Follow Up (referensi UI — belum ada logic).
+     * Riwayat pesan follow up — data nyata, dengan ringkasan status,
+     * pencarian, filter status/aturan, dan pembatalan.
      */
-    public function index()
+    public function index(Request $request)
     {
-        return view('admin.follow-up.index');
+        $q = (string) $request->query('q', '');
+        $status = (string) $request->query('status', '');
+        $rule = (string) $request->query('rule', '');
+
+        $logs = MessageLog::query()
+            ->jenis('follow_up')
+            ->with('template:id,judul', 'reminder.poli:id,nama')
+            ->when($q, fn ($query) => $query->where(
+                fn ($sub) => $sub->where('penerima_nama', 'like', "%{$q}%")
+                    ->orWhere('penerima_no_hp', 'like', "%{$q}%")
+                    ->orWhere('konten', 'like', "%{$q}%")
+            ))
+            ->when($status, fn ($query) => $query->where('status', $status))
+            ->when($rule, fn ($query) => $query->where('rule', $rule))
+            ->orderByDesc('id')
+            ->paginate(10)
+            ->withQueryString();
+
+        $perStatus = MessageLog::jenis('follow_up')
+            ->selectRaw('status, count(*) as total')
+            ->groupBy('status')
+            ->pluck('total', 'status');
+
+        return view('admin.follow-up.index', [
+            'logs' => $logs,
+            'perStatus' => $perStatus,
+            'penerimaUnik' => MessageLog::jenis('follow_up')->distinct()->count('pnpp_id'),
+            'total' => (int) $perStatus->sum(),
+            'filters' => ['q' => $q, 'status' => $status, 'rule' => $rule],
+        ]);
     }
 
     /**
-     * Halaman tambah follow up.
-     * Alur: pilih satker -> pilih PNPP -> atur pesan & jadwal kirim ulang.
+     * Generate pesan follow up (H-1, hari-H, tidak-datang) dari
+     * penjadwalan aktif — sekaligus menyapu status penjadwalan lewat
+     * tanpa kunjungan.
      */
-    public function create()
+    public function generate(Request $request)
     {
-        return view('admin.follow-up.create', $this->masterData());
-    }
+        $service = app(BroadcastService::class);
 
-    /**
-     * Halaman edit follow up.
-     */
-    public function edit()
-    {
-        return view('admin.follow-up.edit', $this->masterData());
-    }
+        $ditandai = $service->sweepStatus();
+        $hasil = $service->generate('follow_up', $request->user());
 
-    /**
-     * Halaman import follow up (referensi UI — belum ada logic).
-     */
-    public function import()
-    {
-        return view('admin.follow-up.import');
-    }
+        $pesan = $hasil['dibuat'].' pesan follow up dibuat, '
+            .$hasil['dilewati'].' dilewati (sudah pernah dibuat).';
 
-    /**
-     * Data master untuk form Follow Up (read-only, tanpa insert/update).
-     */
-    private function masterData(): array
-    {
-        $satkers = Satker::orderBy('nama')->get(['id', 'kode', 'nama']);
+        if ($ditandai > 0) {
+            $pesan .= " {$ditandai} penjadwalan lewat tanpa kunjungan ditandai tidak datang.";
+        }
 
-        $pnpps = Pnpp::orderBy('nama')
-            ->get()
-            ->map(fn ($p) => [
-                'id'       => $p->id,
-                'nama'     => $p->nama,
-                'nip'      => $p->nip,
-                'noHp'     => $p->no_hp,
-                'satkerId' => $p->satker_id,
-            ]);
-
-        $templates = MessageTemplate::query()
-            ->where('channel', 'WhatsApp')
-            ->where('is_active', true)
-            ->orderBy('judul')
-            ->get(['id', 'judul', 'konten']);
-
-        return compact('satkers', 'pnpps', 'templates');
+        return redirect()
+            ->route('admin.follow-up.index')
+            ->with('success', $pesan);
     }
 }

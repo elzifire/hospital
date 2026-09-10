@@ -16,6 +16,7 @@ use DateTimeImmutable;
  *
  * Setiap entitas mendefinisikan:
  *  - label        : nama tampilan
+ *  - permission   : permission fitur yang mengunci import/export entitas
  *  - model        : class model Eloquent
  *  - eager        : relasi yang dimuat saat export
  *  - headers      : nama kolom CSV (harus sama urutannya dengan sample/toRow)
@@ -55,39 +56,39 @@ class MasterRegistry
     public static function fields(string $entity): array
     {
         $select = fn (array $options) => ['type' => 'select', 'options' => array_values($options)];
-        $multi  = fn (array $options) => ['type' => 'multiselect', 'options' => array_values($options)];
-        $text   = ['type' => 'text'];
+        $multi = fn (array $options) => ['type' => 'multiselect', 'options' => array_values($options)];
+        $text = ['type' => 'text'];
 
         return match ($entity) {
             'pnpp' => [
-                'Nama'               => $text,
-                'NIP/NRP'            => $text,
+                'Nama' => $text,
+                'NIP/NRP' => $text,
                 'Status Kepegawaian' => $select(['Anggota Polri', 'PNS', 'TNI', 'ASN Polri']),
-                'Pangkat'            => $text,
-                'Jabatan'            => $text,
-                'Satker'             => $select(Satker::orderBy('nama')->pluck('nama')->all()),
-                'Satuan Kerja'       => $text,
-                'Bagian'             => $text,
-                'Email'              => $text,
-                'Alamat'             => $text,
-                'No. BPJS'           => $text,
-                'No. HP'             => $text,
-                'Tanggal Lahir'      => $text,
-                'Jenis Kelamin'      => $select(['L', 'P']),
-                'Status Aktif'       => $select(['aktif', 'nonaktif']),
-                'Penyakit Kronis'    => $multi(PenyakitKronis::orderBy('nama')->pluck('nama')->all()),
-                'Penyakit Menahun'   => $multi(PenyakitMenahun::orderBy('nama')->pluck('nama')->all()),
+                'Pangkat' => $text,
+                'Jabatan' => $text,
+                'Satker' => $select(Satker::orderBy('nama')->pluck('nama')->all()),
+                'Satuan Kerja' => $text,
+                'Bagian' => $text,
+                'Email' => $text,
+                'Alamat' => $text,
+                'No. BPJS' => $text,
+                'No. HP' => $text,
+                'Tanggal Lahir' => $text,
+                'Jenis Kelamin' => $select(['L', 'P']),
+                'Status Aktif' => $select(['aktif', 'nonaktif']),
+                'Penyakit Kronis' => $multi(PenyakitKronis::orderBy('nama')->pluck('nama')->all()),
+                'Penyakit Menahun' => $multi(PenyakitMenahun::orderBy('nama')->pluck('nama')->all()),
             ],
             'dokter' => [
-                'Nama'         => $text,
-                'Poli'         => $select(Poli::orderBy('nama')->pluck('nama')->all()),
+                'Nama' => $text,
+                'Poli' => $select(Poli::orderBy('nama')->pluck('nama')->all()),
                 'Spesialisasi' => $text,
             ],
             'jadwal' => [
-                'Poli'        => $select(Poli::orderBy('nama')->pluck('nama')->all()),
-                'Dokter'      => $select(Dokter::orderBy('nama')->pluck('nama')->all()),
-                'Hari'        => $select(Jadwal::HARI),
-                'Jam Mulai'   => $text,
+                'Poli' => $select(Poli::orderBy('nama')->pluck('nama')->all()),
+                'Dokter' => $select(Dokter::orderBy('nama')->pluck('nama')->all()),
+                'Hari' => $select(Jadwal::HARI),
+                'Jam Mulai' => $text,
                 'Jam Selesai' => $text,
             ],
             default => collect(self::config($entity)['headers'])
@@ -100,78 +101,85 @@ class MasterRegistry
     {
         return [
             'satker' => [
-                'label'   => 'Satker',
-                'model'   => Satker::class,
-                'eager'   => [],
+                'label' => 'Satker',
+                'permission' => 'manage satker',
+                'model' => Satker::class,
+                'eager' => [],
                 'headers' => ['Kode', 'Nama'],
-                'sample'  => ['DINKES', 'Dinas Kesehatan'],
-                'toRow'   => fn (Satker $m) => [$m->kode ?? '', $m->nama],
-                'parse'   => fn (array $r) => self::parseKodeNama($r),
+                'sample' => ['DINKES', 'Dinas Kesehatan'],
+                'toRow' => fn (Satker $m) => [$m->kode ?? '', $m->nama],
+                'parse' => fn (array $r) => self::parseKodeNama($r),
             ],
 
             'penyakit' => [
-                'label'   => 'Penyakit Kronis',
-                'model'   => PenyakitKronis::class,
-                'eager'   => [],
+                'label' => 'Penyakit Kronis',
+                'permission' => 'manage penyakit',
+                'model' => PenyakitKronis::class,
+                'eager' => [],
                 'headers' => ['Kode', 'Nama'],
-                'sample'  => ['HTN', 'Hipertensi'],
-                'toRow'   => fn (PenyakitKronis $m) => [$m->kode ?? '', $m->nama],
-                'parse'   => fn (array $r) => self::parseKodeNama($r),
+                'sample' => ['HTN', 'Hipertensi'],
+                'toRow' => fn (PenyakitKronis $m) => [$m->kode ?? '', $m->nama],
+                'parse' => fn (array $r) => self::parseKodeNama($r),
             ],
 
             'penyakit-menahun' => [
-                'label'   => 'Penyakit Menahun',
-                'model'   => PenyakitMenahun::class,
-                'eager'   => [],
+                'label' => 'Penyakit Menahun',
+                'permission' => 'manage penyakit',
+                'model' => PenyakitMenahun::class,
+                'eager' => [],
                 'headers' => ['Kode', 'Nama'],
-                'sample'  => ['GINJAL', 'Gagal Ginjal Kronis'],
-                'toRow'   => fn (PenyakitMenahun $m) => [$m->kode ?? '', $m->nama],
-                'parse'   => fn (array $r) => self::parseKodeNama($r),
+                'sample' => ['GINJAL', 'Gagal Ginjal Kronis'],
+                'toRow' => fn (PenyakitMenahun $m) => [$m->kode ?? '', $m->nama],
+                'parse' => fn (array $r) => self::parseKodeNama($r),
             ],
 
             'poli' => [
-                'label'   => 'Poli',
-                'model'   => Poli::class,
-                'eager'   => [],
+                'label' => 'Poli',
+                'permission' => 'manage poli',
+                'model' => Poli::class,
+                'eager' => [],
                 'headers' => ['Kode', 'Nama'],
-                'sample'  => ['GIGI', 'Poli Gigi'],
-                'toRow'   => fn (Poli $m) => [$m->kode ?? '', $m->nama],
-                'parse'   => fn (array $r) => self::parseKodeNama($r),
+                'sample' => ['GIGI', 'Poli Gigi'],
+                'toRow' => fn (Poli $m) => [$m->kode ?? '', $m->nama],
+                'parse' => fn (array $r) => self::parseKodeNama($r),
             ],
 
             'dokter' => [
-                'label'   => 'Dokter',
-                'model'   => Dokter::class,
-                'eager'   => ['poli'],
+                'label' => 'Dokter',
+                'permission' => 'manage dokter',
+                'model' => Dokter::class,
+                'eager' => ['poli'],
                 'headers' => ['Nama', 'Poli', 'Spesialisasi'],
-                'sample'  => ['dr. Rina Pratiwi', 'Poli Umum', 'Dokter Umum'],
-                'toRow'   => fn (Dokter $m) => [$m->nama, $m->poli?->nama ?? '', $m->spesialisasi ?? ''],
-                'parse'   => fn (array $r) => self::parseDokter($r),
+                'sample' => ['dr. Rina Pratiwi', 'Poli Umum', 'Dokter Umum'],
+                'toRow' => fn (Dokter $m) => [$m->nama, $m->poli?->nama ?? '', $m->spesialisasi ?? ''],
+                'parse' => fn (array $r) => self::parseDokter($r),
             ],
 
             'jadwal' => [
-                'label'   => 'Jadwal',
-                'model'   => Jadwal::class,
-                'eager'   => ['dokter.poli'],
+                'label' => 'Jadwal',
+                'permission' => 'manage jadwal',
+                'model' => Jadwal::class,
+                'eager' => ['dokter.poli'],
                 'headers' => ['Poli', 'Dokter', 'Hari', 'Jam Mulai', 'Jam Selesai'],
-                'sample'  => ['Poli Umum', 'dr. Rina Pratiwi', 'Senin', '08:00', '12:00'],
-                'toRow'   => fn (Jadwal $m) => [
+                'sample' => ['Poli Umum', 'dr. Rina Pratiwi', 'Senin', '08:00', '12:00'],
+                'toRow' => fn (Jadwal $m) => [
                     $m->dokter?->poli?->nama ?? '',
                     $m->dokter?->nama ?? '',
                     $m->hari,
                     $m->jam_mulai->format('H:i'),
                     $m->jam_selesai->format('H:i'),
                 ],
-                'parse'   => fn (array $r) => self::parseJadwal($r),
+                'parse' => fn (array $r) => self::parseJadwal($r),
             ],
 
             'pnpp' => [
-                'label'   => 'PNPP',
-                'model'   => Pnpp::class,
-                'eager'   => ['satker', 'penyakit', 'penyakitMenahun'],
+                'label' => 'PNPP',
+                'permission' => 'manage pnpp',
+                'model' => Pnpp::class,
+                'eager' => ['satker', 'penyakit', 'penyakitMenahun'],
                 'headers' => ['Nama', 'NIP/NRP', 'Status Kepegawaian', 'Pangkat', 'Jabatan', 'Satker', 'Satuan Kerja', 'Bagian', 'Email', 'Alamat', 'No. BPJS', 'No. HP', 'Tanggal Lahir', 'Jenis Kelamin', 'Status Aktif', 'Penyakit Kronis', 'Penyakit Menahun'],
-                'sample'  => ['Budi Santoso', '198501012010011001', 'Anggota Polri', 'Bripka', 'Bintara', 'Dinas Kesehatan', 'Dinas Kesehatan', 'Bagian Umum', 'budi@contoh.id', 'Jl. Merdeka No. 1', '0001234567890', '081234567890', '1985-01-01', 'L', 'aktif', 'Hipertensi, Diabetes Melitus', 'Gagal Ginjal Kronis'],
-                'toRow'   => fn (Pnpp $m) => [
+                'sample' => ['Budi Santoso', '198501012010011001', 'Anggota Polri', 'Bripka', 'Bintara', 'Dinas Kesehatan', 'Dinas Kesehatan', 'Bagian Umum', 'budi@contoh.id', 'Jl. Merdeka No. 1', '0001234567890', '081234567890', '1985-01-01', 'L', 'aktif', 'Hipertensi, Diabetes Melitus', 'Gagal Ginjal Kronis'],
+                'toRow' => fn (Pnpp $m) => [
                     $m->nama,
                     $m->nip ?? '',
                     $m->status_kepegawaian ?? '',
@@ -190,9 +198,9 @@ class MasterRegistry
                     $m->penyakit->pluck('nama')->implode(', '),
                     $m->penyakitMenahun->pluck('nama')->implode(', '),
                 ],
-                'parse'   => fn (array $r) => self::parsePnpp($r),
+                'parse' => fn (array $r) => self::parsePnpp($r),
                 'resolve' => fn (array $result) => self::resolvePnppSatker($result),
-                'sync'    => function (Pnpp $model, array $relations): void {
+                'sync' => function (Pnpp $model, array $relations): void {
                     $model->penyakit()->sync($relations['penyakit'] ?? []);
                     $model->penyakitMenahun()->sync($relations['penyakit_menahun'] ?? []);
                 },
@@ -206,8 +214,8 @@ class MasterRegistry
 
     private static function parseKodeNama(array $row): array
     {
-        $kode  = self::field($row, 'Kode');
-        $nama  = self::field($row, 'Nama');
+        $kode = self::field($row, 'Kode');
+        $nama = self::field($row, 'Nama');
         $errors = [];
 
         if ($nama === '') {
@@ -215,19 +223,19 @@ class MasterRegistry
         }
 
         return [
-            'data'      => ['kode' => $kode !== '' ? $kode : null, 'nama' => $nama],
-            'unique'    => $kode !== '' ? ['kode' => $kode] : ['nama' => $nama],
+            'data' => ['kode' => $kode !== '' ? $kode : null, 'nama' => $nama],
+            'unique' => $kode !== '' ? ['kode' => $kode] : ['nama' => $nama],
             'relations' => [],
-            'errors'    => $errors,
+            'errors' => $errors,
         ];
     }
 
     private static function parseDokter(array $row): array
     {
-        $nama      = self::field($row, 'Nama');
-        $poliName  = self::field($row, 'Poli');
+        $nama = self::field($row, 'Nama');
+        $poliName = self::field($row, 'Poli');
         $spesialis = self::field($row, 'Spesialisasi');
-        $errors    = [];
+        $errors = [];
 
         $poli = null;
 
@@ -245,24 +253,24 @@ class MasterRegistry
         }
 
         return [
-            'data'      => [
-                'poli_id'      => $poli?->id,
-                'nama'         => $nama,
+            'data' => [
+                'poli_id' => $poli?->id,
+                'nama' => $nama,
                 'spesialisasi' => $spesialis !== '' ? $spesialis : null,
             ],
-            'unique'    => ['nama' => $nama],
+            'unique' => ['nama' => $nama],
             'relations' => [],
-            'errors'    => $errors,
+            'errors' => $errors,
         ];
     }
 
     private static function parseJadwal(array $row): array
     {
         $dokterName = self::field($row, 'Dokter');
-        $hari       = self::normalizeHari(self::field($row, 'Hari'));
-        $jamMulai   = self::normalizeTime(self::field($row, 'Jam Mulai'));
+        $hari = self::normalizeHari(self::field($row, 'Hari'));
+        $jamMulai = self::normalizeTime(self::field($row, 'Jam Mulai'));
         $jamSelesai = self::normalizeTime(self::field($row, 'Jam Selesai'));
-        $errors     = [];
+        $errors = [];
 
         $dokter = null;
 
@@ -289,38 +297,38 @@ class MasterRegistry
         }
 
         return [
-            'data'      => [
-                'dokter_id'   => $dokter?->id,
-                'hari'        => $hari,
-                'jam_mulai'   => $jamMulai,
+            'data' => [
+                'dokter_id' => $dokter?->id,
+                'hari' => $hari,
+                'jam_mulai' => $jamMulai,
                 'jam_selesai' => $jamSelesai,
             ],
-            'unique'    => ['dokter_id' => $dokter?->id, 'hari' => $hari, 'jam_mulai' => $jamMulai],
+            'unique' => ['dokter_id' => $dokter?->id, 'hari' => $hari, 'jam_mulai' => $jamMulai],
             'relations' => [],
-            'errors'    => $errors,
+            'errors' => $errors,
         ];
     }
 
     private static function parsePnpp(array $row): array
     {
-        $nama        = self::field($row, 'Nama');
-        $nip         = self::field($row, 'NIP/NRP');
-        $statusKep   = self::field($row, 'Status Kepegawaian');
-        $pangkat     = self::field($row, 'Pangkat');
-        $jabatan     = self::field($row, 'Jabatan');
-        $satkerName  = self::field($row, 'Satker');
+        $nama = self::field($row, 'Nama');
+        $nip = self::field($row, 'NIP/NRP');
+        $statusKep = self::field($row, 'Status Kepegawaian');
+        $pangkat = self::field($row, 'Pangkat');
+        $jabatan = self::field($row, 'Jabatan');
+        $satkerName = self::field($row, 'Satker');
         $satuanKerja = self::field($row, 'Satuan Kerja');
-        $bagian      = self::field($row, 'Bagian');
-        $email       = self::field($row, 'Email');
-        $alamat      = self::field($row, 'Alamat');
-        $noBpjs      = self::normalizeDigits(self::field($row, 'No. BPJS'));
-        $noHp        = self::normalizePhone(self::field($row, 'No. HP'));
-        $tglLahir    = self::normalizeDate(self::field($row, 'Tanggal Lahir'));
-        $jk          = self::normalizeJk(self::field($row, 'Jenis Kelamin'));
+        $bagian = self::field($row, 'Bagian');
+        $email = self::field($row, 'Email');
+        $alamat = self::field($row, 'Alamat');
+        $noBpjs = self::normalizeDigits(self::field($row, 'No. BPJS'));
+        $noHp = self::normalizePhone(self::field($row, 'No. HP'));
+        $tglLahir = self::normalizeDate(self::field($row, 'Tanggal Lahir'));
+        $jk = self::normalizeJk(self::field($row, 'Jenis Kelamin'));
         $statusAktif = self::field($row, 'Status Aktif');
         $penyakitRaw = self::field($row, 'Penyakit Kronis');
-        $menahunRaw  = self::field($row, 'Penyakit Menahun');
-        $errors      = [];
+        $menahunRaw = self::field($row, 'Penyakit Menahun');
+        $errors = [];
 
         if ($nama === '') {
             $errors[] = 'Nama wajib diisi';
@@ -377,30 +385,30 @@ class MasterRegistry
         $statusAktifValue = in_array($statusAktif, ['aktif', 'nonaktif'], true) ? $statusAktif : 'aktif';
 
         return [
-            'data'      => [
-                'nama'               => $nama,
-                'nip'                => $nip !== '' ? $nip : null,
+            'data' => [
+                'nama' => $nama,
+                'nip' => $nip !== '' ? $nip : null,
                 'status_kepegawaian' => $statusKep !== '' ? $statusKep : null,
-                'pangkat'            => $pangkat !== '' ? $pangkat : null,
-                'jabatan'            => $jabatan !== '' ? $jabatan : null,
-                'satuan_kerja'       => $finalSatuanKerja,
-                'bagian'             => $bagian !== '' ? $bagian : null,
-                'email'              => $email !== '' ? $email : null,
-                'alamat'             => $alamat !== '' ? $alamat : null,
-                'no_bpjs'            => $noBpjs,
-                'satker_id'          => $satkerId,
-                'no_hp'              => $noHp,
-                'tanggal_lahir'      => $tglLahir,
-                'jenis_kelamin'      => $jk,
-                'status_aktif'       => $statusAktifValue,
+                'pangkat' => $pangkat !== '' ? $pangkat : null,
+                'jabatan' => $jabatan !== '' ? $jabatan : null,
+                'satuan_kerja' => $finalSatuanKerja,
+                'bagian' => $bagian !== '' ? $bagian : null,
+                'email' => $email !== '' ? $email : null,
+                'alamat' => $alamat !== '' ? $alamat : null,
+                'no_bpjs' => $noBpjs,
+                'satker_id' => $satkerId,
+                'no_hp' => $noHp,
+                'tanggal_lahir' => $tglLahir,
+                'jenis_kelamin' => $jk,
+                'status_aktif' => $statusAktifValue,
             ],
-            'unique'    => ['nip' => $nip],
+            'unique' => ['nip' => $nip],
             'relations' => [
                 'penyakit' => $penyakitIds,
                 'penyakit_menahun' => $penyakitMenahunIds,
                 'satker_name' => $satkerName,
             ],
-            'errors'    => $errors,
+            'errors' => $errors,
         ];
     }
 
@@ -510,9 +518,9 @@ class MasterRegistry
         }
 
         if (str_starts_with($digits, '62')) {
-            $digits = '0' . substr($digits, 2);
+            $digits = '0'.substr($digits, 2);
         } elseif (! str_starts_with($digits, '0')) {
-            $digits = '0' . $digits;
+            $digits = '0'.$digits;
         }
 
         return $digits;

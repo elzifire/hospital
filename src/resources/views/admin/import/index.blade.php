@@ -104,16 +104,27 @@
         <form action="{{ route('admin.master.import.confirm', $entity) }}" method="POST" x-data="importPreview()" x-cloak>
             @csrf
             <input type="hidden" name="token" value="{{ $token }}">
-            <input type="hidden" name="rows" :value="rowsJson">
+            @if ($preview['total'] <= \App\Jobs\PreviewImportJob::PREVIEW_LIMIT)
+                <input type="hidden" name="rows" :value="rowsJson">
+            @endif
 
             <div class="space-y-4">
                 <div class="flex flex-col gap-3 rounded-2xl bg-white p-5 shadow-xs ring-1 ring-slate-200 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <h3 class="text-base font-bold text-slate-900">Pratinjau & Edit Data</h3>
-                        <p class="mt-0.5 text-sm text-slate-500">Klik sel tabel untuk mengedit langsung sebelum diproses.</p>
+                        <p class="mt-0.5 text-sm text-slate-500">
+                            @if ($preview['total'] <= \App\Jobs\PreviewImportJob::PREVIEW_LIMIT)
+                                Klik sel tabel untuk mengedit langsung sebelum diproses.
+                            @else
+                                File besar diproses langsung dari backend per batch; preview hanya menampilkan {{ \App\Jobs\PreviewImportJob::PREVIEW_LIMIT }} baris pertama.
+                            @endif
+                        </p>
                     </div>
                     <div class="flex flex-wrap gap-2">
                         <span class="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600 ring-1 ring-slate-200">{{ $preview['total'] }} baris</span>
+                        @if ($preview['total'] > count($preview['rows']))
+                            <span class="inline-flex items-center gap-1.5 rounded-full bg-sky-50 px-3 py-1 text-xs font-bold text-sky-700 ring-1 ring-sky-200">Preview {{ count($preview['rows']) }} baris pertama</span>
+                        @endif
                         <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200/70">{{ $preview['valid'] }} valid</span>
                         <span class="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-3 py-1 text-xs font-bold text-rose-700 ring-1 ring-rose-200/70">{{ $preview['invalid'] }} perlu diperiksa</span>
                     </div>

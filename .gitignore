@@ -9,3 +9,9 @@ wa-gateway/wa_auth/*
 
 
 test-php/*
+# WAHA (WhatsApp HTTP API)
+waha/.env
+waha/sessions/
+waha/media/
+waha/qr-*.png
+waha/*

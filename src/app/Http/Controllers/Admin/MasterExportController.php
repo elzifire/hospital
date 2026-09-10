@@ -17,12 +17,12 @@ class MasterExportController extends Controller
         $this->resolve($entity);
 
         $config = MasterRegistry::config($entity);
-        $count  = $config['model']::count();
+        $count = $config['model']::count();
 
         return view('admin.export.index', [
             'entity' => $entity,
             'config' => $config,
-            'count'  => $count,
+            'count' => $count,
         ]);
     }
 
@@ -42,7 +42,7 @@ class MasterExportController extends Controller
             ->map($config['toRow'])
             ->all();
 
-        return $this->response($entity, $config['headers'], $rows, $format, $entity . '_' . date('Ymd_His'));
+        return $this->response($entity, $config['headers'], $rows, $format, $entity.'_'.date('Ymd_His'));
     }
 
     /**
@@ -55,7 +55,7 @@ class MasterExportController extends Controller
         $config = MasterRegistry::config($entity);
         $format = $this->format($request);
 
-        return $this->response($entity, $config['headers'], [$config['sample']], $format, 'template_' . $entity);
+        return $this->response($entity, $config['headers'], [$config['sample']], $format, 'template_'.$entity);
     }
 
     private function format(Request $request): string
@@ -69,14 +69,14 @@ class MasterExportController extends Controller
 
         if ($format === 'xlsx') {
             return response($content, 200, [
-                'Content-Type'        => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                'Content-Disposition' => 'attachment; filename="' . $filename . '.xlsx"',
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'Content-Disposition' => 'attachment; filename="'.$filename.'.xlsx"',
             ]);
         }
 
         return response($content, 200, [
-            'Content-Type'        => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '.csv"',
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'.csv"',
         ]);
     }
 
@@ -84,6 +84,13 @@ class MasterExportController extends Controller
     {
         if (! MasterRegistry::has($entity)) {
             abort(404);
+        }
+
+        // Export terkunci permission fitur entitas terkait.
+        $permission = MasterRegistry::config($entity)['permission'] ?? null;
+
+        if ($permission && ! auth()->user()?->can($permission)) {
+            abort(403, 'Anda tidak memiliki akses ke fitur ini.');
         }
     }
 }

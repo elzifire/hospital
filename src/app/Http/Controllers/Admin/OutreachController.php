@@ -2,69 +2,75 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Broadcasting\BroadcastService;
 use App\Http\Controllers\Controller;
-use App\Models\MessageTemplate;
-use App\Models\Pnpp;
-use App\Models\Satker;
+use App\Models\MessageLog;
+use Illuminate\Http\Request;
 
+/**
+ * Modul Outreach — riwayat pesan undangan jadwal (rule H-7 & H-1) yang
+ * digenerate dari penjadwalan Digital Reminder (broadcast_rules).
+ */
 class OutreachController extends Controller
 {
     /**
-     * Halaman Outreach — data pesan yang telah dikirim ke pasien
-     * melalui nomor WhatsApp (status: terkirim / menunggu dikirim).
+     * Riwayat pesan outreach — data nyata, dengan ringkasan status,
+     * pencarian, filter status/aturan, dan pembatalan.
      */
-    public function index()
+    public function index(Request $request)
     {
-        return view('admin.outreach.index');
+        $q = (string) $request->query('q', '');
+        $status = (string) $request->query('status', '');
+        $rule = (string) $request->query('rule', '');
+
+        $logs = MessageLog::query()
+            ->jenis('outreach')
+            ->with('template:id,judul', 'reminder.poli:id,nama')
+            ->when($q, fn ($query) => $query->where(
+                fn ($sub) => $sub->where('penerima_nama', 'like', "%{$q}%")
+                    ->orWhere('penerima_no_hp', 'like', "%{$q}%")
+                    ->orWhere('konten', 'like', "%{$q}%")
+            ))
+            ->when($status, fn ($query) => $query->where('status', $status))
+            ->when($rule, fn ($query) => $query->where('rule', $rule))
+            ->orderByDesc('id')
+            ->paginate(10)
+            ->withQueryString();
+
+        $perStatus = MessageLog::jenis('outreach')
+            ->selectRaw('status, count(*) as total')
+            ->groupBy('status')
+            ->pluck('total', 'status');
+
+        return view('admin.outreach.index', [
+            'logs' => $logs,
+            'perStatus' => $perStatus,
+            'penerimaUnik' => MessageLog::jenis('outreach')->distinct()->count('pnpp_id'),
+            'total' => (int) $perStatus->sum(),
+            'filters' => ['q' => $q, 'status' => $status, 'rule' => $rule],
+        ]);
     }
 
     /**
-     * Halaman kirim pesan outreach baru (referensi UI — belum ada logic).
+     * Generate pesan outreach (H-7 & H-1) dari penjadwalan aktif —
+     * sekaligus menyapu status penjadwalan lewat tanpa kunjungan.
      */
-    public function create()
+    public function generate(Request $request)
     {
-        return view('admin.outreach.create', $this->masterData());
-    }
+        $service = app(BroadcastService::class);
 
-    /**
-     * Halaman edit pesan outreach (referensi UI — belum ada logic).
-     */
-    public function edit()
-    {
-        return view('admin.outreach.edit', $this->masterData());
-    }
+        $ditandai = $service->sweepStatus();
+        $hasil = $service->generate('outreach', $request->user());
 
-    /**
-     * Halaman import daftar kirim outreach (referensi UI — belum ada logic).
-     */
-    public function import()
-    {
-        return view('admin.outreach.import');
-    }
+        $pesan = $hasil['dibuat'].' pesan outreach dibuat, '
+            .$hasil['dilewati'].' dilewati (sudah pernah dibuat).';
 
-    /**
-     * Data master untuk form Outreach (read-only, tanpa insert/update).
-     */
-    private function masterData(): array
-    {
-        $satkers = Satker::orderBy('nama')->get(['id', 'kode', 'nama']);
+        if ($ditandai > 0) {
+            $pesan .= " {$ditandai} penjadwalan lewat tanpa kunjungan ditandai tidak datang.";
+        }
 
-        $pnpps = Pnpp::orderBy('nama')
-            ->get()
-            ->map(fn ($p) => [
-                'id'       => $p->id,
-                'nama'     => $p->nama,
-                'nip'      => $p->nip,
-                'noHp'     => $p->no_hp,
-                'satkerId' => $p->satker_id,
-            ]);
-
-        $templates = MessageTemplate::query()
-            ->where('channel', 'WhatsApp')
-            ->where('is_active', true)
-            ->orderBy('judul')
-            ->get(['id', 'judul', 'konten']);
-
-        return compact('satkers', 'pnpps', 'templates');
+        return redirect()
+            ->route('admin.outreach.index')
+            ->with('success', $pesan);
     }
 }

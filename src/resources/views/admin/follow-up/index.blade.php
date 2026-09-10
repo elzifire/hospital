@@ -6,76 +6,63 @@
 @section('content')
 @php
     $stats = [
-        ['label' => 'Perlu Follow Up', 'value' => '18',  'tone' => 'amber',   'icon' => 'M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 0 0 2.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 0 1-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 0 0-1.091-.852H4.5A2.25 2.25 0 0 0 2.25 4.5v2.25Z'],
-        ['label' => 'Hari Ini',         'value' => '7',   'tone' => 'sky',     'icon' => 'M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z'],
-        ['label' => 'Terlambat',        'value' => '3',   'tone' => 'rose',    'icon' => 'M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z'],
-        ['label' => 'Selesai',          'value' => '124', 'tone' => 'emerald', 'icon' => 'M4.5 12.75l6 6 9-13.5'],
+        ['label' => 'Total Pesan',      'value' => number_format($total),                 'tone' => 'sky',     'icon' => 'M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 0 0 2.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 0 1-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 0 0-1.091-.852H4.5A2.25 2.25 0 0 0 2.25 4.5v2.25Z'],
+        ['label' => 'Menunggu',         'value' => number_format((int) ($perStatus['menunggu'] ?? 0)),   'tone' => 'amber',   'icon' => 'M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z'],
+        ['label' => 'Terkirim',         'value' => number_format((int) ($perStatus['terkirim'] ?? 0)),   'tone' => 'emerald', 'icon' => 'M4.5 12.75l6 6 9-13.5'],
+        ['label' => 'Gagal',            'value' => number_format((int) ($perStatus['gagal'] ?? 0)),      'tone' => 'rose',    'icon' => 'M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z'],
+        ['label' => 'Pasien Difollow Up', 'value' => number_format($penerimaUnik),         'tone' => 'violet',  'icon' => 'M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z'],
     ];
 
     $toneColor = [
-        'amber'   => ['bg' => 'bg-amber-50',   'text' => 'text-amber-600'],
         'sky'     => ['bg' => 'bg-sky-50',     'text' => 'text-sky-600'],
-        'rose'    => ['bg' => 'bg-rose-50',    'text' => 'text-rose-600'],
         'emerald' => ['bg' => 'bg-emerald-50', 'text' => 'text-emerald-600'],
-    ];
-
-    $tabs = [
-        ['label' => 'Menunggu',  'count' => 8,   'active' => true],
-        ['label' => 'Terlambat', 'count' => 3,   'active' => false],
-        ['label' => 'Selesai',   'count' => 124, 'active' => false],
-    ];
-
-    $rows = [
-        ['nama' => 'Budi Santoso', 'nip' => '198501012010011001', 'terakhir_kirim' => 'Kemarin, 07:30', 'jadwal' => 'Hari ini, 14:00', 'petugas' => 'Ayu Lestari',  'status' => 'Menunggu'],
-        ['nama' => 'Agus Wijaya',  'nip' => '197812302008121003', 'terakhir_kirim' => '2 hari lalu',   'jadwal' => 'Hari ini, 15:30', 'petugas' => 'Bimo Saputra', 'status' => 'Terlambat'],
-        ['nama' => 'Siti Aminah',  'nip' => '199003152015122002', 'terakhir_kirim' => 'Kemarin, 09:00', 'jadwal' => 'Besok, 09:00',   'petugas' => 'Citra Dewi',   'status' => 'Menunggu'],
-        ['nama' => 'Dewi Lestari', 'nip' => '198802102010042004', 'terakhir_kirim' => '3 hari lalu',   'jadwal' => 'Besok, 10:00',   'petugas' => 'Ayu Lestari',  'status' => 'Selesai'],
-        ['nama' => 'Rudi Hartono', 'nip' => '199105052016051005', 'terakhir_kirim' => 'Kemarin, 10:30','jadwal' => 'Besok, 13:00',   'petugas' => 'Bimo Saputra', 'status' => 'Menunggu'],
-        ['nama' => 'Lina Marlina', 'nip' => '199311122017112006', 'terakhir_kirim' => 'Kemarin, 11:00','jadwal' => 'Hari ini, 11:30', 'petugas' => 'Citra Dewi',  'status' => 'Selesai'],
-    ];
-
-    $prioritasStyle = [
-        'Tinggi' => 'bg-rose-50 text-rose-700 ring-rose-200/70',
-        'Sedang' => 'bg-amber-50 text-amber-700 ring-amber-200/70',
-        'Rendah' => 'bg-slate-100 text-slate-600 ring-slate-200',
+        'amber'   => ['bg' => 'bg-amber-50',   'text' => 'text-amber-600'],
+        'rose'    => ['bg' => 'bg-rose-50',    'text' => 'text-rose-600'],
+        'violet'  => ['bg' => 'bg-violet-50',  'text' => 'text-violet-600'],
     ];
 
     $statusStyle = [
-        'Menunggu'  => 'bg-amber-50 text-amber-700 ring-amber-200/70',
-        'Terlambat' => 'bg-rose-50 text-rose-700 ring-rose-200/70',
-        'Selesai'   => 'bg-emerald-50 text-emerald-700 ring-emerald-200/70',
+        'terkirim'   => 'bg-emerald-50 text-emerald-700 ring-emerald-200/70',
+        'menunggu'   => 'bg-amber-50 text-amber-700 ring-amber-200/70',
+        'gagal'      => 'bg-rose-50 text-rose-700 ring-rose-200/70',
+        'dibatalkan' => 'bg-slate-100 text-slate-500 ring-slate-200/70',
     ];
 
-    $dueToday = [
-        ['nama' => 'Budi Santoso', 'jam' => '14:00', 'prioritas' => 'Tinggi'],
-        ['nama' => 'Agus Wijaya',  'jam' => '15:30', 'prioritas' => 'Tinggi'],
-        ['nama' => 'Siti Aminah',  'jam' => '09:00', 'prioritas' => 'Sedang'],
-    ];
+    $statusLabel = ['terkirim' => 'Terkirim', 'menunggu' => 'Menunggu Dikirim', 'gagal' => 'Gagal', 'dibatalkan' => 'Dibatalkan'];
+    $ruleLabel   = ['h-1' => 'H-1', 'h' => 'Hari-H', 'tidak_datang' => 'Tidak Datang'];
 @endphp
-<div class="space-y-6">
 
+<div class="space-y-6">
     {{-- ===== Header ===== --}}
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
             <h2 class="text-xl font-bold tracking-tight text-slate-900">Follow Up</h2>
-            <p class="mt-0.5 text-sm text-slate-500">Pengingat ulang bagi PNPP yang belum membalas pesan WhatsApp yang telah dikirim.</p>
+            <p class="mt-0.5 text-sm text-slate-500">Pesan tindak lanjut jadwal (H-1, hari-H, dan tidak datang) yang digenerate dari penjadwalan.</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
-            <a href="{{ route('admin.follow-up.import') }}" class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-xs transition hover:bg-slate-50">
-                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" /></svg>
-                Import
-            </a>
-            <a href="{{ route('admin.follow-up.create') }}" class="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2">
-                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-                Tambah Follow Up
-            </a>
+            @can('manage respon')
+                <a href="{{ route('admin.respon.index') }}"
+                   class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-xs transition hover:bg-slate-50">
+                    Lihat Balasan (Respon)
+                </a>
+            @endcan
+            @can('manage follow-up')
+                <form method="POST" action="{{ route('admin.follow-up.generate') }}">
+                    @csrf
+                    <button type="submit"
+                            class="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z" /></svg>
+                        Generate Pesan
+                    </button>
+                </form>
+            @endcan
         </div>
     </div>
 
     {{-- ===== Kartu Statistik ===== --}}
-    <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div class="grid grid-cols-2 gap-3 lg:grid-cols-5">
         @foreach ($stats as $s)
-            @php $c = $toneColor[$s['tone']]; @endphp
+            @php($c = $toneColor[$s['tone']])
             <div class="flex items-center gap-3 rounded-xl bg-white px-4 py-3 shadow-xs ring-1 ring-slate-200">
                 <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg {{ $c['bg'] }} {{ $c['text'] }}">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $s['icon'] }}" /></svg>
@@ -88,163 +75,108 @@
         @endforeach
     </div>
 
-    <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+    {{-- ===== Riwayat + filter ===== --}}
+    <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div class="border-b border-slate-100 px-5 py-4">
+            <h3 class="text-sm font-bold text-slate-900">Riwayat Follow Up</h3>
+        </div>
 
-        {{-- ===== Tabel Follow Up ===== --}}
-        <div class="lg:col-span-2">
-            <div class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
-
-                {{-- Tabs --}}
-                <div class="flex gap-1 border-b border-slate-100 bg-slate-50/60 px-4 pt-4">
-                    @foreach ($tabs as $tab)
-                        <button class="inline-flex items-center gap-2 rounded-t-lg border-b-2 px-4 py-2.5 text-sm font-semibold transition {{ $tab['active'] ? 'border-sky-600 text-sky-700' : 'border-transparent text-slate-500 hover:text-slate-700' }}">
-                            {{ $tab['label'] }}
-                            <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold tabular-nums text-slate-500">{{ $tab['count'] }}</span>
-                        </button>
+        <form method="GET" action="{{ route('admin.follow-up.index') }}"
+              class="flex flex-wrap items-end gap-3 border-b border-slate-100 bg-slate-50/50 px-5 py-4">
+            <div>
+                <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Cari</label>
+                <input type="text" name="q" value="{{ $filters['q'] }}" placeholder="Nama / nomor / isi pesan…"
+                       class="w-56 rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+            </div>
+            <div>
+                <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Status</label>
+                <select name="status" class="rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                    <option value="">Semua</option>
+                    @foreach ($statusLabel as $key => $label)
+                        <option value="{{ $key }}" {{ $filters['status'] === $key ? 'selected' : '' }}>{{ $label }}</option>
                     @endforeach
-                </div>
+                </select>
+            </div>
+            <div class="flex gap-2">
+                <button type="submit" class="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700">Filter</button>
+                <a href="{{ route('admin.follow-up.index') }}" class="rounded-lg bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-300">Reset</a>
+            </div>
+        </form>
 
-                {{-- Toolbar --}}
-                <div class="flex flex-col gap-4 border-b border-slate-100 bg-slate-50/60 p-4 lg:flex-row lg:items-center lg:justify-between">
-                    <div class="relative w-full lg:max-w-sm">
-                        <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5">
-                            <svg class="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>
-                        </div>
-                        <input type="text" placeholder="Cari nama, NIP, atau petugas..."
-                               class="block w-full rounded-xl border-0 bg-white py-2.5 pl-10 pr-9 text-sm text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-sky-500 transition">
-                    </div>
-
-                    
-                </div>
-
-                {{-- Table --}}
-                <div class="overflow-x-auto">
-                    <table class="w-full min-w-[900px] text-left">
-                        <thead>
-                            <tr class="border-b border-slate-100 text-[11px] uppercase tracking-wider text-slate-400">
-                                <th class="px-6 py-3.5 font-semibold">Pasien</th>
-                                <th class="px-6 py-3.5 font-semibold">Terakhir Dikirim</th>
-                                <th class="px-6 py-3.5 font-semibold">Balasan</th>
-                                <th class="px-6 py-3.5 font-semibold">Jadwal</th>
-                                <th class="px-6 py-3.5 font-semibold">Status</th>
-                                <th class="px-6 py-3.5 text-right font-semibold">Aksi</th>
+        @if ($logs->isEmpty())
+            <div class="px-5 py-12 text-center">
+                <p class="text-sm font-medium text-slate-500">Belum ada pesan follow up. Generate dari jadwal di Digital Reminder.</p>
+            </div>
+        @else
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-slate-100 text-sm">
+                    <thead class="bg-slate-50/70 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                        <tr>
+                            <th class="px-5 py-3">Penerima</th>
+                            <th class="px-5 py-3">Pesan</th>
+                            <th class="px-5 py-3">Template</th>
+                            <th class="px-5 py-3">Aturan</th>
+                            <th class="px-5 py-3">Waktu</th>
+                            <th class="px-5 py-3">Status</th>
+                            <th class="px-5 py-3 text-right">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        @foreach ($logs as $log)
+                            <tr class="hover:bg-slate-50/60">
+                                <td class="px-5 py-3">
+                                    <p class="font-semibold text-slate-800">{{ $log->penerima_nama }}</p>
+                                    <p class="font-mono text-xs text-slate-400">{{ $log->penerima_no_hp }}</p>
+                                </td>
+                                <td class="max-w-[300px] px-5 py-3">
+                                    <p class="truncate text-xs text-slate-600" title="{{ $log->konten }}">{{ \Illuminate\Support\Str::limit($log->konten, 90) }}</p>
+                                </td>
+                                <td class="px-5 py-3 text-xs text-slate-500">{{ $log->template?->judul ?? '—' }}</td>
+                                <td class="px-5 py-3">
+                                    @if ($log->rule)
+                                        <span class="rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-inset ring-amber-200/70">{{ $ruleLabel[$log->rule] ?? $log->rule }}</span>
+                                    @else
+                                        <span class="text-xs text-slate-300">—</span>
+                                    @endif
+                                </td>
+                                <td class="whitespace-nowrap px-5 py-3 text-xs text-slate-500">
+                                    {{ $log->created_at->format('d M Y, H:i') }}
+                                    @if ($log->sent_at)
+                                        <span class="block text-[10px] text-emerald-500">terkirim {{ $log->sent_at->format('d M H:i') }}</span>
+                                    @endif
+                                </td>
+                                <td class="px-5 py-3">
+                                    <span class="rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ring-inset {{ $statusStyle[$log->status] ?? '' }}">
+                                        {{ $statusLabel[$log->status] ?? $log->status }}
+                                    </span>
+                                    @if ($log->status === 'gagal' && $log->error)
+                                        <span class="mt-0.5 block max-w-[180px] truncate text-[10px] text-rose-400" title="{{ $log->error }}">{{ $log->error }}</span>
+                                    @endif
+                                </td>
+                                <td class="px-5 py-3 text-right">
+                                    @if ($log->status === 'menunggu')
+                                        <button type="button"
+                                                onclick="confirmSubmit('{{ route('admin.broadcast.batalkan', $log->id) }}', {
+                                                    title: 'Batalkan pesan?',
+                                                    html: 'Pesan ke <strong>{{ $log->penerima_nama }}</strong> tidak akan dikirim.',
+                                                    confirmText: 'Ya, batalkan'
+                                                })"
+                                                class="rounded-lg bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-600 ring-1 ring-inset ring-rose-200 transition hover:bg-rose-100">
+                                            Batalkan
+                                        </button>
+                                    @else
+                                        <span class="text-xs text-slate-300">—</span>
+                                    @endif
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-50">
-                            @foreach ($rows as $r)
-                                <tr class="group bg-white transition-colors hover:bg-sky-50/40">
-                                    <td class="px-6 py-4">
-                                        <div class="flex items-center gap-3">
-                                            <div class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold uppercase text-emerald-700">
-                                                {{ substr($r['nama'], 0, 1) }}
-                                            </div>
-                                            <div class="min-w-0">
-                                                <p class="truncate text-sm font-bold text-slate-900">{{ $r['nama'] }}</p>
-                                                <p class="truncate font-mono text-xs text-slate-400">{{ $r['nip'] }}</p>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td class="whitespace-nowrap px-6 py-4">
-                                        <span class="text-xs font-semibold text-slate-500">{{ $r['terakhir_kirim'] }}</span>
-                                    </td>
-                                    <td class="whitespace-nowrap px-6 py-4">
-                                        <span class="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-700 ring-1 ring-inset ring-rose-200/70">
-                                            <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>
-                                            Belum Membalas
-                                        </span>
-                                    </td>
-                                    <td class="whitespace-nowrap px-6 py-4">
-                                        <span class="text-xs font-semibold text-slate-500">{{ $r['jadwal'] }}</span>
-                                    </td>
-                                    <td class="whitespace-nowrap px-6 py-4">
-                                        <span class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 ring-inset {{ $statusStyle[$r['status']] }}">
-                                            {{ $r['status'] }}
-                                        </span>
-                                    </td>
-                                    <td class="whitespace-nowrap px-6 py-4 text-right">
-                                        <div class="flex items-center justify-end gap-1.5 opacity-60 transition-opacity group-hover:opacity-100 lg:opacity-0">
-                                            <button title="Tandai Selesai" class="rounded-lg p-2 text-slate-400 transition-all hover:bg-emerald-50 hover:text-emerald-600 focus:opacity-100">
-                                                <svg class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
-                                            </button>
-                                            <a href="{{ route('admin.follow-up.edit', 1) }}" title="Edit" class="rounded-lg p-2 text-slate-400 transition-all hover:bg-sky-50 hover:text-sky-600 focus:opacity-100">
-                                                <svg class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" /></svg>
-                                            </a>
-                                        </div>
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-
-                {{-- Pagination (placeholder) --}}
-                <div class="flex flex-col items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/60 px-6 py-4 sm:flex-row">
-                    <p class="text-xs font-medium text-slate-500">
-                        Menampilkan <span class="font-bold text-slate-800">1</span>–<span class="font-bold text-slate-800">6</span>
-                        dari <span class="font-bold text-slate-800">18</span> follow up
-                    </p>
-                    <div class="flex items-center gap-1">
-                        <button class="rounded-lg bg-white p-2 text-slate-500 shadow-xs ring-1 ring-slate-200 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40" disabled>
-                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" /></svg>
-                        </button>
-                        <button class="h-8 min-w-8 rounded-lg bg-sky-600 px-2 text-xs font-bold tabular-nums text-white shadow-sm">1</button>
-                        <button class="h-8 min-w-8 rounded-lg bg-white px-2 text-xs font-bold tabular-nums text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50">2</button>
-                        <button class="h-8 min-w-8 rounded-lg bg-white px-2 text-xs font-bold tabular-nums text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50">3</button>
-                        <button class="rounded-lg bg-white p-2 text-slate-500 shadow-xs ring-1 ring-slate-200 transition hover:bg-slate-50">
-                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
-                        </button>
-                    </div>
-                </div>
+                        @endforeach
+                    </tbody>
+                </table>
             </div>
-        </div>
-
-        {{-- ===== Sidebar ===== --}}
-        <div class="space-y-6">
-            {{-- Due Hari Ini --}}
-            <div class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
-                <div class="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-                    <h3 class="text-base font-bold text-slate-900">Hari Ini</h3>
-                    <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold tabular-nums text-amber-700 ring-1 ring-amber-200/70">3</span>
-                </div>
-                <ul class="divide-y divide-slate-50">
-                    @foreach ($dueToday as $d)
-                        <li class="flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-sky-50/30">
-                            <div class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100 text-xs font-bold uppercase text-emerald-700">
-                                {{ substr($d['nama'], 0, 1) }}
-                            </div>
-                            <div class="min-w-0 flex-1">
-                                <p class="truncate text-sm font-bold text-slate-900">{{ $d['nama'] }}</p>
-                                <p class="truncate text-xs text-slate-400">WhatsApp · {{ $d['jam'] }}</p>
-                            </div>
-                            <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 ring-inset {{ $prioritasStyle[$d['prioritas']] }}">
-                                {{ $d['prioritas'] }}
-                            </span>
-                        </li>
-                    @endforeach
-                </ul>
+            <div class="border-t border-slate-100 px-5 py-3">
+                {{ $logs->links() }}
             </div>
-
-            {{-- Ringkasan Prioritas --}}
-            <div class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
-                <div class="border-b border-slate-100 px-5 py-4">
-                    <h3 class="text-base font-bold text-slate-900">Ringkasan Prioritas</h3>
-                </div>
-                <div class="space-y-3 p-5">
-                    <div class="flex items-center justify-between rounded-xl bg-rose-50/70 p-3 ring-1 ring-rose-100">
-                        <span class="text-sm font-semibold text-rose-700">Tinggi</span>
-                        <span class="text-lg font-extrabold tabular-nums text-rose-700">5</span>
-                    </div>
-                    <div class="flex items-center justify-between rounded-xl bg-amber-50/70 p-3 ring-1 ring-amber-100">
-                        <span class="text-sm font-semibold text-amber-700">Sedang</span>
-                        <span class="text-lg font-extrabold tabular-nums text-amber-700">8</span>
-                    </div>
-                    <div class="flex items-center justify-between rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200">
-                        <span class="text-sm font-semibold text-slate-600">Rendah</span>
-                        <span class="text-lg font-extrabold tabular-nums text-slate-700">5</span>
-                    </div>
-                </div>
-            </div>
-        </div>
+        @endif
     </div>
 </div>
 @endsection

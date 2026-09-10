@@ -3,79 +3,289 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\MessageTemplate;
+use App\Models\Dokter;
+use App\Models\Kunjungan;
 use App\Models\Pnpp;
 use App\Models\Poli;
+use App\Models\Reminder;
 use App\Models\Satker;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
+/**
+ * Modul Digital Reminder — penjadwalan kunjungan pasien (murni jadwal,
+ * tanpa pengiriman pesan). Pesan undangan/tindak lanjut digenerate dari
+ * jadwal-jadwal ini lewat modul Outreach & Follow Up.
+ */
 class DigitalReminderController extends Controller
 {
     /**
-     * Halaman Digital Reminder (referensi UI — belum ada logic).
+     * Daftar penjadwalan — cari nama/NIP, filter status & poli.
      */
-    public function index()
+    public function index(Request $request)
     {
-        return view('admin.digital-reminder.index');
+        $q = (string) $request->query('q', '');
+        $status = (string) $request->query('status', '');
+        $poliId = (string) $request->query('poli', '');
+
+        $reminders = Reminder::query()
+            ->with('pnpp.satker:id,nama', 'poli:id,nama', 'dokter:id,nama')
+            ->withExists('kunjungan as sudah_kunjungan')
+            ->when($q, fn ($query) => $query->where(
+                fn ($sub) => $sub
+                    ->where('catatan', 'like', "%{$q}%")
+                    ->orWhereHas('pnpp', fn ($p) => $p
+                        ->where('nama', 'like', "%{$q}%")
+                        ->orWhere('nip', 'like', "%{$q}%"))
+            ))
+            ->when($status, fn ($query) => $query->where('status', $status))
+            ->when($poliId, fn ($query) => $query->where('poli_id', $poliId))
+            ->orderByDesc('tanggal')
+            ->orderByDesc('id')
+            ->paginate(10)
+            ->withQueryString();
+
+        $perStatus = Reminder::query()
+            ->selectRaw('status, count(*) as total')
+            ->groupBy('status')
+            ->pluck('total', 'status');
+
+        return view('admin.digital-reminder.index', [
+            'reminders' => $reminders,
+            'perStatus' => $perStatus,
+            'total' => (int) $perStatus->sum(),
+            'mendatang' => Reminder::where('status', 'terjadwal')
+                ->whereDate('tanggal', '>=', today())->count(),
+            'polis' => Poli::orderBy('nama')->get(['id', 'nama']),
+            'filters' => ['q' => $q, 'status' => $status, 'poli' => $poliId],
+        ]);
     }
 
     /**
-     * Halaman Template Pesan (dipindahkan ke modul setting).
+     * Form buat penjadwalan: cari pasien (nama/NIP, filter satker) lalu
+     * pilih beberapa poli sekaligus (chips) + pengaturan shared.
      */
-    public function template()
+    public function create(Request $request)
     {
-        return redirect()->route('admin.setting.index');
+        return view('admin.digital-reminder.create', $this->dataTarget($request));
     }
 
     /**
-     * Halaman tambah reminder.
-     * Alur: pilih satker -> pilih database PNPP atau grouping -> jadwalkan ke satu/beberapa poli.
+     * Simpan penjadwalan — pasien terpilih × poli terpilih (chips).
+     * Pengaturan (tanggal/jam/home visit/catatan) dibagi semua kombinasi;
+     * dokter dibiarkan kosong karena beda-beda per poli — isi lewat edit.
      */
-    public function create()
+    public function store(Request $request)
     {
-        return view('admin.digital-reminder.create', $this->masterData());
+        $data = $request->validate($this->aturanValidasi($request));
+
+        $dibuat = DB::transaction(function () use ($data, $request): int {
+            $jumlah = 0;
+
+            foreach ($data['pnpp_ids'] as $pnppId) {
+                foreach ($data['poli_ids'] as $poliId) {
+                    Reminder::create([
+                        'pnpp_id' => $pnppId,
+                        'poli_id' => $poliId,
+                        'dokter_id' => null,
+                        'tanggal' => $data['tanggal'],
+                        'jam' => $data['jam'],
+                        'home_visit' => (bool) ($data['home_visit'] ?? false),
+                        'status' => 'terjadwal',
+                        'created_by' => $request->user()?->id,
+                        'catatan' => $data['catatan'] ?? null,
+                    ]);
+                    $jumlah++;
+                }
+            }
+
+            return $jumlah;
+        });
+
+        return redirect()
+            ->route('admin.digital-reminder.index')
+            ->with('success', "{$dibuat} penjadwalan kunjungan berhasil dibuat.");
     }
 
     /**
-     * Halaman edit reminder.
+     * Ubah penjadwalan — termasuk status manual (jaga-jaga petugas
+     * lupa mencatat kunjungan sehingga status otomatis meleset).
      */
-    public function edit()
+    public function edit(Reminder $reminder)
     {
-        return view('admin.digital-reminder.edit', $this->masterData());
+        $reminder->load('pnpp.satker:id,nama', 'poli:id,nama', 'dokter:id,nama', 'kunjungan');
+
+        // Baris poli lain yang dikunjungi pasien pada tanggal realisasi
+        // (realisasi multi-poli — hanya baris poli terjadwal yang
+        // terhubung ke reminder ini).
+        $sehari = $reminder->kunjungan
+            ? Kunjungan::with('poli:id,nama')
+                ->where('pnpp_id', $reminder->pnpp_id)
+                ->whereDate('tanggal_kunjungan', $reminder->kunjungan->tanggal_kunjungan)
+                ->orderBy('poli_id')
+                ->get()
+            : collect();
+
+        return view('admin.digital-reminder.edit', [
+            'reminder' => $reminder,
+            'polis' => Poli::orderBy('nama')->get(['id', 'nama']),
+            'dokters' => Dokter::orderBy('nama')->get(['id', 'nama', 'poli_id']),
+            'kunjunganSehari' => $sehari,
+        ]);
+    }
+
+    public function update(Request $request, Reminder $reminder)
+    {
+        $data = $request->validate($this->aturanValidasi($request, $reminder) + [
+            'status' => ['required', Rule::in(Reminder::STATUS)],
+        ]);
+
+        $reminder->update([
+            'poli_id' => $data['poli_id'],
+            'dokter_id' => $data['dokter_id'] ?? null,
+            'tanggal' => $data['tanggal'],
+            'jam' => $data['jam'],
+            'home_visit' => (bool) ($data['home_visit'] ?? false),
+            'status' => $data['status'],
+            'catatan' => $data['catatan'] ?? null,
+        ]);
+
+        return redirect()
+            ->route('admin.digital-reminder.index')
+            ->with('success', 'Penjadwalan untuk "'.$reminder->pnpp->nama.'" berhasil diperbarui.');
+    }
+
+    public function destroy(Reminder $reminder)
+    {
+        $nama = $reminder->pnpp?->nama;
+        $reminder->delete();
+
+        return redirect()
+            ->route('admin.digital-reminder.index')
+            ->with('success', 'Penjadwalan untuk "'.$nama.'" berhasil dihapus.');
     }
 
     /**
-     * Halaman import reminder (referensi UI — belum ada logic).
+     * Catat kunjungan nyata dari sebuah penjadwalan → status selesai.
+     * Poli terjadwal selalu tercatat (checklist-nya terkunci); poli
+     * lain yang juga dikunjungi pasien hari itu dicentang opsional —
+     * tiap poli menjadi satu baris kunjungan.
      */
-    public function import()
+    public function catatKunjungan(Request $request, Reminder $reminder)
     {
-        return view('admin.digital-reminder.import');
+        $data = $request->validate([
+            'tanggal_kunjungan' => ['required', 'date'],
+            'poli_pilih' => ['nullable', 'array'],
+            'poli_pilih.*' => ['integer', Rule::exists('polis', 'id')],
+            'polis' => ['nullable', 'array'],
+            'polis.*.keluhan' => ['nullable', 'string', 'max:1000'],
+            'polis.*.diagnosa' => ['nullable', 'string', 'max:1000'],
+            'keluhan' => ['nullable', 'string', 'max:1000'],
+            'diagnosa' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        if ($reminder->kunjungan()->exists()) {
+            return back()->with('error', 'Penjadwalan ini sudah memiliki kunjungan tercatat.');
+        }
+
+        $detail = (array) ($data['polis'] ?? []);
+        $utama = (int) $reminder->poli_id;
+
+        // Poli terjadwal diutamakan; poli tercentang lain menyusul.
+        $terpilih = array_values(array_unique(array_merge([(string) $utama], array_map('strval', $data['poli_pilih'] ?? []))));
+        $terpilih = array_map('intval', $terpilih);
+
+        DB::transaction(function () use ($data, $detail, $utama, $terpilih, $reminder): void {
+            foreach ($terpilih as $poliId) {
+                $keluhan = $detail[$poliId]['keluhan'] ?? null;
+                $diagnosa = $detail[$poliId]['diagnosa'] ?? null;
+
+                if ($poliId === $utama) {
+                    $keluhan = $keluhan ?? ($data['keluhan'] ?? null);
+                    $diagnosa = $diagnosa ?? ($data['diagnosa'] ?? null);
+                }
+
+                // Hanya baris poli terjadwal yang terhubung ke reminder
+                // (reminder_id unik); poli lain menjadi baris mandiri.
+                $baris = [
+                    'poli_id' => $poliId,
+                    'tanggal_kunjungan' => $data['tanggal_kunjungan'],
+                    'keluhan' => $keluhan,
+                    'diagnosa' => $diagnosa,
+                ];
+
+                if ($poliId === $utama) {
+                    $reminder->kunjungan()->create($baris + ['pnpp_id' => $reminder->pnpp_id]);
+                } else {
+                    $reminder->pnpp->kunjungans()->create($baris);
+                }
+            }
+
+            $reminder->update(['status' => 'selesai']);
+        });
+
+        return redirect()
+            ->route('admin.pnpp.kunjungan', $reminder->pnpp_id)
+            ->with('success', 'Kunjungan untuk "'.$reminder->pnpp->nama.'" tercatat ('.count($terpilih).' poli) — penjadwalan selesai.');
     }
 
     /**
-     * Data master untuk form Digital Reminder (read-only, tanpa insert/update).
+     * Aturan validasi form. Create: pasien + chips poli (pengaturan
+     * shared, tanpa dokter). Update: satu blok poli + dokter.
      */
-    private function masterData(): array
+    protected function aturanValidasi(Request $request, ?Reminder $reminder = null): array
     {
-        $satkers = Satker::orderBy('nama')->get(['id', 'kode', 'nama']);
+        if ($reminder) {
+            return [
+                'poli_id' => ['required', Rule::exists('polis', 'id')],
+                'dokter_id' => [
+                    'nullable',
+                    Rule::exists('dokters', 'id')->where('poli_id', $request->integer('poli_id')),
+                ],
+                'tanggal' => ['required', 'date'],
+                'jam' => ['required', 'date_format:H:i'],
+                'home_visit' => ['nullable', 'boolean'],
+                'catatan' => ['nullable', 'string', 'max:500'],
+            ];
+        }
 
-        $pnpps = Pnpp::orderBy('nama')
-            ->get()
-            ->map(fn ($p) => [
-                'id'       => $p->id,
-                'nama'     => $p->nama,
-                'nip'      => $p->nip,
-                'noHp'     => $p->no_hp,
-                'satkerId' => $p->satker_id,
-            ]);
+        return [
+            'pnpp_ids' => ['required', 'array', 'min:1'],
+            'pnpp_ids.*' => ['integer', Rule::exists('pnpps', 'id')],
+            'poli_ids' => ['required', 'array', 'min:1'],
+            'poli_ids.*' => ['integer', Rule::exists('polis', 'id')],
+            'tanggal' => ['required', 'date', 'after_or_equal:today'],
+            'jam' => ['required', 'date_format:H:i'],
+            'home_visit' => ['nullable', 'boolean'],
+            'catatan' => ['nullable', 'string', 'max:500'],
+        ];
+    }
 
-        $polis = Poli::orderBy('nama')->get(['id', 'nama']);
+    /**
+     * Data form: daftar pasien (filter satker + cari nama/NIP/HP) & master.
+     */
+    protected function dataTarget(Request $request): array
+    {
+        $q = (string) $request->query('q', '');
+        $satkerId = (string) $request->query('satker', '');
 
-        $templates = MessageTemplate::query()
-            ->where('channel', 'WhatsApp')
-            ->where('is_active', true)
-            ->orderBy('judul')
-            ->get(['id', 'judul', 'konten']);
+        $pnpps = Pnpp::query()
+            ->with('satker:id,nama')
+            ->when($q, fn ($query) => $query->where(
+                fn ($sub) => $sub->where('nama', 'like', "%{$q}%")
+                    ->orWhere('nip', 'like', "%{$q}%")
+                    ->orWhere('no_hp', 'like', "%{$q}%")
+            ))
+            ->when($satkerId, fn ($query) => $query->where('satker_id', $satkerId))
+            ->orderBy('nama')
+            ->get(['id', 'nama', 'nip', 'no_hp', 'satker_id']);
 
-        return compact('satkers', 'pnpps', 'polis', 'templates');
+        return [
+            'pnpps' => $pnpps,
+            'satkers' => Satker::orderBy('nama')->get(['id', 'nama']),
+            'polis' => Poli::orderBy('nama')->get(['id', 'nama']),
+            'filters' => ['q' => $q, 'satker' => $satkerId],
+        ];
     }
 }

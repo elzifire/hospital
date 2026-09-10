@@ -29,5 +29,8 @@
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
+        <!-- Webhook test mengatur token/HMAC per kasus — default kosong -->
+        <env name="WA_WEBHOOK_VERIFY_TOKEN" value=""/>
+        <env name="WA_WEBHOOK_SECRET" value=""/>
     </php>
 </phpunit>

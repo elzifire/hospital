@@ -20,9 +20,9 @@ class MasterImportController extends Controller
     {
         $this->resolve($entity);
 
-        $status  = null;
+        $status = null;
         $preview = null;
-        $token   = session('import_token');
+        $token = session('import_token');
 
         if ($token && Cache::has(ImportMasterJob::cacheKey($token))) {
             $status = Cache::get(ImportMasterJob::cacheKey($token));
@@ -35,11 +35,11 @@ class MasterImportController extends Controller
         }
 
         return view('admin.import.index', [
-            'entity'  => $entity,
-            'config'  => MasterRegistry::config($entity),
+            'entity' => $entity,
+            'config' => MasterRegistry::config($entity),
             'preview' => $preview,
-            'token'   => $preview ? $token : null,
-            'status'  => $status,
+            'token' => $preview ? $token : null,
+            'status' => $status,
         ]);
     }
 
@@ -55,7 +55,7 @@ class MasterImportController extends Controller
         ]);
 
         $token = (string) Str::uuid();
-        $ext   = strtolower($request->file('file')->getClientOriginalExtension()) ?: 'xlsx';
+        $ext = strtolower($request->file('file')->getClientOriginalExtension()) ?: 'xlsx';
 
         $request->file('file')->storeAs('imports', "{$token}.{$ext}", 'local');
 
@@ -77,26 +77,34 @@ class MasterImportController extends Controller
         $this->resolve($entity);
 
         $token = $request->input('token');
-        $rows  = json_decode((string) $request->input('rows'), true);
+        $status = $token ? Cache::get(ImportMasterJob::cacheKey($token)) : null;
+        $total = (int) ($status['total'] ?? 0);
+        $totalChunks = (int) ($status['total_chunks'] ?? 0);
 
-        if (! $token || ! is_array($rows) || $rows === []) {
+        if (! $token || ($status['status'] ?? null) !== 'preview_ready' || $total === 0 || $totalChunks === 0) {
             return redirect()
                 ->route('admin.master.import', $entity)
                 ->withErrors(['file' => 'Data preview kosong. Silakan upload ulang.']);
         }
 
-        Storage::disk('local')->put("imports/{$token}.rows.json", json_encode($rows));
+        $editedRows = json_decode((string) $request->input('rows'), true);
+        if (is_array($editedRows) && $editedRows !== [] && count($editedRows) <= PreviewImportJob::PREVIEW_LIMIT) {
+            $total = count($editedRows);
+            $totalChunks = (int) ceil($total / ImportMasterJob::BATCH_SIZE);
+            foreach (array_chunk($editedRows, ImportMasterJob::BATCH_SIZE) as $chunk => $rows) {
+                Storage::disk('local')->put("imports/{$token}.rows.{$chunk}.json", json_encode($rows, JSON_UNESCAPED_UNICODE));
+            }
+        }
 
-        $totalChunks = (int) ceil(count($rows) / ImportMasterJob::BATCH_SIZE);
         Cache::put(ImportMasterJob::cacheKey($token), [
-            'status'       => 'pending',
-            'total'        => count($rows),
+            'status' => 'pending',
+            'total' => $total,
             'total_chunks' => $totalChunks,
-            'processed'    => 0,
-            'created'      => 0,
-            'updated'      => 0,
-            'failed'       => 0,
-            'errors'       => [],
+            'processed' => 0,
+            'created' => 0,
+            'updated' => 0,
+            'failed' => 0,
+            'errors' => [],
         ], now()->addHours(2));
 
         ImportMasterJob::dispatch($entity, $token, 0, $totalChunks);
@@ -118,7 +126,7 @@ class MasterImportController extends Controller
         $token = $request->input('token');
         if ($token) {
             foreach (Storage::disk('local')->files('imports') as $file) {
-                if (str_starts_with(basename($file), $token . '.')) {
+                if (str_starts_with(basename($file), $token.'.')) {
                     Storage::disk('local')->delete($file);
                 }
             }
@@ -133,6 +141,13 @@ class MasterImportController extends Controller
     {
         if (! MasterRegistry::has($entity)) {
             abort(404);
+        }
+
+        // Import terkunci permission fitur entitas terkait.
+        $permission = MasterRegistry::config($entity)['permission'] ?? null;
+
+        if ($permission && ! auth()->user()?->can($permission)) {
+            abort(403, 'Anda tidak memiliki akses ke fitur ini.');
         }
     }
 }

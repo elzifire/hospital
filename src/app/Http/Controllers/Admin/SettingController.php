@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\BroadcastRule;
 use App\Models\MessageTemplate;
 use App\Models\TemplateCategory;
 use Illuminate\Http\Request;
@@ -41,8 +42,18 @@ class SettingController extends Controller
             'total_template' => MessageTemplate::count(),
             'total_kategori' => TemplateCategory::count(),
             'template_aktif' => MessageTemplate::where('is_active', true)->count(),
-            'total_dipakai'  => MessageTemplate::sum('dipakai_count'),
+            'total_dipakai' => MessageTemplate::sum('dipakai_count'),
         ];
+
+        // Aturan generate pesan (tab Aturan Pesan) + kandidat template aktif
+        $aturan = BroadcastRule::with('template:id,judul')
+            ->orderByRaw("jenis = 'follow_up'")
+            ->orderByRaw("array_position(ARRAY['h-7','h-1','h','tidak_datang'], rule)")
+            ->get();
+
+        $templateAktif = MessageTemplate::where('is_active', true)
+            ->orderBy('judul')
+            ->get(['id', 'judul']);
 
         // Daftar Variabel Dinamis untuk PNPP
         $variables = [
@@ -59,16 +70,18 @@ class SettingController extends Controller
         ];
 
         return view('admin.setting.index', [
-            'tab'        => $tab,
-            'templates'  => $templates,
+            'tab' => $tab,
+            'templates' => $templates,
             'categories' => $categories,
-            'stats'      => $stats,
-            'variables'  => $variables,
-            'filters'    => [
-                'q'           => $search,
+            'stats' => $stats,
+            'variables' => $variables,
+            'aturan' => $aturan,
+            'templateAktif' => $templateAktif,
+            'filters' => [
+                'q' => $search,
                 'category_id' => $categoryId,
-                'channel'     => $channel,
-                'status'      => $status,
+                'channel' => $channel,
+                'status' => $status,
             ],
         ]);
     }

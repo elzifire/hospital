@@ -238,11 +238,13 @@
 
                 {{-- Action bar --}}
                 <div class="flex items-center justify-between gap-3">
-                    <a href="{{ route('admin.pnpp.kunjungan', $pnpp) }}"
-                       class="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100">
-                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
-                        Riwayat Kunjungan
-                    </a>
+                    @can('manage kunjungan')
+                        <a href="{{ route('admin.pnpp.kunjungan', $pnpp) }}"
+                           class="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100">
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                            Riwayat Kunjungan
+                        </a>
+                    @endcan
                     <div class="flex items-center gap-3">
                         <a href="{{ route('admin.pnpp.index') }}"
                            class="rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-xs transition hover:bg-slate-50">Batal</a>
