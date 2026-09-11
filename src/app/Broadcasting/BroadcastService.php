@@ -17,13 +17,13 @@ use Illuminate\Support\Collection;
  *    tidak_datang (bahan rule follow up no-show).
  *  - batalkan() → pesan yang belum terkirim.
  *
- * Pengiriman nyata ke WhatsApp sengaja belum aktif (menunggu pihak
- * ketiga): pesan hasil generate berstatus "menunggu" dan siap dikirim
- * saat infrastruktur kirim dibangun kembali.
+ * Pesan hasil generate berstatus "menunggu" lalu dikirim oleh worker
+ * queue (job KirimPesanJob, diantrekan command broadcast:kirim tiap
+ * menit) atau tombol "Kirim Sekarang" secara sinkron.
  */
 class BroadcastService
 {
-    public function __construct(protected MessageRenderer $renderer) {}
+    public function __construct(protected PesanFactory $pesan) {}
 
     /**
      * Buat pesan untuk seluruh reminder yang cocok dengan rule aktif jenis tsb.
@@ -122,41 +122,8 @@ class BroadcastService
 
     protected function buatPesan(BroadcastRule $aturan, Reminder $reminder, ?User $oleh): MessageLog
     {
-        $pnpp = $reminder->pnpp;
-        $noHp = PhoneFormat::toWa($pnpp?->no_hp);
-
-        return MessageLog::create([
-            'jenis' => $aturan->jenis,
-            'rule' => $aturan->rule,
-            'reminder_id' => $reminder->id,
-            'message_template_id' => $aturan->message_template_id,
-            'pnpp_id' => $pnpp?->id,
-            'created_by' => $oleh?->id,
-            'penerima_nama' => (string) ($pnpp?->nama ?? '—'),
-            'penerima_no_hp' => $noHp ?? (string) ($pnpp?->no_hp ?? ''),
-            'konten' => $this->renderer->render(
-                (string) $aturan->template?->konten,
-                $pnpp,
-                $this->meta($reminder),
-            ),
-            'status' => $noHp === null ? 'gagal' : 'menunggu',
-            'error' => $noHp === null ? 'Pasien tidak memiliki nomor WhatsApp yang valid.' : null,
-        ]);
-    }
-
-    /**
-     * Konteks render ({poli} {dokter} {tanggal} {jam}) derivasi dari
-     * penjadwalan — bukan lagi meta bebas dari form.
-     *
-     * @return array<string, ?string>
-     */
-    protected function meta(Reminder $reminder): array
-    {
-        return [
-            'poli' => $reminder->poli?->nama,
-            'dokter' => $reminder->dokter?->nama,
-            'tanggal' => $reminder->tanggal?->format('Y-m-d'),
-            'jam' => $reminder->jam?->format('H:i'),
-        ];
+        return MessageLog::create(
+            $this->pesan->atribut($aturan->template, $reminder->pnpp, $reminder, $aturan->jenis, $aturan->rule, $oleh),
+        );
     }
 }

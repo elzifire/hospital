@@ -191,7 +191,7 @@
                                         @endforeach
                                     </div>
                                 @else
-                                    <span class="text-xs text-slate-400">Sehat / —</span>
+                                    <span class="text-xs text-slate-400">—</span>
                                 @endif
                             </td>
                             <td class="px-6 py-4">

@@ -22,6 +22,9 @@
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_STORE" value="array"/>
+        <!-- Database khusus test — RefreshDatabase menjalankan migrate:fresh,
+             jangan arahkan ke DB dev (hospital-app). -->
+        <env name="DB_DATABASE" value="hospital_test"/>
         <!-- <env name="DB_CONNECTION" value="sqlite"/> -->
         <!-- <env name="DB_DATABASE" value=":memory:"/> -->
         <env name="MAIL_MAILER" value="array"/>
@@ -29,8 +32,9 @@
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
-        <!-- Webhook test mengatur token/HMAC per kasus — default kosong -->
-        <env name="WA_WEBHOOK_VERIFY_TOKEN" value=""/>
-        <env name="WA_WEBHOOK_SECRET" value=""/>
+        <!-- Test tidak boleh mengirim WhatsApp nyata -->
+        <env name="WA_DRIVER" value="log"/>
+        <env name="WA_META_FALLBACK_TEMPLATE" value="3p_direct_integration_test_template"/>
+        <env name="WA_META_FALLBACK_LANGUAGE" value="en_US"/>
     </php>
 </phpunit>

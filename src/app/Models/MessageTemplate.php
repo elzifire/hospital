@@ -17,16 +17,23 @@ class MessageTemplate extends Model
         'judul',
         'kode',
         'channel',
+        'meta_template_name',
+        'meta_language',
+        'meta_param_tokens',
         'konten',
         'deskripsi',
         'is_active',
         'dipakai_count',
     ];
 
-    protected $casts = [
-        'is_active' => 'boolean',
-        'dipakai_count' => 'integer',
-    ];
+    protected function casts(): array
+    {
+        return [
+            'is_active' => 'boolean',
+            'dipakai_count' => 'integer',
+            'meta_param_tokens' => 'array',
+        ];
+    }
 
     protected static function booted(): void
     {
@@ -40,6 +47,24 @@ class MessageTemplate extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(TemplateCategory::class, 'template_category_id');
+    }
+
+    /**
+     * Urutan token yang menjadi parameter template Meta ({{1}}, {{2}},
+     * …): pakai meta_param_tokens bila diisi, selain itu urutan
+     * kemunculan pertama token di konten.
+     *
+     * @return array<int, string>
+     */
+    public function tokenParam(): array
+    {
+        if (filled($this->meta_param_tokens)) {
+            return array_values((array) $this->meta_param_tokens);
+        }
+
+        preg_match_all('/\{([a-z_]+)\}/i', (string) $this->konten, $cocok);
+
+        return array_values(array_unique($cocok[1] ?? []));
     }
 
     public function scopeSearch(Builder $query, ?string $search): Builder

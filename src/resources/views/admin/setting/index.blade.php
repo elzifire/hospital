@@ -49,7 +49,10 @@
         channel: 'WhatsApp',
         konten: '',
         deskripsi: '',
-        is_active: true
+        is_active: true,
+        meta_template_name: '',
+        meta_language: '',
+        meta_param_tokens: ''
     },
     categoryModal: {
         open: false,
@@ -133,6 +136,9 @@
         this.templateModal.konten = '';
         this.templateModal.deskripsi = '';
         this.templateModal.is_active = true;
+        this.templateModal.meta_template_name = '';
+        this.templateModal.meta_language = '';
+        this.templateModal.meta_param_tokens = '';
         this.templateModal.open = true;
     },
 
@@ -145,6 +151,9 @@
         this.templateModal.konten = t.konten;
         this.templateModal.deskripsi = t.deskripsi || '';
         this.templateModal.is_active = !!t.is_active;
+        this.templateModal.meta_template_name = t.meta_template_name || '';
+        this.templateModal.meta_language = t.meta_language || '';
+        this.templateModal.meta_param_tokens = Array.isArray(t.meta_param_tokens) ? t.meta_param_tokens.join(',') : (t.meta_param_tokens || '');
         this.templateModal.open = true;
     },
 
@@ -874,6 +883,28 @@
                             <textarea id="templateTextarea" name="konten" x-model="templateModal.konten" rows="4" required
                                       placeholder="Ketik isi pesan di sini. Gunakan tombol token di atas untuk menyisipkan variabel otomatis..."
                                       class="block w-full rounded-xl border-0 py-2.5 px-3.5 text-xs text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-inset focus:ring-sky-500"></textarea>
+                        </div>
+
+                        <div x-show="templateModal.channel === 'WhatsApp'" class="rounded-xl bg-sky-50/60 p-4 ring-1 ring-inset ring-sky-200/70">
+                            <p class="mb-3 text-xs font-bold text-sky-800">Pemetaan Template Meta (WhatsApp Official)</p>
+                            <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                <div>
+                                    <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-sky-500">Nama Template Meta</label>
+                                    <input type="text" name="meta_template_name" x-model="templateModal.meta_template_name" placeholder="Contoh: promo_h1"
+                                           class="block w-full rounded-lg border-0 py-2 px-3 text-xs text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-inset focus:ring-sky-500">
+                                </div>
+                                <div>
+                                    <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-sky-500">Bahasa Meta</label>
+                                    <input type="text" name="meta_language" x-model="templateModal.meta_language" placeholder="id"
+                                           class="block w-full rounded-lg border-0 py-2 px-3 text-xs text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-inset focus:ring-sky-500">
+                                </div>
+                                <div>
+                                    <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-sky-500">Token Parameter</label>
+                                    <input type="text" name="meta_param_tokens" x-model="templateModal.meta_param_tokens" placeholder="nama,poli,tanggal"
+                                           class="block w-full rounded-lg border-0 py-2 px-3 text-xs text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-inset focus:ring-sky-500">
+                                    <p class="mt-1 text-[10px] text-sky-500">Koma: nama, nip, satker, obat, poli, dokter, tanggal, jam</p>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="flex items-center gap-2 pt-2">

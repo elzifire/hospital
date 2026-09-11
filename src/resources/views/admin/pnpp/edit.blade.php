@@ -41,8 +41,8 @@
                             </div>
 
                             <div>
-                                <label for="nip" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">NIP/NRP</label>
-                                <input type="text" name="nip" id="nip" value="{{ old('nip', $pnpp->nip) }}" x-model="nip" placeholder="18 digit NIP"
+                                <label for="nip" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">NIP/NRP <span class="text-rose-500">*</span></label>
+                                <input type="text" name="nip" id="nip" value="{{ old('nip', $pnpp->nip) }}" x-model="nip" placeholder="18 digit NIP" required
                                        class="block w-full rounded-xl border-0 py-2.5 px-3.5 text-sm text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-sky-500 transition @error('nip') ring-rose-300 focus:ring-rose-500 @enderror">
                                 @error('nip')<p class="mt-1.5 text-xs font-medium text-rose-600">{{ $message }}</p>@enderror
                             </div>
@@ -82,9 +82,9 @@
                             </div>
 
                             <div>
-                                <label for="satker_id" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Satker</label>
+                                <label for="satker_id" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Satker <span class="text-rose-500">*</span></label>
                                 <select name="satker_id" id="satker_id" x-model="satkerId" @change="if (!satuanKerja) satuanKerja = satkerName"
-                                        class="block w-full rounded-xl border-0 py-2.5 px-3.5 text-sm text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-inset focus:ring-sky-500 transition cursor-pointer @error('satker_id') ring-rose-300 focus:ring-rose-500 @enderror">
+                                        class="block w-full rounded-xl border-0 py-2.5 px-3.5 text-sm text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-inset focus:ring-sky-500 transition cursor-pointer @error('satker_id') ring-rose-300 focus:ring-rose-500 @enderror" required>
                                     <option value="">— Pilih Satker —</option>
                                     @foreach ($satkers as $satker)
                                         <option value="{{ $satker->id }}" @selected(old('satker_id', $pnpp->satker_id) == $satker->id)>{{ $satker->nama }}</option>
@@ -94,9 +94,9 @@
                             </div>
 
                             <div>
-                                <label for="satuan_kerja" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Satuan Kerja</label>
+                                <label for="satuan_kerja" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Satuan Kerja <span class="text-rose-500">*</span></label>
                                 <input type="text" name="satuan_kerja" id="satuan_kerja" value="{{ old('satuan_kerja', $pnpp->satuan_kerja) }}" x-model="satuanKerja" placeholder="cth. Dinas Kesehatan"
-                                       class="block w-full rounded-xl border-0 py-2.5 px-3.5 text-sm text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-sky-500 transition @error('satuan_kerja') ring-rose-300 focus:ring-rose-500 @enderror">
+                                       class="block w-full rounded-xl border-0 py-2.5 px-3.5 text-sm text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-sky-500 transition @error('satuan_kerja') ring-rose-300 focus:ring-rose-500 @enderror" required>
                                 @error('satuan_kerja')<p class="mt-1.5 text-xs font-medium text-rose-600">{{ $message }}</p>@enderror
                             </div>
 
@@ -108,9 +108,9 @@
                             </div>
 
                             <div>
-                                <label for="no_hp" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">No. HP</label>
+                                <label for="no_hp" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">No. HP <span class="text-rose-500">*</span></label>
                                 <input type="text" name="no_hp" id="no_hp" value="{{ old('no_hp', $pnpp->no_hp) }}" x-model="noHp" placeholder="cth. 081234567890"
-                                       class="block w-full rounded-xl border-0 py-2.5 px-3.5 text-sm text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-sky-500 transition @error('no_hp') ring-rose-300 focus:ring-rose-500 @enderror">
+                                       class="block w-full rounded-xl border-0 py-2.5 px-3.5 text-sm text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-sky-500 transition @error('no_hp') ring-rose-300 focus:ring-rose-500 @enderror" required>
                                 @error('no_hp')<p class="mt-1.5 text-xs font-medium text-rose-600">{{ $message }}</p>@enderror
                             </div>
 

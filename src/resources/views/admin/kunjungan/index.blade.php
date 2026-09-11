@@ -124,7 +124,7 @@
                             <th class="px-5 py-3">Tanggal</th>
                             <th class="px-5 py-3">Pasien</th>
                             <th class="px-5 py-3">Poli Dikunjungi</th>
-                            <th class="px-5 py-3">Sumber</th>
+                            {{-- <th class="px-5 py-3">Sumber</th> --}}
                             <th class="px-5 py-3 text-right">Aksi</th>
                         </tr>
                     </thead>
@@ -155,11 +155,11 @@
                                         </p>
                                     @endif
                                 </td>
-                                <td class="whitespace-nowrap px-5 py-3">
+                                {{-- <td class="whitespace-nowrap px-5 py-3">
                                     <span class="rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ring-inset {{ $viaReminder ? 'bg-emerald-50 text-emerald-700 ring-emerald-200/70' : 'bg-slate-100 text-slate-500 ring-slate-200/70' }}">
                                         {{ $viaReminder ? 'Realisasi Reminder' : 'Manual' }}
                                     </span>
-                                </td>
+                                </td> --}}
                                 <td class="whitespace-nowrap px-5 py-3 text-right">
                                     <a href="{{ route('admin.pnpp.kunjungan', $pasien) }}"
                                        class="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-200">

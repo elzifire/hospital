@@ -30,7 +30,6 @@ use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\Webhook\WhatsAppWebhookController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -52,9 +51,7 @@ Route::middleware('guest')->group(function () {
     Route::post('/login', [AuthController::class, 'login']);
 });
 
-// Webhook WhatsApp (dipanggil WAHA dari luar — tanpa sesi login)
-Route::post('/webhook/whatsapp', [WhatsAppWebhookController::class, 'handle'])
-    ->name('webhook.whatsapp');
+// Webhook WhatsApp lama (WAHA) dihapus — fokus pengiriman pesan.
 
 // Authenticated routes
 Route::middleware('auth')->group(function () {
@@ -101,9 +98,14 @@ Route::middleware('auth')->group(function () {
                 ->name('digital-reminder.kunjungan');
         });
 
-        // Outreach: riwayat & generate pesan undangan jadwal (rule H-7, H-1).
+        // Outreach: riwayat & generate pesan undangan jadwal (rule H-7, H-1)
+        // + kirim pesan manual mengikuti metode resource Laravel:
+        //   create → tampilkan form pilih penerima, store → simpan & kirim.
+        // Jenis follow-up dicek izinnya di controller.
         Route::middleware('can:manage outreach')->group(function () {
             Route::get('outreach', [OutreachController::class, 'index'])->name('outreach.index');
+            Route::get('outreach/create', [OutreachController::class, 'create'])->name('outreach.create');
+            Route::post('outreach', [OutreachController::class, 'store'])->name('outreach.store');
             Route::post('outreach/generate', [OutreachController::class, 'generate'])->name('outreach.generate');
         });
 
@@ -120,7 +122,11 @@ Route::middleware('auth')->group(function () {
         });
 
         // Aksi atas riwayat pesan (dipakai lintas modul broadcast):
-        // permission dicek per jenis pesan di dalam controller.
+        // detail, kirim ulang (gagal), kirim sekarang (antrean), dan
+        // pembatalan — permission dicek per jenis pesan di controller.
+        Route::get('broadcast/log/{log}', [BroadcastLogController::class, 'show'])->name('broadcast.show');
+        Route::post('broadcast/log/{log}/kirim-ulang', [BroadcastLogController::class, 'kirimUlang'])->name('broadcast.kirim-ulang');
+        Route::post('broadcast/kirim/{jenis}', [BroadcastLogController::class, 'kirimSekarang'])->name('broadcast.kirim-sekarang');
         Route::delete('broadcast/log/{log}/batalkan', [BroadcastLogController::class, 'batalkan'])->name('broadcast.batalkan');
 
         // Pengaturan Template Pesan & Kategori (khusus pengelola template)
@@ -203,3 +209,25 @@ Route::middleware('auth')->group(function () {
         Route::get('master/{entity}/template', [MasterExportController::class, 'template'])->name('master.template');
     });
 });
+
+
+// Route::get('/whatsapp/webhook', function (\Illuminate\Http\Request $request) {
+//     $verifyToken = 'ELZIFIRE_WA_VERIFY_2026';
+
+//     if (
+//         $request->query('hub_mode') === 'subscribe' &&
+//         $request->query('hub_verify_token') === $verifyToken
+//     ) {
+//         return response($request->query('hub_challenge'), 200);
+//     }
+
+//     return response('Forbidden', 403);
+// });
+
+// Route::post('/whatsapp/webhook', function (\Illuminate\Http\Request $request) {
+//     Log::info('WhatsApp Webhook', $request->all());
+
+//     return response()->json([
+//         'status' => 'ok'
+//     ]);
+// });

@@ -2,7 +2,6 @@
 
 namespace App\Support;
 
-use App\Models\BroadcastRule;
 use App\Models\Dokter;
 use App\Models\Jadwal;
 use App\Models\Kunjungan;
@@ -113,6 +112,7 @@ class MonitoringRegistry
         ];
         $statusTone = [
             'menunggu' => 'slate',
+            'mengirim' => 'sky',
             'terkirim' => 'emerald',
             'gagal' => 'rose',
             'dibatalkan' => 'amber',
@@ -150,7 +150,7 @@ class MonitoringRegistry
                         'key' => 'status',
                         'label' => 'Semua Status',
                         'type' => 'select',
-                        'options' => fn () => array_combine(MessageLog::STATUS, array_map('ucfirst', MessageLog::STATUS)),
+                        'options' => fn () => MessageLog::LABEL_STATUS,
                         'apply' => fn (Builder $q, string $v) => $q->where('status', $v),
                     ],
                     [
@@ -190,8 +190,7 @@ class MonitoringRegistry
                 $o['columns'],
                 [
                     ['label' => 'Status', 'type' => 'badge',                      'value' => fn ($m) => [$m->status, $statusTone[$m->status] ?? 'slate']],
-                    ['label' => 'Waktu',  'type' => 'strong',                     'value' => fn ($m) => ($m->sent_at ?? $m->created_at)?->translatedFormat('d M Y H:i')],
-                ]
+                    ['label' => 'Waktu',  'type' => 'strong',                     'value' => fn ($m) => ($m->sent_at ?? $m->created_at)?->translatedFormat('d M Y H:i')],                ]
             ),
             'export' => [
                 'headers' => array_merge(
@@ -205,7 +204,7 @@ class MonitoringRegistry
                     $m->penerima_no_hp ?? '',
                     $m->pnpp?->satker?->nama ?? '',
                     $m->template?->judul ?? '',
-                    $m->status,
+                    MessageLog::LABEL_STATUS[$m->status] ?? $m->status,
                     $m->sent_at?->format('Y-m-d H:i') ?? '',
                 ], ($o['exportRow'])($m), [$m->konten ?? '', $m->error ?? '']),
             ],
@@ -830,15 +829,17 @@ class MonitoringRegistry
                         'key' => 'rule',
                         'label' => 'Semua Aturan',
                         'type' => 'select',
-                        'options' => fn () => array_combine(BroadcastRule::RULE, BroadcastRule::RULE),
+                        'options' => fn () => [
+                            'h-7' => 'H-7', 'h-1' => 'H-1', 'manual' => 'Manual',
+                        ],
                         'apply' => fn (Builder $q, string $v) => $q->where('rule', $v),
                     ],
                 ],
                 'stats' => fn () => [
-                    ['label' => 'Total Pesan', 'value' => MessageLog::jenis('outreach')->count(),                                 'icon' => $iconMega,  'tone' => 'emerald'],
-                    ['label' => 'Menunggu',    'value' => MessageLog::jenis('outreach')->status('menunggu')->count(),              'icon' => $iconClock, 'tone' => 'violet'],
-                    ['label' => 'Terkirim',    'value' => MessageLog::jenis('outreach')->status('terkirim')->count(),              'icon' => $iconCheck, 'tone' => 'sky'],
-                    ['label' => 'Gagal',       'value' => MessageLog::jenis('outreach')->status('gagal')->count(),                  'icon' => $iconWarn,  'tone' => 'rose'],
+                    ['label' => 'Total Pesan',  'value' => MessageLog::jenis('outreach')->count(),                                 'icon' => $iconMega,  'tone' => 'emerald'],
+                    ['label' => 'Dalam Proses', 'value' => MessageLog::jenis('outreach')->whereIn('status', ['menunggu', 'mengirim'])->count(), 'icon' => $iconClock, 'tone' => 'violet'],
+                    ['label' => 'Terkirim',     'value' => MessageLog::jenis('outreach')->status('terkirim')->count(),              'icon' => $iconCheck, 'tone' => 'sky'],
+                    ['label' => 'Gagal',        'value' => MessageLog::jenis('outreach')->status('gagal')->count(),                  'icon' => $iconWarn,  'tone' => 'rose'],
                 ],
                 'columns' => [
                     ['label' => 'Aturan',   'type' => 'badge',  'tone' => 'amber', 'value' => fn ($m) => $m->rule ? [$m->rule, 'amber'] : null],
@@ -932,13 +933,16 @@ class MonitoringRegistry
                         'key' => 'rule',
                         'label' => 'Semua Aturan',
                         'type' => 'select',
-                        'options' => fn () => array_combine(BroadcastRule::RULE, BroadcastRule::RULE),
+                        'options' => fn () => [
+                            'h-1' => 'H-1', 'hari_h' => 'Hari-H', 'tidak_datang' => 'Tidak Datang',
+                            'manual' => 'Manual',
+                        ],
                         'apply' => fn (Builder $q, string $v) => $q->where('rule', $v),
                     ],
                 ],
                 'stats' => fn () => [
                     ['label' => 'Total Follow Up', 'value' => MessageLog::jenis('follow_up')->count(),                        'icon' => $iconPhone, 'tone' => 'amber'],
-                    ['label' => 'Menunggu',        'value' => MessageLog::jenis('follow_up')->status('menunggu')->count(),      'icon' => $iconClock, 'tone' => 'violet'],
+                    ['label' => 'Dalam Proses',    'value' => MessageLog::jenis('follow_up')->whereIn('status', ['menunggu', 'mengirim'])->count(), 'icon' => $iconClock, 'tone' => 'violet'],
                     ['label' => 'Tidak Datang',    'value' => MessageLog::jenis('follow_up')->rule('tidak_datang')->count(),    'icon' => $iconWarn,  'tone' => 'rose'],
                     ['label' => 'Gagal',           'value' => MessageLog::jenis('follow_up')->status('gagal')->count(),          'icon' => $iconPin,   'tone' => 'sky'],
                 ],

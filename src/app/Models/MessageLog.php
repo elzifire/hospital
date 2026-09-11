@@ -17,10 +17,24 @@ class MessageLog extends Model
     public const JENIS = ['outreach', 'follow_up'];
 
     /**
-     * Status pesan: "menunggu" sampai infrastruktur kirim WhatsApp
-     * dibangun kembali (pengiriman nyata sementara tidak aktif).
+     * Status pesan: "menunggu" (dalam proses antrean) → "mengirim"
+     * (sedang dikirim worker) → "terkirim" / "gagal"; "dibatalkan"
+     * final karena dibatalkan petugas sebelum terkirim.
      */
-    public const STATUS = ['menunggu', 'terkirim', 'gagal', 'dibatalkan'];
+    public const STATUS = ['menunggu', 'mengirim', 'terkirim', 'gagal', 'dibatalkan'];
+
+    /**
+     * Label status untuk UI — alur antrean dibuat eksplisit supaya
+     * pengguna tidak bingung membedakan antrean dan pengiriman
+     * yang sedang berjalan.
+     */
+    public const LABEL_STATUS = [
+        'menunggu' => 'Dalam Proses',
+        'mengirim' => 'Sedang Dikirim',
+        'terkirim' => 'Terkirim',
+        'gagal' => 'Gagal',
+        'dibatalkan' => 'Dibatalkan',
+    ];
 
     protected $fillable = [
         'jenis',
@@ -35,12 +49,20 @@ class MessageLog extends Model
         'status',
         'sent_at',
         'error',
+        'kirim_pada',
+        'provider',
+        'provider_message_id',
+        'meta_template_name',
+        'meta_language',
+        'template_params',
     ];
 
     protected function casts(): array
     {
         return [
             'sent_at' => 'datetime',
+            'kirim_pada' => 'datetime',
+            'template_params' => 'array',
         ];
     }
 
