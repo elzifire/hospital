@@ -51,6 +51,12 @@ trait BuildsReportQuery
             ($config['query'])($query);
         }
 
+        // Pembatasan per poli untuk user akun poli — query laporan yang
+        // punya kolom poli_id langsung (kunjungan & digital-reminder).
+        if (! empty($config['poliScope'])) {
+            ($config['poliScope'])($query);
+        }
+
         if ($search = trim((string) $request->query('search'))) {
             ($config['search'])($query, $search);
         }

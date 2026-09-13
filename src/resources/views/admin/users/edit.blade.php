@@ -9,6 +9,7 @@
     $roleBadge = match ($currentRole) {
         'superadmin' => ['bg-rose-100 text-rose-700 ring-rose-600/20', 'bg-rose-500'],
         'admin'      => ['bg-amber-100 text-amber-700 ring-amber-600/20', 'bg-amber-500'],
+        'poli'       => ['bg-violet-100 text-violet-700 ring-violet-600/20', 'bg-violet-500'],
         'user'       => ['bg-emerald-100 text-emerald-700 ring-emerald-600/20', 'bg-emerald-500'],
         default      => ['bg-slate-100 text-slate-600 ring-slate-500/20', 'bg-slate-400'],
     };
@@ -82,6 +83,19 @@
                         </div>
                         <div class="flex items-center justify-between text-sm">
                             <dt class="flex items-center gap-2 text-slate-500">
+                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" /></svg>
+                                Poli
+                            </dt>
+                            <dd>
+                                @if ($user->userDetail?->poli)
+                                    <span class="inline-flex items-center gap-1 rounded-lg bg-violet-50 px-2 py-0.5 text-xs font-semibold text-violet-700 ring-1 ring-violet-600/20">{{ $user->userDetail->poli->nama }}</span>
+                                @else
+                                    <span class="text-xs text-slate-400">—</span>
+                                @endif
+                            </dd>
+                        </div>
+                        <div class="flex items-center justify-between text-sm">
+                            <dt class="flex items-center gap-2 text-slate-500">
                                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
                                 Diupdate
                             </dt>
@@ -119,6 +133,7 @@
                                 $desc = match ($role->name) {
                                     'superadmin' => 'Akses tanpa batas ke seluruh sistem.',
                                     'admin'      => 'Mengelola pengguna & melihat dashboard.',
+                                    'poli'       => 'Akun petugas/penanggung jawab instalasi.',
                                     'user'       => 'Akses standar ke fitur umum.',
                                     default      => 'Role kustom dengan permission tertentu.',
                                 };
@@ -166,6 +181,21 @@
                             </label>
                         @endforeach
 
+                        {{-- Poli / Instalasi (hanya untuk role poli) --}}
+                        <div x-show="selected === 'poli'" x-cloak
+                             class="rounded-xl bg-violet-50/60 p-4 ring-1 ring-violet-200/70 transition-all">
+                            <label for="poli_id" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-violet-700">Instalasi / Poli <span class="text-rose-500">*</span></label>
+                            <select name="poli_id" id="poli_id" x-model="poliId" :required="selected === 'poli'"
+                                    class="block w-full rounded-xl border-0 py-2.5 px-3.5 text-sm text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-violet-500 transition">
+                                <option value="">-- Pilih Poli --</option>
+                                @foreach ($polis as $poli)
+                                    <option value="{{ $poli->id }}" @selected((string) ($user->userDetail?->poli_id ?? old('poli_id')) === (string) $poli->id)>{{ $poli->kode }} — {{ $poli->nama }}</option>
+                                @endforeach
+                            </select>
+                            <p class="mt-1.5 text-xs text-violet-500">Poli wajib diisi untuk akun dengan role <strong>Poli</strong>.</p>
+                            @error('poli_id')<p class="mt-1.5 text-xs font-medium text-rose-600">{{ $message }}</p>@enderror
+                        </div>
+
                         @error('role')
                             <div class="flex items-start gap-2.5 rounded-xl bg-rose-50 p-4 ring-1 ring-rose-200">
                                 <svg class="mt-0.5 h-5 w-5 flex-shrink-0 text-rose-500" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" /></svg>
@@ -208,10 +238,14 @@
         Alpine.data('roleAssign', () => ({
             selected: @js($currentRole),
             original: @js($currentRole),
+            poliId: @js((string) ($user->userDetail?->poli_id ?? old('poli_id', ''))),
+            poliOriginal: @js((string) ($user->userDetail?->poli_id ?? '')),
             saving: false,
 
             get isDirty() {
-                return this.selected !== this.original;
+                const roleChanged = this.selected !== this.original;
+                const poliChanged = this.selected === 'poli' && this.poliId !== this.poliOriginal;
+                return roleChanged || poliChanged;
             },
 
             init() {

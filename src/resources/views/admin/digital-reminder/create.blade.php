@@ -66,6 +66,7 @@
               semuaId: @js($pnpps->pluck('id')),
               poliIdSemua: @js($polis->pluck('id')),
               oldPoliIds: @js(collect(old('poli_ids', []))->map(fn ($v) => (string) $v)),
+              poliAwal: @js($poliAwal ?? []),
               get jumlah() { return Object.values(this.terpilih).filter(Boolean).length },
               get jumlahPoli() { return Object.values(this.poliTerpilih).filter(Boolean).length },
               get totalJadwal() { return this.jumlah * this.jumlahPoli },
@@ -80,7 +81,7 @@
                   this.semuaId.forEach(i => this.terpilih[i] = nilai);
               }
           }"
-          x-init="poliIdSemua.forEach(i => poliTerpilih[i] = oldPoliIds.includes(String(i)))"
+          x-init="poliIdSemua.forEach(i => poliTerpilih[i] = oldPoliIds.includes(String(i)) || poliAwal.includes(String(i)))"
           class="space-y-6">
         @csrf
 

@@ -18,6 +18,7 @@ use App\Http\Controllers\Admin\PermissionController;
 use App\Http\Controllers\Admin\PnppController;
 use App\Http\Controllers\Admin\PoliController;
 use App\Http\Controllers\Admin\ProfileController;
+use App\Http\Controllers\Admin\RegisterPnppController as AdminRegisterPnppController;
 use App\Http\Controllers\Admin\ResponController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\SatkerController;
@@ -30,6 +31,7 @@ use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\RegisterPnppController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -49,6 +51,10 @@ Route::get('/', function () {
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
     Route::post('/login', [AuthController::class, 'login']);
+
+    // Pendaftaran PNPP publik — bisa diakses tanpa login.
+    Route::get('register-pnpp', [RegisterPnppController::class, 'create'])->name('register-pnpp.create');
+    Route::post('register-pnpp', [RegisterPnppController::class, 'store'])->name('register-pnpp.store');
 });
 
 // Webhook WhatsApp lama (WAHA) dihapus — fokus pengiriman pesan.
@@ -190,6 +196,14 @@ Route::middleware('auth')->group(function () {
             Route::resource('poli', PoliController::class)->except('show');
         });
 
+        // Registrasi PNPP: verifikasi pendaftaran publik & persetujuan.
+        Route::middleware('can:manage register-pnpp')->group(function () {
+            Route::get('register-pnpp', [AdminRegisterPnppController::class, 'index'])->name('register-pnpp.index');
+            Route::get('register-pnpp/{registerPnpp}', [AdminRegisterPnppController::class, 'show'])->name('register-pnpp.show');
+            Route::patch('register-pnpp/{registerPnpp}/status', [AdminRegisterPnppController::class, 'approve'])->name('register-pnpp.approve');
+            Route::delete('register-pnpp/{registerPnpp}', [AdminRegisterPnppController::class, 'destroy'])->name('register-pnpp.destroy');
+        });
+
         Route::middleware('can:manage dokter')->group(function () {
             Route::resource('dokter', DokterController::class)->except('show');
         });
@@ -209,7 +223,6 @@ Route::middleware('auth')->group(function () {
         Route::get('master/{entity}/template', [MasterExportController::class, 'template'])->name('master.template');
     });
 });
-
 
 // Route::get('/whatsapp/webhook', function (\Illuminate\Http\Request $request) {
 //     $verifyToken = 'ELZIFIRE_WA_VERIFY_2026';

@@ -17,6 +17,8 @@ class DatabaseSeeder extends Seeder
             BroadcastPermissionSeeder::class,
             UserSeeder::class,
             FeaturePermissionSeeder::class,
+            TujuanKunjunganSeeder::class,
+            PoliUserSeeder::class,
             MessageTemplateSeeder::class,
             BroadcastRuleSeeder::class,
             // MasterDataSeeder::class,

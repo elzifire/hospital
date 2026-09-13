@@ -22,10 +22,19 @@ class FollowUpController extends Controller
         $q = (string) $request->query('q', '');
         $status = (string) $request->query('status', '');
         $rule = (string) $request->query('rule', '');
+        $poliId = $request->user()?->poliId();
+
+        // Akun poli hanya melihat pesan hasil generate dari reminder
+        // polinya sendiri.
+        $scopePoli = fn ($query) => $query->when(
+            $poliId !== null,
+            fn ($sub) => $sub->whereHas('reminder', fn ($reminder) => $reminder->where('poli_id', $poliId)),
+        );
 
         $logs = MessageLog::query()
             ->jenis('follow_up')
             ->with('template:id,judul', 'reminder.poli:id,nama')
+            ->tap($scopePoli)
             ->when($q, fn ($query) => $query->where(
                 fn ($sub) => $sub->where('penerima_nama', 'like', "%{$q}%")
                     ->orWhere('penerima_no_hp', 'like', "%{$q}%")
@@ -38,6 +47,7 @@ class FollowUpController extends Controller
             ->withQueryString();
 
         $perStatus = MessageLog::jenis('follow_up')
+            ->tap($scopePoli)
             ->selectRaw('status, count(*) as total')
             ->groupBy('status')
             ->pluck('total', 'status');
@@ -45,7 +55,7 @@ class FollowUpController extends Controller
         return view('admin.follow-up.index', [
             'logs' => $logs,
             'perStatus' => $perStatus,
-            'penerimaUnik' => MessageLog::jenis('follow_up')->distinct()->count('pnpp_id'),
+            'penerimaUnik' => MessageLog::jenis('follow_up')->tap($scopePoli)->distinct()->count('pnpp_id'),
             'total' => (int) $perStatus->sum(),
             'filters' => ['q' => $q, 'status' => $status, 'rule' => $rule],
         ]);
@@ -59,9 +69,10 @@ class FollowUpController extends Controller
     public function generate(Request $request)
     {
         $service = app(BroadcastService::class);
+        $poliId = $request->user()?->poliId();
 
-        $ditandai = $service->sweepStatus();
-        $hasil = $service->generate('follow_up', $request->user());
+        $ditandai = $service->sweepStatus($poliId);
+        $hasil = $service->generate('follow_up', $request->user(), $poliId);
 
         $pesan = $hasil['dibuat'].' pesan follow up dibuat, '
             .$hasil['dilewati'].' dilewati (sudah pernah dibuat).';

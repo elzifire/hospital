@@ -7,8 +7,10 @@ use App\Models\Kunjungan;
 use App\Models\Pnpp;
 use App\Models\Poli;
 use App\Models\Satker;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
@@ -22,7 +24,8 @@ class KunjunganController extends Controller
     /**
      * Daftar kunjungan — cari nama/NIP, filter poli, periode & rentang
      * tanggal; dikelompokkan per pasien + tanggal (satu pasien bisa
-     * beberapa poli dalam satu tanggal).
+     * beberapa poli dalam satu tanggal). User role poli hanya melihat
+     * polinya sendiri.
      */
     public function index(Request $request)
     {
@@ -31,6 +34,8 @@ class KunjunganController extends Controller
         $dari = (string) $request->query('dari', '');
         $sampai = (string) $request->query('sampai', '');
         $periode = (string) $request->query('periode', '');
+
+        $dasar = fn (Builder $t) => $t->when($this->batasiPoli(), fn ($u) => $u->where('poli_id', $this->poliAktif()));
 
         $query = Kunjungan::query()
             ->with('pnpp.satker:id,nama', 'poli:id,nama')
@@ -46,7 +51,8 @@ class KunjunganController extends Controller
                 '30-hari' => today()->subDays(29)->toDateString(),
                 default => null,
             }, fn ($t, $mulai) => $t->where('tanggal_kunjungan', '>=', $mulai))
-            ->when($poliId, fn ($t) => $t->where('poli_id', $poliId))
+            ->when($poliId && ! $this->batasiPoli(), fn ($t) => $t->where('poli_id', $poliId))
+            ->tap($dasar)
             ->orderByDesc('tanggal_kunjungan')
             ->orderBy('pnpp_id')
             ->orderBy('poli_id')
@@ -65,15 +71,18 @@ class KunjunganController extends Controller
             ['path' => $request->url(), 'query' => $request->query()],
         );
 
+        $dasarCount = fn (Builder $t) => $t->when($this->batasiPoli(), fn ($u) => $u->where('poli_id', $this->poliAktif()));
+
         return view('admin.kunjungan.index', [
             'kunjungan' => $kunjungan,
-            'polis' => Poli::orderBy('nama')->get(['id', 'nama']),
+            'polis' => $this->daftarPoliAktif(),
+            'batasiPoli' => $this->batasiPoli(),
             'filters' => ['q' => $q, 'poli' => $poliId, 'dari' => $dari, 'sampai' => $sampai, 'periode' => $periode],
-            'total' => Kunjungan::count(),
-            'hariIni' => Kunjungan::whereDate('tanggal_kunjungan', today())->count(),
-            'bulanIni' => Kunjungan::whereYear('tanggal_kunjungan', now()->year)->whereMonth('tanggal_kunjungan', now()->month)->count(),
-            'realisasi' => Kunjungan::whereNotNull('reminder_id')->count(),
-            'pasien' => Kunjungan::distinct()->count('pnpp_id'),
+            'total' => Kunjungan::query()->tap($dasarCount)->count(),
+            'hariIni' => Kunjungan::whereDate('tanggal_kunjungan', today())->tap($dasarCount)->count(),
+            'bulanIni' => Kunjungan::whereYear('tanggal_kunjungan', now()->year)->whereMonth('tanggal_kunjungan', now()->month)->tap($dasarCount)->count(),
+            'realisasi' => Kunjungan::whereNotNull('reminder_id')->tap($dasarCount)->count(),
+            'pasien' => Kunjungan::query()->tap($dasarCount)->distinct()->count('pnpp_id'),
         ]);
     }
 
@@ -100,7 +109,8 @@ class KunjunganController extends Controller
         return view('admin.kunjungan.create', [
             'pnpps' => $pnpps,
             'satkers' => Satker::orderBy('nama')->get(['id', 'nama']),
-            'polis' => Poli::orderBy('nama')->get(['id', 'nama']),
+            'polis' => $this->daftarPoliAktif(),
+            'poliTerkunci' => $this->batasiPoli(),
             'filters' => ['q' => $q, 'satker' => $satkerId],
         ]);
     }
@@ -141,13 +151,14 @@ class KunjunganController extends Controller
     public function edit(Pnpp $pnpp, Kunjungan $kunjungan)
     {
         abort_unless($kunjungan->pnpp_id === $pnpp->id, 404);
+        $this->pastikanPoli($kunjungan);
 
         $kunjungan->load('poli:id,nama', 'reminder.poli:id,nama');
 
         return view('admin.kunjungan.edit', [
             'pnpp' => $pnpp->load('satker:id,nama'),
             'kunjungan' => $kunjungan,
-            'polis' => Poli::orderBy('nama')->get(['id', 'nama']),
+            'polis' => $this->daftarPoliAktif(),
         ]);
     }
 
@@ -158,10 +169,11 @@ class KunjunganController extends Controller
     public function update(Request $request, Pnpp $pnpp, Kunjungan $kunjungan)
     {
         abort_unless($kunjungan->pnpp_id === $pnpp->id, 404);
+        $this->pastikanPoli($kunjungan);
 
         $data = $request->validate([
             'tanggal_kunjungan' => ['required', 'date'],
-            'poli_id' => ['required', Rule::exists('polis', 'id')],
+            'poli_id' => array_merge(['required', Rule::exists('polis', 'id')], $this->pembatasanPoli()),
             'keluhan' => ['nullable', 'string', 'max:1000'],
             'diagnosa' => ['nullable', 'string', 'max:1000'],
         ]);
@@ -178,6 +190,8 @@ class KunjunganController extends Controller
      */
     public function destroy(Pnpp $pnpp, Kunjungan $kunjungan)
     {
+        $this->pastikanPoli($kunjungan);
+
         $pnpp->kunjungans()->whereKey($kunjungan->id)->delete();
 
         return redirect()
@@ -194,10 +208,59 @@ class KunjunganController extends Controller
         return [
             'tanggal_kunjungan' => ['required', 'date'],
             'polis' => ['required', 'array', 'min:1'],
-            'polis.*.poli_id' => ['required', Rule::exists('polis', 'id')],
+            'polis.*.poli_id' => array_merge(['required', Rule::exists('polis', 'id')], $this->pembatasanPoli()),
             'polis.*.keluhan' => ['nullable', 'string', 'max:1000'],
             'polis.*.diagnosa' => ['nullable', 'string', 'max:1000'],
         ];
+    }
+
+    /**
+     * ID poli pemilik akun login (role poli), null untuk admin/superadmin.
+     */
+    protected function poliAktif(): ?int
+    {
+        return auth()->user()?->poliId();
+    }
+
+    /**
+     * Apakah user login adalah akun poli (terikat satu poli)?
+     */
+    protected function batasiPoli(): bool
+    {
+        return $this->poliAktif() !== null;
+    }
+
+    /**
+     * Batasan validasi beban / item poli untuk user akun poli —
+     * hanya polinya sendiri yang sah. Kosong untuk admin/superadmin.
+     */
+    protected function pembatasanPoli(): array
+    {
+        return $this->batasiPoli() ? [Rule::in([$this->poliAktif()])] : [];
+    }
+
+    /**
+     * Cegah akses ke data poli lain (403).
+     */
+    protected function pastikanPoli(Kunjungan $kunjungan): void
+    {
+        abort_unless($this->bolehAkses($kunjungan), 403, 'Anda hanya dapat mengelola data poli Anda sendiri.');
+    }
+
+    protected function bolehAkses(Kunjungan $kunjungan): bool
+    {
+        return ! $this->batasiPoli() || ($kunjungan->poli_id === null || (int) $kunjungan->poli_id === $this->poliAktif());
+    }
+
+    /**
+     * Daftar poli yang boleh dilihat — polinya sendiri untuk akun poli.
+     */
+    protected function daftarPoliAktif(): Collection
+    {
+        return Poli::query()
+            ->when($this->batasiPoli(), fn ($q) => $q->whereKey($this->poliAktif()))
+            ->orderBy('nama')
+            ->get(['id', 'nama']);
     }
 
     /**

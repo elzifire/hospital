@@ -29,15 +29,16 @@ class BroadcastService
      * Buat pesan untuk seluruh reminder yang cocok dengan rule aktif jenis tsb.
      *
      * @param  string  $jenis  outreach | follow_up
+     * @param  int|null  $poliId  batasi ke satu poli (null = semua poli)
      * @return array{dibuat: int, dilewati: int}
      */
-    public function generate(string $jenis, ?User $oleh = null): array
+    public function generate(string $jenis, ?User $oleh = null, ?int $poliId = null): array
     {
         $dibuat = 0;
         $dilewati = 0;
 
         foreach ($this->aturanAktif($jenis) as $aturan) {
-            foreach ($this->reminderUntukRule($aturan->rule) as $reminder) {
+            foreach ($this->reminderUntukRule($aturan->rule, $poliId) as $reminder) {
                 if ($this->sudahDibuat($jenis, $aturan->rule, $reminder->id)) {
                     $dilewati++;
 
@@ -55,10 +56,15 @@ class BroadcastService
     /**
      * Tandai reminder terjadwal yang tanggalnya sudah lewat tanpa
      * kunjungan sebagai tidak datang. Aman dipanggil berulang.
+     *
+     * @param  int|null  $poliId  batasi ke satu poli (null = semua poli)
      */
-    public function sweepStatus(): int
+    public function sweepStatus(?int $poliId = null): int
     {
-        return Reminder::query()->terlambatTanpaKunjungan()->update(['status' => 'tidak_datang']);
+        return Reminder::query()
+            ->terlambatTanpaKunjungan()
+            ->when($poliId !== null, fn ($query) => $query->where('poli_id', $poliId))
+            ->update(['status' => 'tidak_datang']);
     }
 
     /**
@@ -96,10 +102,11 @@ class BroadcastService
      *
      * @return Collection<Reminder>
      */
-    protected function reminderUntukRule(string $rule): Collection
+    protected function reminderUntukRule(string $rule, ?int $poliId = null): Collection
     {
         return Reminder::query()
             ->with('pnpp.satker', 'poli', 'dokter')
+            ->when($poliId !== null, fn ($query) => $query->where('poli_id', $poliId))
             ->when(
                 $rule === 'tidak_datang',
                 fn ($query) => $query->where('status', 'tidak_datang'),

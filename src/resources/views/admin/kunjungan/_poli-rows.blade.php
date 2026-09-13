@@ -1,6 +1,38 @@
 {{-- Baris poli repeatable untuk form kunjungan multi-poli.
     Satu pasien bisa ke beberapa poli dalam satu tanggal — tiap baris
-    menjadi satu baris kunjungan. Self-contained (bawa x-data sendiri). --}}
+    menjadi satu baris kunjungan. Self-contained (bawa x-data sendiri).
+
+    $poliTerkunci=true → user akun poli: satu baris poli tunggal
+    (polinya sendiri) non-editabel, tanpa tombol tambah/hapus. --}}
+@if ($poliTerkunci ?? false)
+    @php($poliTerkunciData = $polis->first())
+    <div class="rounded-xl border border-violet-200 bg-violet-50/40 p-4">
+        <div class="grid grid-cols-1 items-start gap-3 lg:grid-cols-[180px_1fr_1fr]">
+            <div>
+                <label class="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-400">Poli <span class="text-rose-500">*</span></label>
+                <input type="hidden" name="polis[0][poli_id]" value="{{ $poliTerkunciData?->id }}">
+                <span class="inline-flex w-full items-center gap-1.5 rounded-lg bg-violet-50 px-3 py-2 text-sm font-semibold text-violet-700 ring-1 ring-inset ring-violet-200/70">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                    {{ $poliTerkunciData?->nama }}
+                </span>
+                @error('polis.0.poli_id')<p class="mt-1 text-xs text-rose-500">{{ $message }}</p>@enderror
+            </div>
+            <div>
+                <label class="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-400">Keluhan</label>
+                <input type="text" name="polis[0][keluhan]" maxlength="1000" value="{{ old('polis.0.keluhan') }}" placeholder="cth. Pusing, demam"
+                       class="w-full rounded-lg border-0 py-2 px-3 text-sm text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-sky-500">
+                @error('polis.0.keluhan')<p class="mt-1 text-xs text-rose-500">{{ $message }}</p>@enderror
+            </div>
+            <div>
+                <label class="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-400">Diagnosa</label>
+                <input type="text" name="polis[0][diagnosa]" maxlength="1000" value="{{ old('polis.0.diagnosa') }}" placeholder="cth. Hipertensi"
+                       class="w-full rounded-lg border-0 py-2 px-3 text-sm text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-sky-500">
+                @error('polis.0.diagnosa')<p class="mt-1 text-xs text-rose-500">{{ $message }}</p>@enderror
+            </div>
+        </div>
+    </div>
+    @error('polis')<p class="text-xs font-medium text-rose-600">{{ $message }}</p>@enderror
+@else
 @php
     $rowsAwal = collect(old('polis', []))
         ->map(fn ($r) => ['poli_id' => $r['poli_id'] ?? '', 'keluhan' => $r['keluhan'] ?? '', 'diagnosa' => $r['diagnosa'] ?? ''])
@@ -57,3 +89,4 @@
 
     @error('polis')<p class="text-xs font-medium text-rose-600">{{ $message }}</p>@enderror
 </div>
+@endif

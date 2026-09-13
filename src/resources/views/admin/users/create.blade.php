@@ -33,6 +33,7 @@
                         <span class="h-1.5 w-1.5 rounded-full" :class="role ? dotClass(role) : 'bg-slate-400'"></span>
                         <span x-text="role || 'Tanpa Role'"></span>
                     </span>
+                    <p x-show="role === 'poli' && poliName" x-cloak class="mt-1.5 text-xs font-semibold text-violet-600" x-text="'Poli: ' + poliName"></p>
                 </div>
             </div>
 
@@ -130,6 +131,21 @@
                             @error('role')<p class="mt-1.5 text-xs font-medium text-rose-600">{{ $message }}</p>@enderror
                         </div>
 
+                        {{-- Poli / Instalasi (hanya untuk role poli) --}}
+                        <div x-show="role === 'poli'" x-cloak
+                             class="rounded-xl bg-violet-50/60 p-4 ring-1 ring-violet-200/70 transition-all">
+                            <label for="poli_id" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-violet-700">Instalasi / Poli <span class="text-rose-500">*</span></label>
+                            <select name="poli_id" id="poli_id" x-model="poliId" :required="role === 'poli'"
+                                    class="block w-full rounded-xl border-0 py-2.5 px-3.5 text-sm text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-violet-500 transition">
+                                <option value="">-- Pilih Poli --</option>
+                                @foreach ($polis as $poli)
+                                    <option value="{{ $poli->id }}">{{ $poli->kode }} — {{ $poli->nama }}</option>
+                                @endforeach
+                            </select>
+                            <p class="mt-1.5 text-xs text-violet-500">Poli wajib diisi untuk akun dengan role <strong>Poli</strong>.</p>
+                            @error('poli_id')<p class="mt-1.5 text-xs font-medium text-rose-600">{{ $message }}</p>@enderror
+                        </div>
+
                         {{-- Password --}}
                         <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
                             <div>
@@ -199,6 +215,8 @@
             name: @js(old('name')),
             email: @js(old('email')),
             role: @js(old('role')),
+            polis: @json($polis->mapWithKeys(fn ($p) => [(string) $p->id => $p->nama])->all()),
+            poliId: @js(old('poli_id')) ?? '',
             password: '',
             confirmation: '',
             showPw: false,
@@ -228,15 +246,19 @@
                 if (this.cases.mixed) score++;
                 return Math.min(4, score);
             },
+            get poliName() {
+                return this.polis[this.poliId] || '';
+            },
             badgeClass(role) {
                 return {
                     superadmin: 'bg-rose-50 text-rose-700 ring-rose-600/20',
                     admin:      'bg-amber-50 text-amber-700 ring-amber-600/20',
+                    poli:       'bg-violet-50 text-violet-700 ring-violet-600/20',
                     user:       'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
                 }[role] ?? 'bg-sky-50 text-sky-700 ring-sky-600/20';
             },
             dotClass(role) {
-                return { superadmin: 'bg-rose-500', admin: 'bg-amber-500', user: 'bg-emerald-500' }[role] ?? 'bg-sky-500';
+                return { superadmin: 'bg-rose-500', admin: 'bg-amber-500', poli: 'bg-violet-500', user: 'bg-emerald-500' }[role] ?? 'bg-sky-500';
             },
         }));
     });

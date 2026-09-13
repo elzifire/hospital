@@ -104,6 +104,29 @@ class MonitoringRegistry
             ? round($count * 100 / max(1, $totalPnpp)).'% dari total PNPP'
             : '—';
 
+        // Pembatasan data per poli untuk user akun poli (role "poli"):
+        // hanya baris polinya sendiri yang terlihat/dihitung/di-export.
+        // Dipakai untuk laporan yang punya kolom poli_id langsung
+        // (kunjungan & digital-reminder).
+        $scopePoli = function (Builder $query): void {
+            $poliId = auth()->user()?->poliId();
+
+            if ($poliId !== null) {
+                $query->where('poli_id', $poliId);
+            }
+        };
+
+        // Pembatasan serupa untuk pesan keluar (MessageLog): pesan tidak
+        // menyimpan poli_id — scope lewat reminder pembentuknya
+        // (outreach & follow-up).
+        $scopePoliPesan = function (Builder $query): void {
+            $poliId = auth()->user()?->poliId();
+
+            if ($poliId !== null) {
+                $query->whereHas('reminder', fn ($reminder) => $reminder->where('poli_id', $poliId));
+            }
+        };
+
         // Peta permission per jenis pesan + warna status pengiriman
         // (laporan broadcasting) — laporan terkunci permission fiturnya.
         $jenisPermission = [
@@ -130,11 +153,12 @@ class MonitoringRegistry
             'icon' => $o['icon'],
             'tone' => $o['tone'],
             'available' => true,
-            'count' => fn () => MessageLog::where('jenis', $o['jenis'])->count(),
+            'count' => fn () => MessageLog::where('jenis', $o['jenis'])->tap($scopePoliPesan)->count(),
             'model' => MessageLog::class,
             'eager' => ['template', 'pnpp.satker'],
             'withCount' => $o['withCount'] ?? [],
             'query' => fn (Builder $q) => $q->where('jenis', $o['jenis']),
+            'poliScope' => $scopePoliPesan,
             'searchHint' => 'Cari nama/NIP pasien, nomor HP, isi pesan, atau nama template...',
             'search' => fn (Builder $q, string $t) => $q->where(fn ($w) => $w
                 ->where('penerima_nama', 'like', "%{$t}%")
@@ -647,10 +671,11 @@ class MonitoringRegistry
                 'icon' => $iconPin,
                 'tone' => 'rose',
                 'available' => true,
-                'count' => fn () => Kunjungan::count(),
+                'count' => fn () => Kunjungan::query()->tap($scopePoli)->count(),
                 'model' => Kunjungan::class,
                 'eager' => ['pnpp.satker', 'poli'],
                 'withCount' => [],
+                'poliScope' => $scopePoli,
                 'searchHint' => 'Cari nama/NIP pasien, keluhan, atau diagnosa...',
                 'search' => fn (Builder $q, string $t) => $q->where(fn ($w) => $w
                     ->where('keluhan', 'like', "%{$t}%")
@@ -675,7 +700,9 @@ class MonitoringRegistry
                         'key' => 'poli',
                         'label' => 'Semua Poli',
                         'type' => 'select',
-                        'options' => fn () => Poli::orderBy('nama')->pluck('nama', 'id')->all(),
+                        'options' => fn () => Poli::query()
+                            ->when(auth()->user()?->poliId(), fn ($q, $id) => $q->whereKey($id))
+                            ->orderBy('nama')->pluck('nama', 'id')->all(),
                         'apply' => fn (Builder $q, string $v) => $q->where('poli_id', (int) $v),
                     ],
                     [
@@ -692,10 +719,10 @@ class MonitoringRegistry
                 ],
                 'defaultSort' => 'terbaru',
                 'stats' => fn () => [
-                    ['label' => 'Total Kunjungan', 'value' => Kunjungan::count(),                                              'icon' => $iconPin,   'tone' => 'rose'],
-                    ['label' => 'Bulan Ini',       'value' => Kunjungan::whereYear('tanggal_kunjungan', now()->year)->whereMonth('tanggal_kunjungan', now()->month)->count(), 'icon' => $iconCal,   'tone' => 'violet'],
-                    ['label' => 'Tahun Ini',       'value' => Kunjungan::whereYear('tanggal_kunjungan', now()->year)->count(), 'icon' => $iconClock, 'tone' => 'sky'],
-                    ['label' => 'PNPP Dilayani',   'value' => Kunjungan::distinct()->count('pnpp_id'),                         'icon' => $iconUsers, 'tone' => 'emerald'],
+                    ['label' => 'Total Kunjungan', 'value' => Kunjungan::query()->tap($scopePoli)->count(),                                                                            'icon' => $iconPin,   'tone' => 'rose'],
+                    ['label' => 'Bulan Ini',       'value' => Kunjungan::whereYear('tanggal_kunjungan', now()->year)->whereMonth('tanggal_kunjungan', now()->month)->tap($scopePoli)->count(), 'icon' => $iconCal,   'tone' => 'violet'],
+                    ['label' => 'Tahun Ini',       'value' => Kunjungan::whereYear('tanggal_kunjungan', now()->year)->tap($scopePoli)->count(), 'icon' => $iconClock, 'tone' => 'sky'],
+                    ['label' => 'PNPP Dilayani',   'value' => Kunjungan::query()->tap($scopePoli)->distinct()->count('pnpp_id'),                   'icon' => $iconUsers, 'tone' => 'emerald'],
                 ],
                 'columns' => [
                     ['label' => 'Tanggal', 'type' => 'strong',                     'value' => fn ($m) => $m->tanggal_kunjungan?->translatedFormat('d M Y')],
@@ -730,11 +757,12 @@ class MonitoringRegistry
                 'icon' => $iconBell,
                 'tone' => 'sky',
                 'available' => true,
-                'count' => fn () => Reminder::count(),
+                'count' => fn () => Reminder::query()->tap($scopePoli)->count(),
                 'model' => Reminder::class,
                 'eager' => ['pnpp.satker', 'poli', 'dokter'],
                 'withCount' => ['messageLogs'],
                 'query' => fn (Builder $q) => $q,
+                'poliScope' => $scopePoli,
                 'searchHint' => 'Cari nama/NIP pasien, poli, dokter, atau catatan...',
                 'search' => fn (Builder $q, string $t) => $q->where(fn ($w) => $w
                     ->where('catatan', 'like', "%{$t}%")
@@ -755,7 +783,9 @@ class MonitoringRegistry
                         'key' => 'poli',
                         'label' => 'Semua Poli',
                         'type' => 'select',
-                        'options' => fn () => Poli::orderBy('nama')->pluck('nama', 'id')->all(),
+                        'options' => fn () => Poli::query()
+                            ->when(auth()->user()?->poliId(), fn ($q, $id) => $q->whereKey($id))
+                            ->orderBy('nama')->pluck('nama', 'id')->all(),
                         'apply' => fn (Builder $q, string $v) => $q->where('poli_id', (int) $v),
                     ],
                     [
@@ -784,10 +814,10 @@ class MonitoringRegistry
                 ],
                 'defaultSort' => 'terbaru',
                 'stats' => fn () => [
-                    ['label' => 'Total Jadwal', 'value' => Reminder::count(),                                                             'icon' => $iconBell,  'tone' => 'sky'],
-                    ['label' => 'Terjadwal',    'value' => Reminder::where('status', 'terjadwal')->count(),                                  'icon' => $iconClock, 'tone' => 'violet'],
-                    ['label' => 'Mendatang',    'value' => Reminder::where('status', 'terjadwal')->whereDate('tanggal', '>=', today())->count(), 'icon' => $iconCheck, 'tone' => 'emerald'],
-                    ['label' => 'Tidak Datang', 'value' => Reminder::where('status', 'tidak_datang')->count(),                               'icon' => $iconWarn,  'tone' => 'rose'],
+                    ['label' => 'Total Jadwal', 'value' => Reminder::query()->tap($scopePoli)->count(),                                                                      'icon' => $iconBell,  'tone' => 'sky'],
+                    ['label' => 'Terjadwal',    'value' => Reminder::where('status', 'terjadwal')->tap($scopePoli)->count(),                                                       'icon' => $iconClock, 'tone' => 'violet'],
+                    ['label' => 'Mendatang',    'value' => Reminder::where('status', 'terjadwal')->whereDate('tanggal', '>=', today())->tap($scopePoli)->count(),               'icon' => $iconCheck, 'tone' => 'emerald'],
+                    ['label' => 'Tidak Datang', 'value' => Reminder::where('status', 'tidak_datang')->tap($scopePoli)->count(),                                                     'icon' => $iconWarn,  'tone' => 'rose'],
                 ],
                 'columns' => [
                     ['label' => 'Jadwal',     'type' => 'strong',                   'value' => fn ($m) => $m->tanggal?->translatedFormat('d M Y').' · '.$m->jam?->format('H:i')],
@@ -836,10 +866,10 @@ class MonitoringRegistry
                     ],
                 ],
                 'stats' => fn () => [
-                    ['label' => 'Total Pesan',  'value' => MessageLog::jenis('outreach')->count(),                                 'icon' => $iconMega,  'tone' => 'emerald'],
-                    ['label' => 'Dalam Proses', 'value' => MessageLog::jenis('outreach')->whereIn('status', ['menunggu', 'mengirim'])->count(), 'icon' => $iconClock, 'tone' => 'violet'],
-                    ['label' => 'Terkirim',     'value' => MessageLog::jenis('outreach')->status('terkirim')->count(),              'icon' => $iconCheck, 'tone' => 'sky'],
-                    ['label' => 'Gagal',        'value' => MessageLog::jenis('outreach')->status('gagal')->count(),                  'icon' => $iconWarn,  'tone' => 'rose'],
+                    ['label' => 'Total Pesan',  'value' => MessageLog::jenis('outreach')->tap($scopePoliPesan)->count(),                                 'icon' => $iconMega,  'tone' => 'emerald'],
+                    ['label' => 'Dalam Proses', 'value' => MessageLog::jenis('outreach')->tap($scopePoliPesan)->whereIn('status', ['menunggu', 'mengirim'])->count(), 'icon' => $iconClock, 'tone' => 'violet'],
+                    ['label' => 'Terkirim',     'value' => MessageLog::jenis('outreach')->tap($scopePoliPesan)->status('terkirim')->count(),              'icon' => $iconCheck, 'tone' => 'sky'],
+                    ['label' => 'Gagal',        'value' => MessageLog::jenis('outreach')->tap($scopePoliPesan)->status('gagal')->count(),                  'icon' => $iconWarn,  'tone' => 'rose'],
                 ],
                 'columns' => [
                     ['label' => 'Aturan',   'type' => 'badge',  'tone' => 'amber', 'value' => fn ($m) => $m->rule ? [$m->rule, 'amber'] : null],
@@ -941,10 +971,10 @@ class MonitoringRegistry
                     ],
                 ],
                 'stats' => fn () => [
-                    ['label' => 'Total Follow Up', 'value' => MessageLog::jenis('follow_up')->count(),                        'icon' => $iconPhone, 'tone' => 'amber'],
-                    ['label' => 'Dalam Proses',    'value' => MessageLog::jenis('follow_up')->whereIn('status', ['menunggu', 'mengirim'])->count(), 'icon' => $iconClock, 'tone' => 'violet'],
-                    ['label' => 'Tidak Datang',    'value' => MessageLog::jenis('follow_up')->rule('tidak_datang')->count(),    'icon' => $iconWarn,  'tone' => 'rose'],
-                    ['label' => 'Gagal',           'value' => MessageLog::jenis('follow_up')->status('gagal')->count(),          'icon' => $iconPin,   'tone' => 'sky'],
+                    ['label' => 'Total Follow Up', 'value' => MessageLog::jenis('follow_up')->tap($scopePoliPesan)->count(),                        'icon' => $iconPhone, 'tone' => 'amber'],
+                    ['label' => 'Dalam Proses',    'value' => MessageLog::jenis('follow_up')->tap($scopePoliPesan)->whereIn('status', ['menunggu', 'mengirim'])->count(), 'icon' => $iconClock, 'tone' => 'violet'],
+                    ['label' => 'Tidak Datang',    'value' => MessageLog::jenis('follow_up')->tap($scopePoliPesan)->rule('tidak_datang')->count(),    'icon' => $iconWarn,  'tone' => 'rose'],
+                    ['label' => 'Gagal',           'value' => MessageLog::jenis('follow_up')->tap($scopePoliPesan)->status('gagal')->count(),          'icon' => $iconPin,   'tone' => 'sky'],
                 ],
                 'columns' => [
                     ['label' => 'Aturan',   'type' => 'badge',  'tone' => 'amber', 'value' => fn ($m) => $m->rule ? [$m->rule, 'amber'] : null],

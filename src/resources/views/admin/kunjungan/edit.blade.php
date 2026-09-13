@@ -9,8 +9,10 @@
     {{-- ===== Header + Breadcrumb ===== --}}
     <div>
         <nav class="mb-2 flex items-center gap-1.5 text-xs font-medium text-slate-400" aria-label="Breadcrumb">
-            <a href="{{ route('admin.pnpp.index') }}" class="rounded transition hover:text-sky-600">Data PNPP</a>
-            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
+            @can('manage pnpp')
+                <a href="{{ route('admin.pnpp.index') }}" class="rounded transition hover:text-sky-600">Data PNPP</a>
+                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
+            @endcan
             <a href="{{ route('admin.pnpp.kunjungan', $pnpp) }}" class="rounded transition hover:text-sky-600">Riwayat Kunjungan</a>
             <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
             <span class="font-semibold text-slate-600">Edit Catatan Poli</span>

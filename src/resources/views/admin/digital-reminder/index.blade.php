@@ -85,15 +85,25 @@
                     @endforeach
                 </select>
             </div>
-            <div>
-                <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Poli</label>
-                <select name="poli" class="rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
-                    <option value="">Semua</option>
-                    @foreach ($polis as $po)
-                        <option value="{{ $po->id }}" {{ $filters['poli'] == $po->id ? 'selected' : '' }}>{{ $po->nama }}</option>
-                    @endforeach
-                </select>
-            </div>
+            @if ($batasiPoli ?? false)
+                <div>
+                    <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Poli</label>
+                    <span class="inline-flex items-center gap-1.5 rounded-lg bg-violet-50 px-3 py-2 text-sm font-semibold text-violet-700 ring-1 ring-violet-200/70">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                        {{ $polis->first()?->nama }}
+                    </span>
+                </div>
+            @else
+                <div>
+                    <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Poli</label>
+                    <select name="poli" class="rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                        <option value="">Semua</option>
+                        @foreach ($polis as $po)
+                            <option value="{{ $po->id }}" {{ $filters['poli'] == $po->id ? 'selected' : '' }}>{{ $po->nama }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            @endif
             <div class="flex gap-2">
                 <button type="submit" class="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700">Filter</button>
                 <a href="{{ route('admin.digital-reminder.index') }}" class="rounded-lg bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-300">Reset</a>

@@ -36,6 +36,7 @@ class FeaturePermissionSeeder extends Seeder
 
             // Layanan & broadcasting
             'manage kunjungan',
+            'manage register-pnpp',
             'manage outreach',
             'manage digital-reminder',
             'manage respon',
@@ -76,6 +77,16 @@ class FeaturePermissionSeeder extends Seeder
 
         // User biasa: hanya dashboard (fitur dibuka per permintaan via menu Role).
         Role::findOrCreate('user')->syncPermissions(['view dashboard']);
+
+        // Poli: akun petugas/penanggung jawab tiap instalasi — dashboard +
+        // digital reminder + follow up. Data dibatasi ke polinya sendiri
+        // (lihat DigitalReminderController & FollowUpController).
+        Role::findOrCreate('poli')->syncPermissions([
+            'view dashboard',
+            'manage digital-reminder',
+            'manage kunjungan',
+            'manage follow-up',
+        ]);
 
         // Bersihkan permission agregat lama beserta relasi role/model-nya.
         foreach (self::permissionUsang() as $nama) {

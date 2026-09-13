@@ -10,6 +10,7 @@ use App\Models\Poli;
 use App\Models\Reminder;
 use App\Models\Satker;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
@@ -22,6 +23,7 @@ class DigitalReminderController extends Controller
 {
     /**
      * Daftar penjadwalan — cari nama/NIP, filter status & poli.
+     * User role poli hanya melihat polinya sendiri.
      */
     public function index(Request $request)
     {
@@ -30,6 +32,7 @@ class DigitalReminderController extends Controller
         $poliId = (string) $request->query('poli', '');
 
         $reminders = Reminder::query()
+            ->when($this->batasiPoli(), fn ($query) => $query->where('poli_id', $this->poliAktif()))
             ->with('pnpp.satker:id,nama', 'poli:id,nama', 'dokter:id,nama')
             ->withExists('kunjungan as sudah_kunjungan')
             ->when($q, fn ($query) => $query->where(
@@ -40,13 +43,14 @@ class DigitalReminderController extends Controller
                         ->orWhere('nip', 'like', "%{$q}%"))
             ))
             ->when($status, fn ($query) => $query->where('status', $status))
-            ->when($poliId, fn ($query) => $query->where('poli_id', $poliId))
+            ->when($poliId && ! $this->batasiPoli(), fn ($query) => $query->where('poli_id', $poliId))
             ->orderByDesc('tanggal')
             ->orderByDesc('id')
             ->paginate(10)
             ->withQueryString();
 
         $perStatus = Reminder::query()
+            ->when($this->batasiPoli(), fn ($query) => $query->where('poli_id', $this->poliAktif()))
             ->selectRaw('status, count(*) as total')
             ->groupBy('status')
             ->pluck('total', 'status');
@@ -55,9 +59,12 @@ class DigitalReminderController extends Controller
             'reminders' => $reminders,
             'perStatus' => $perStatus,
             'total' => (int) $perStatus->sum(),
-            'mendatang' => Reminder::where('status', 'terjadwal')
+            'mendatang' => Reminder::query()
+                ->when($this->batasiPoli(), fn ($query) => $query->where('poli_id', $this->poliAktif()))
+                ->where('status', 'terjadwal')
                 ->whereDate('tanggal', '>=', today())->count(),
-            'polis' => Poli::orderBy('nama')->get(['id', 'nama']),
+            'polis' => $this->daftarPoliAktif(),
+            'batasiPoli' => $this->batasiPoli(),
             'filters' => ['q' => $q, 'status' => $status, 'poli' => $poliId],
         ]);
     }
@@ -114,6 +121,8 @@ class DigitalReminderController extends Controller
      */
     public function edit(Reminder $reminder)
     {
+        $this->pastikanPoli($reminder);
+
         $reminder->load('pnpp.satker:id,nama', 'poli:id,nama', 'dokter:id,nama', 'kunjungan');
 
         // Baris poli lain yang dikunjungi pasien pada tanggal realisasi
@@ -123,20 +132,26 @@ class DigitalReminderController extends Controller
             ? Kunjungan::with('poli:id,nama')
                 ->where('pnpp_id', $reminder->pnpp_id)
                 ->whereDate('tanggal_kunjungan', $reminder->kunjungan->tanggal_kunjungan)
+                ->when($this->batasiPoli(), fn ($q) => $q->where('poli_id', $reminder->poli_id))
                 ->orderBy('poli_id')
                 ->get()
             : collect();
 
         return view('admin.digital-reminder.edit', [
             'reminder' => $reminder,
-            'polis' => Poli::orderBy('nama')->get(['id', 'nama']),
-            'dokters' => Dokter::orderBy('nama')->get(['id', 'nama', 'poli_id']),
+            'polis' => $this->daftarPoliAktif(),
+            'dokters' => Dokter::query()
+                ->when($this->batasiPoli(), fn ($q) => $q->where('poli_id', $this->poliAktif()))
+                ->orderBy('nama')
+                ->get(['id', 'nama', 'poli_id']),
             'kunjunganSehari' => $sehari,
         ]);
     }
 
     public function update(Request $request, Reminder $reminder)
     {
+        $this->pastikanPoli($reminder);
+
         $data = $request->validate($this->aturanValidasi($request, $reminder) + [
             'status' => ['required', Rule::in(Reminder::STATUS)],
         ]);
@@ -158,6 +173,8 @@ class DigitalReminderController extends Controller
 
     public function destroy(Reminder $reminder)
     {
+        $this->pastikanPoli($reminder);
+
         $nama = $reminder->pnpp?->nama;
         $reminder->delete();
 
@@ -174,10 +191,12 @@ class DigitalReminderController extends Controller
      */
     public function catatKunjungan(Request $request, Reminder $reminder)
     {
+        $this->pastikanPoli($reminder);
+
         $data = $request->validate([
             'tanggal_kunjungan' => ['required', 'date'],
             'poli_pilih' => ['nullable', 'array'],
-            'poli_pilih.*' => ['integer', Rule::exists('polis', 'id')],
+            'poli_pilih.*' => array_merge(['integer', Rule::exists('polis', 'id')], $this->pembatasanPoli()),
             'polis' => ['nullable', 'array'],
             'polis.*.keluhan' => ['nullable', 'string', 'max:1000'],
             'polis.*.diagnosa' => ['nullable', 'string', 'max:1000'],
@@ -238,7 +257,7 @@ class DigitalReminderController extends Controller
     {
         if ($reminder) {
             return [
-                'poli_id' => ['required', Rule::exists('polis', 'id')],
+                'poli_id' => array_merge(['required', Rule::exists('polis', 'id')], $this->pembatasanPoli()),
                 'dokter_id' => [
                     'nullable',
                     Rule::exists('dokters', 'id')->where('poli_id', $request->integer('poli_id')),
@@ -254,7 +273,7 @@ class DigitalReminderController extends Controller
             'pnpp_ids' => ['required', 'array', 'min:1'],
             'pnpp_ids.*' => ['integer', Rule::exists('pnpps', 'id')],
             'poli_ids' => ['required', 'array', 'min:1'],
-            'poli_ids.*' => ['integer', Rule::exists('polis', 'id')],
+            'poli_ids.*' => array_merge(['integer', Rule::exists('polis', 'id')], $this->pembatasanPoli()),
             'tanggal' => ['required', 'date', 'after_or_equal:today'],
             'jam' => ['required', 'date_format:H:i'],
             'home_visit' => ['nullable', 'boolean'],
@@ -264,6 +283,8 @@ class DigitalReminderController extends Controller
 
     /**
      * Data form: daftar pasien (filter satker + cari nama/NIP/HP) & master.
+     * User role poli: poli dibatasi ke polinya sendiri (dan otomatis
+     * terpilih di form).
      */
     protected function dataTarget(Request $request): array
     {
@@ -284,8 +305,58 @@ class DigitalReminderController extends Controller
         return [
             'pnpps' => $pnpps,
             'satkers' => Satker::orderBy('nama')->get(['id', 'nama']),
-            'polis' => Poli::orderBy('nama')->get(['id', 'nama']),
+            'polis' => $this->daftarPoliAktif(),
+            'poliAwal' => $this->batasiPoli() ? [(string) $this->poliAktif()] : [],
             'filters' => ['q' => $q, 'satker' => $satkerId],
         ];
+    }
+
+    /**
+     * ID poli pemilik akun login (role poli), null untuk admin/superadmin.
+     */
+    protected function poliAktif(): ?int
+    {
+        return auth()->user()?->poliId();
+    }
+
+    /**
+     * Apakah user login adalah akun poli (terikat satu poli)?
+     */
+    protected function batasiPoli(): bool
+    {
+        return $this->poliAktif() !== null;
+    }
+
+    /**
+     * Batasan validasi beban / item poli untuk user akun poli —
+     * hanya polinya sendiri yang sah. Kosong untuk admin/superadmin.
+     */
+    protected function pembatasanPoli(): array
+    {
+        return $this->batasiPoli() ? [Rule::in([$this->poliAktif()])] : [];
+    }
+
+    /**
+     * Cegah akses ke data poli lain (403).
+     */
+    protected function pastikanPoli(Reminder $reminder): void
+    {
+        abort_unless($this->bolehAkses($reminder), 403, 'Anda hanya dapat mengelola data poli Anda sendiri.');
+    }
+
+    protected function bolehAkses(Reminder $reminder): bool
+    {
+        return ! $this->batasiPoli() || (int) $reminder->poli_id === $this->poliAktif();
+    }
+
+    /**
+     * Daftar poli yang boleh dilihat — polinya sendiri untuk akun poli.
+     */
+    protected function daftarPoliAktif(): Collection
+    {
+        return Poli::query()
+            ->when($this->batasiPoli(), fn ($q) => $q->where('id', $this->poliAktif()))
+            ->orderBy('nama')
+            ->get(['id', 'nama']);
     }
 }

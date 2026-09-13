@@ -18,4 +18,9 @@ class Poli extends Model
     {
         return $this->hasMany(Dokter::class);
     }
+
+    public function userDetails()
+    {
+        return $this->hasMany(UserDetail::class);
+    }
 }

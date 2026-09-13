@@ -148,20 +148,30 @@ class PnppController extends Controller
 
     /**
      * Halaman riwayat kunjungan untuk satu PNPP (group per tanggal,
-     * satu tanggal bisa beberapa poli).
+     * satu tanggal bisa beberapa poli). User akun poli hanya melihat
+     * catatan polinya sendiri.
      */
     public function kunjungan(Pnpp $pnpp)
     {
+        $poliId = auth()->user()?->poliId();
+
         $pnpp->load([
             'satker',
             'penyakit',
             'penyakitMenahun',
-            'kunjungans' => fn ($q) => $q->with('poli:id,nama')->orderByDesc('tanggal_kunjungan'),
+            'kunjungans' => fn ($q) => $q
+                ->with('poli:id,nama')
+                ->when($poliId, fn ($u) => $u->where('poli_id', $poliId))
+                ->orderByDesc('tanggal_kunjungan'),
         ]);
 
         return view('admin.pnpp.kunjungan', [
             'pnpp' => $pnpp,
-            'polis' => Poli::orderBy('nama')->get(['id', 'nama']),
+            'polis' => Poli::query()
+                ->when($poliId, fn ($q) => $q->whereKey($poliId))
+                ->orderBy('nama')
+                ->get(['id', 'nama']),
+            'poliTerkunci' => $poliId !== null,
         ]);
     }
 

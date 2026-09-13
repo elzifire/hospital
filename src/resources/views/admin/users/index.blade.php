@@ -25,12 +25,14 @@
             ['key' => 'all',        'label' => 'Total Pengguna', 'count' => $counts['total'],      'icon' => 'M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Z', 'color' => 'sky'],
             ['key' => 'superadmin', 'label' => 'Superadmin',     'count' => $counts['superadmin'], 'icon' => 'M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z', 'color' => 'rose'],
             ['key' => 'admin',      'label' => 'Admin',          'count' => $counts['admin'],      'icon' => 'M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 0 1 1.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 0 1-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.397.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 0 1-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.505-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.108-1.204l-.526-.738a1.125 1.125 0 0 1 .12-1.45l.773-.773a1.125 1.125 0 0 1 1.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894Z', 'color' => 'amber'],
+            ['key' => 'poli',       'label' => 'Poli',           'count' => $counts['poli'],       'icon' => 'M8.25 21v-4.875c0-.621.504-1.125 1.125-1.125h5.25c.621 0 1.125.504 1.125 1.125V21m0 0h4.5V3.545M12.75 21h7.5V10.75M2.25 21h1.5m18 0h-18M2.25 9l4.5-1.636M18.75 3l-1.5.545m0 6.205 3 1m1.5.5-1.5-.5M6.75 7.5V21m3-9h.008v.008H9.75V12Z', 'color' => 'violet'],
             ['key' => 'no_role',    'label' => 'Tanpa Role',     'count' => $counts['no_role'],    'icon' => 'M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636', 'color' => 'slate'],
         ];
         $statColor = [
             'sky'   => ['bg' => 'bg-sky-50',   'text' => 'text-sky-600',   'activeRing' => 'ring-2 ring-sky-500'],
             'rose'  => ['bg' => 'bg-rose-50',  'text' => 'text-rose-600',  'activeRing' => 'ring-2 ring-rose-500'],
             'amber' => ['bg' => 'bg-amber-50', 'text' => 'text-amber-600', 'activeRing' => 'ring-2 ring-amber-500'],
+            'violet'=> ['bg' => 'bg-violet-50','text' => 'text-violet-600', 'activeRing' => 'ring-2 ring-violet-500'],
             'slate' => ['bg' => 'bg-slate-100','text' => 'text-slate-600', 'activeRing' => 'ring-2 ring-slate-500'],
         ];
     @endphp
@@ -100,7 +102,7 @@
                     <tr class="border-b border-slate-100 text-[11px] uppercase tracking-wider text-slate-400">
                         <th class="px-6 py-3.5 font-semibold">Pengguna</th>
                         <th class="px-6 py-3.5 font-semibold">Role</th>
-                        <th class="px-6 py-3.5 font-semibold">Email Terverifikasi</th>
+                        <th class="px-6 py-3.5 font-semibold">Poli</th>
                         <th class="px-6 py-3.5 font-semibold">Bergabung</th>
                         <th class="px-6 py-3.5 text-right font-semibold">Aksi</th>
                     </tr>
@@ -130,19 +132,13 @@
                                 </span>
                             </td>
                             <td class="whitespace-nowrap px-6 py-4">
-                                <template x-if="u.verified">
-                                    <span class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-600">
-                                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
-                                        Terverifikasi
-                                    </span>
-                                </template>
-                                <template x-if="!u.verified">
-                                    <span class="inline-flex items-center gap-1.5 text-xs font-medium text-amber-600">
-                                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m9.75 9.75 4.5 4.5m0-4.5-4.5 4.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
-                                        Belum
-                                    </span>
-                                </template>
+                                <span x-show="u.role === 'poli'" class="inline-flex items-center gap-1.5 rounded-lg bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-700 ring-1 ring-violet-600/20">
+                                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" /></svg>
+                                    <span x-text="u.poli || '—'"></span>
+                                </span>
+                                <span x-show="u.role !== 'poli'" class="text-xs text-slate-300" x-text="u.poli || '—'"></span>
                             </td>
+                            
                             <td class="whitespace-nowrap px-6 py-4">
                                 <div class="text-sm font-medium text-slate-700" x-text="u.joinedAt"></div>
                                 <div class="text-xs text-slate-400" x-text="timeAgo(u.timestamp)"></div>
@@ -168,7 +164,7 @@
 
                     {{-- Empty State --}}
                     <tr x-show="filteredUsers.length === 0" x-cloak>
-                        <td colspan="5" class="px-6 py-16 text-center">
+                        <td colspan="6" class="px-6 py-16 text-center">
                             <div class="mx-auto flex max-w-sm flex-col items-center">
                                 <div class="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 ring-8 ring-slate-50">
                                     <svg class="h-7 w-7 text-slate-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -255,6 +251,7 @@
                     initials: "{{ strtoupper(substr($user->name, 0, 1)) }}",
                     gradient: "{{ $gradientList[abs(crc32($user->name)) % count($gradientList)] }}",
                     role: "{{ $user->roles->first()?->name ?? 'no_role' }}",
+                    poli: @json($user->userDetail?->poli?->nama ?? ''),
                     verified: {{ $user->email_verified_at ? 'true' : 'false' }},
                     joinedAt: "{{ $user->created_at->translatedFormat('d M Y') }}",
                     timestamp: {{ $user->created_at->timestamp }},
@@ -269,7 +266,7 @@
             get filteredUsers() {
                 let result = this.users.filter(u => {
                     const q = this.search.toLowerCase();
-                    const matchSearch = u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+                    const matchSearch = u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || (u.poli || '').toLowerCase().includes(q);
                     const matchRole = this.roleFilter === 'all' || u.role === this.roleFilter;
                     return matchSearch && matchRole;
                 });
@@ -303,6 +300,7 @@
                 return {
                     superadmin: 'bg-rose-50 text-rose-700 ring-rose-600/20',
                     admin:      'bg-amber-50 text-amber-700 ring-amber-600/20',
+                    poli:       'bg-violet-50 text-violet-700 ring-violet-600/20',
                     user:       'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
                     no_role:    'bg-slate-100 text-slate-600 ring-slate-500/20',
                 }[role] ?? 'bg-sky-50 text-sky-700 ring-sky-600/20';
@@ -311,6 +309,7 @@
                 return {
                     superadmin: 'bg-rose-500',
                     admin:      'bg-amber-500',
+                    poli:       'bg-violet-500',
                     user:       'bg-emerald-500',
                     no_role:    'bg-slate-400',
                 }[role] ?? 'bg-sky-500';
