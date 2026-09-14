@@ -24,6 +24,7 @@ class Reminder extends Model
         'pnpp_id',
         'poli_id',
         'dokter_id',
+        'message_template_id',
         'tanggal',
         'jam',
         'home_visit',
@@ -54,6 +55,15 @@ class Reminder extends Model
     public function dokter(): BelongsTo
     {
         return $this->belongsTo(Dokter::class);
+    }
+
+    /**
+     * Template yang dipilih langsung di form penjadwalan (opsional) —
+     * menggantikan template default rule saat generate pesan.
+     */
+    public function messageTemplate(): BelongsTo
+    {
+        return $this->belongsTo(MessageTemplate::class, 'message_template_id');
     }
 
     public function pembuat(): BelongsTo

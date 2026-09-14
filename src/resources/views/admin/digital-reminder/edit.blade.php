@@ -25,8 +25,55 @@
     <form action="{{ route('admin.digital-reminder.update', $reminder) }}" method="POST"
           x-data="{
               poliId: '{{ old('poli_id', $reminder->poli_id) }}',
+              dokterId: '{{ old('dokter_id', $reminder->dokter_id) }}',
+              tanggal: '{{ old('tanggal', $reminder->tanggal?->format('Y-m-d')) }}',
+              jam: '{{ old('jam', $reminder->jam?->format('H:i')) }}',
               dokters: @js($dokters->map(fn ($d) => ['id' => $d->id, 'nama' => $d->nama, 'poli_id' => $d->poli_id])),
-              get dokterOptions() { return this.dokters.filter(d => d.poli_id == this.poliId) }
+              templates: @js($templates->map(fn ($t) => ['id' => (int) $t->id, 'judul' => (string) $t->judul, 'konten' => (string) $t->konten, 'token' => $t->tokenParam()])->values()),
+              templateId: @js((string) old('message_template_id', $reminder->message_template_id)),
+              poliData: @js($polis->mapWithKeys(fn ($po) => [(string) $po->id => $po->nama])),
+              pnppPid: {{ (int) $reminder->pnpp_id }},
+              pnppData: @js([(string) $reminder->pnpp_id => ['nama' => $reminder->pnpp?->nama ?? '—', 'nip' => $reminder->pnpp?->nip ?? '', 'satker' => $reminder->pnpp?->satker?->nama ?? '']]),
+              activeTemplate() {
+                  return this.templates.find((t) => String(t.id) === String(this.templateId)) ?? null;
+              },
+              pilihTemplate(id) {
+                  this.templateId = id;
+              },
+              tanggalIndonesia(iso) {
+                  if (!iso) return '—';
+                  const d = new Date(iso + 'T00:00:00');
+                  return d.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+              },
+              get dokterNama() {
+                  const d = this.dokters.find((x) => String(x.id) === String(this.dokterId));
+                  return d ? d.nama : '';
+              },
+              get dokterOptions() { return this.dokters.filter(d => d.poli_id == this.poliId) },
+              nilaiToken(token) {
+                  switch (token) {
+                      case 'nama': return this.pnppData[this.pnppPid]?.nama || '—';
+                      case 'nip': return this.pnppData[this.pnppPid]?.nip || '—';
+                      case 'satker': return this.pnppData[this.pnppPid]?.satker || '—';
+                      case 'hari_tanggal': return this.tanggal ? this.tanggalIndonesia(this.tanggal) : '—';
+                      case 'tanggal': return this.tanggal || '—';
+                      case 'waktu_kunjungan':
+                      case 'jam': return this.jam || '—';
+                      case 'poli':
+                      case 'instalasi':
+                      case 'poli_layanan': return this.poliData[this.poliId] || '—';
+                      case 'dokter': return this.dokterNama || '—';
+                      default: return '—';
+                  }
+              },
+              previewFor() {
+                  const t = this.activeTemplate();
+                  if (!t) return '';
+                  return t.konten.replace(/\{+([a-z_]+)\}+/gi, (cocok, token) => {
+                      const isi = this.nilaiToken(token.toLowerCase());
+                      return isi !== '' ? isi : '—';
+                  });
+              }
           }">
         @csrf
         @method('PUT')
@@ -50,7 +97,7 @@
                 </div>
                 <div>
                     <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Dokter</label>
-                    <select name="dokter_id"
+                    <select name="dokter_id" x-model="dokterId"
                             class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
                         <option value="">— Opsional —</option>
                         @foreach ($dokters as $d)
@@ -63,13 +110,13 @@
                 </div>
                 <div>
                     <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Tanggal <span class="text-rose-500">*</span></label>
-                    <input type="date" name="tanggal" value="{{ old('tanggal', $reminder->tanggal?->format('Y-m-d')) }}" required
+                    <input type="date" name="tanggal" x-model="tanggal" value="{{ old('tanggal', $reminder->tanggal?->format('Y-m-d')) }}" required
                            class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
                     @error('tanggal')<p class="mt-1 text-xs text-rose-500">{{ $message }}</p>@enderror
                 </div>
                 <div>
                     <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Jam <span class="text-rose-500">*</span></label>
-                    <input type="time" name="jam" value="{{ old('jam', $reminder->jam?->format('H:i')) }}" required
+                    <input type="time" name="jam" x-model="jam" value="{{ old('jam', $reminder->jam?->format('H:i')) }}" required
                            class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
                     @error('jam')<p class="mt-1 text-xs text-rose-500">{{ $message }}</p>@enderror
                 </div>
@@ -104,6 +151,30 @@
                     <textarea name="catatan" rows="2" maxlength="500" placeholder="Catatan internal untuk jadwal ini (opsional)…"
                               class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">{{ old('catatan', $reminder->catatan) }}</textarea>
                     @error('catatan')<p class="mt-1 text-xs text-rose-500">{{ $message }}</p>@enderror
+                </div>
+                <div class="md:col-span-2">
+                    <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Template Pesan WhatsApp</label>
+                    <select name="message_template_id" x-model="templateId" @change="pilihTemplate($el.value)"
+                            class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                        <option value="">Default — mengikuti aturan modul (Outreach / Follow Up)</option>
+                        @foreach ($templates as $tpl)
+                            <option value="{{ $tpl->id }}" {{ (string) old('message_template_id', $reminder->message_template_id) === (string) $tpl->id ? 'selected' : '' }}>{{ $tpl->judul }}</option>
+                        @endforeach
+                    </select>
+                    <p class="mt-1 text-xs text-slate-400">Opsional — hanya template kategori <strong>Digital Reminder</strong>. Bila dipilih, pesan untuk jadwal ini memakai template ini (menggantikan default aturan modul) saat digenerate.</p>
+                    @error('message_template_id')<p class="mt-1 text-xs text-rose-500">{{ $message }}</p>@enderror
+                </div>
+            </div>
+
+            {{-- ===== Pratinjau pesan ===== --}}
+            <div x-show="activeTemplate()" x-cloak
+                 class="space-y-3 border-t border-slate-100 px-5 py-4">
+                <div>
+                    <h3 class="text-sm font-bold text-slate-900">Pratinjau Pesan</h3>
+                    <p class="mt-0.5 text-xs text-slate-500">Menyesuaikan tanggal, jam, poli, dan dokter di atas — token yang belum terisi ditandai <code class="rounded bg-slate-100 px-1 text-[10px]"> — </code>.</p>
+                </div>
+                <div class="max-w-xl rounded-xl bg-[#dcf8c6] px-3 py-2.5 ring-1 ring-inset ring-emerald-200/60">
+                    <pre class="whitespace-pre-line text-xs leading-relaxed text-slate-800" x-text="previewFor()"></pre>
                 </div>
             </div>
             <div class="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50/50 px-5 py-4">

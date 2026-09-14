@@ -180,6 +180,43 @@ class GenerateRuleTest extends TestCase
     }
 
     #[Test]
+    public function template_dipilih_di_jadwal_menggantikan_template_default_rule(): void
+    {
+        extract($this->skenario());
+
+        $default = MessageTemplate::create([
+            'judul' => 'Default Rule',
+            'channel' => 'WhatsApp',
+            'konten' => 'Default {nama} di {poli}',
+            'is_active' => true,
+        ]);
+        $khusus = MessageTemplate::create([
+            'judul' => 'Khusus Jadwal',
+            'channel' => 'WhatsApp',
+            'konten' => 'Khusus {nama} di {poli}',
+            'is_active' => true,
+        ]);
+
+        BroadcastRule::query()->jenis('outreach')->update(['message_template_id' => $default->id]);
+
+        $jadwalOverride = $this->buatJadwal($budi, $poli, $dokter, today()->addDays(7)->format('Y-m-d'));
+        $jadwalOverride->update(['message_template_id' => $khusus->id]);
+        $jadwalDefault = $this->buatJadwal($budi, $poli, $dokter, today()->addDay()->format('Y-m-d'));
+
+        $this->assertSame(['dibuat' => 2, 'dilewati' => 0], app(BroadcastService::class)->generate('outreach'));
+
+        // Jadwal bernilai khusus memakai template miliknya, bukan default rule
+        $logKhusus = MessageLog::where('rule', 'h-7')->firstOrFail();
+        $this->assertSame($khusus->id, $logKhusus->message_template_id);
+        $this->assertSame('Khusus Budi Santoso di Poli Umum', $logKhusus->konten);
+
+        // Jadwal tanpa template tetap memakai default rule
+        $logDefault = MessageLog::where('rule', 'h-1')->firstOrFail();
+        $this->assertSame($default->id, $logDefault->message_template_id);
+        $this->assertSame('Default Budi Santoso di Poli Umum', $logDefault->konten);
+    }
+
+    #[Test]
     public function tombol_generate_dari_halaman_outreach(): void
     {
         extract($this->skenario());

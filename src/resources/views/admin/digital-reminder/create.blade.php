@@ -67,9 +67,60 @@
               poliIdSemua: @js($polis->pluck('id')),
               oldPoliIds: @js(collect(old('poli_ids', []))->map(fn ($v) => (string) $v)),
               poliAwal: @js($poliAwal ?? []),
+              templates: @js($templates->map(fn ($t) => ['id' => (int) $t->id, 'judul' => (string) $t->judul, 'konten' => (string) $t->konten, 'token' => $t->tokenParam()])->values()),
+              templateId: @js((string) old('message_template_id')),
+              tanggal: @js((string) old('tanggal')),
+              jam: @js((string) old('jam')),
+              poliData: @js($polis->mapWithKeys(fn ($po) => [(string) $po->id => $po->nama])),
+              pnppData: @js($pnpps->mapWithKeys(fn ($p) => [(string) $p->id => ['nama' => $p->nama ?? '—', 'nip' => $p->nip ?? '', 'satker' => $p->satker?->nama ?? '']])),
               get jumlah() { return Object.values(this.terpilih).filter(Boolean).length },
               get jumlahPoli() { return Object.values(this.poliTerpilih).filter(Boolean).length },
               get totalJadwal() { return this.jumlah * this.jumlahPoli },
+              activeTemplate() {
+                  return this.templates.find((t) => String(t.id) === String(this.templateId)) ?? null;
+              },
+              pilihTemplate(id) {
+                  this.templateId = id;
+              },
+              tanggalIndonesia(iso) {
+                  if (!iso) return '—';
+                  const d = new Date(iso + 'T00:00:00');
+                  return d.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+              },
+              get poliNama() {
+                  return Object.keys(this.poliTerpilih)
+                      .filter((i) => this.poliTerpilih[i])
+                      .map((i) => this.poliData[i])
+                      .filter(Boolean)
+                      .join(', ');
+              },
+              get pasienPreview() {
+                  return Object.keys(this.terpilih).filter((i) => this.terpilih[i]);
+              },
+              nilaiToken(pid, token) {
+                  const d = this.pnppData[pid] || {};
+                  switch (token) {
+                      case 'nama': return d.nama || '—';
+                      case 'nip': return d.nip || '—';
+                      case 'satker': return d.satker || '—';
+                      case 'hari_tanggal': return this.tanggal ? this.tanggalIndonesia(this.tanggal) : '—';
+                      case 'tanggal': return this.tanggal || '—';
+                      case 'waktu_kunjungan':
+                      case 'jam': return this.jam || '—';
+                      case 'poli':
+                      case 'instalasi':
+                      case 'poli_layanan': return this.poliNama || '—';
+                      default: return '—';
+                  }
+              },
+              previewFor(pid) {
+                  const t = this.activeTemplate();
+                  if (!t) return '';
+                  return t.konten.replace(/\{+([a-z_]+)\}+/gi, (cocok, token) => {
+                      const isi = this.nilaiToken(pid, token.toLowerCase());
+                      return isi !== '' ? isi : '—';
+                  });
+              },
               togglePoliSemua() {
                   const aktif = !this.semuaPoli;
                   this.semuaPoli = aktif;
@@ -187,13 +238,13 @@
                 <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
                     <div>
                         <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Tanggal <span class="text-rose-500">*</span></label>
-                        <input type="date" name="tanggal" value="{{ old('tanggal') }}" min="{{ today()->format('Y-m-d') }}" required
+                        <input type="date" name="tanggal" x-model="tanggal" value="{{ old('tanggal') }}" min="{{ today()->format('Y-m-d') }}" required
                                class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
                         @error('tanggal')<p class="mt-1 text-xs text-rose-500">{{ $message }}</p>@enderror
                     </div>
                     <div>
                         <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Jam <span class="text-rose-500">*</span></label>
-                        <input type="time" name="jam" value="{{ old('jam') }}" required
+                        <input type="time" name="jam" x-model="jam" value="{{ old('jam') }}" required
                                class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
                         @error('jam')<p class="mt-1 text-xs text-rose-500">{{ $message }}</p>@enderror
                     </div>
@@ -217,6 +268,44 @@
                         <textarea name="catatan" rows="2" maxlength="500" placeholder="Catatan internal untuk jadwal ini (opsional)…"
                                   class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">{{ old('catatan') }}</textarea>
                         @error('catatan')<p class="mt-1 text-xs text-rose-500">{{ $message }}</p>@enderror
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Template Pesan WhatsApp</label>
+                        <select name="message_template_id" x-model="templateId" @change="pilihTemplate($el.value)"
+                                class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                            <option value="">Default — mengikuti aturan modul (Outreach / Follow Up)</option>
+                            @foreach ($templates as $tpl)
+                                <option value="{{ $tpl->id }}" {{ (string) old('message_template_id') === (string) $tpl->id ? 'selected' : '' }}>{{ $tpl->judul }}</option>
+                            @endforeach
+                        </select>
+                        <p class="mt-1 text-xs text-slate-400">Opsional — hanya template kategori <strong>Digital Reminder</strong>. Bila dipilih, semua jadwal dari form ini memakai template ini (menggantikan default aturan modul) saat pesan digenerate. Pratinjau tampil di bawah ketika tanggal, jam, dan pasien terisi.</p>
+                        @error('message_template_id')<p class="mt-1 text-xs text-rose-500">{{ $message }}</p>@enderror
+                    </div>
+                </div>
+
+                {{-- ===== Pratinjau per pasien ===== --}}
+                <div x-show="activeTemplate() && pasienPreview.length > 0" x-cloak class="border-t border-slate-100 pt-5">
+                    <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-900">Pratinjau Pesan</h3>
+                            <p class="mt-0.5 text-xs text-slate-500">Isi pesan mengikuti template terpilih, tanggal/jam, dan poli di atas — token yang belum terisi ditandai <code class="rounded bg-slate-100 px-1 text-[10px]"> — </code>.</p>
+                        </div>
+                        <span class="rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-semibold text-sky-700 ring-1 ring-inset ring-sky-200"
+                              x-text="pasienPreview.length + ' pasien'"></span>
+                    </div>
+                    <div class="space-y-3">
+                        <template x-for="pid in pasienPreview" :key="pid">
+                            <div class="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <span class="text-sm font-semibold text-slate-800" x-text="(pnppData[pid] || {}).nama || '#' + pid"></span>
+                                    <span class="text-xs text-slate-400" x-text="(pnppData[pid] || {}).nip || ''"></span>
+                                    <span class="ml-auto text-xs text-slate-400" x-text="(pnppData[pid] || {}).satker || ''"></span>
+                                </div>
+                                <div class="mt-2.5 rounded-xl bg-[#dcf8c6] px-3 py-2.5 ring-1 ring-inset ring-emerald-200/60">
+                                    <pre class="whitespace-pre-line text-xs leading-relaxed text-slate-800" x-text="previewFor(pid)"></pre>
+                                </div>
+                            </div>
+                        </template>
                     </div>
                 </div>
             </div>

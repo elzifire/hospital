@@ -104,6 +104,23 @@ class ResponBalasTest extends TestCase
     }
 
     #[Test]
+    public function timeline_tetap_berfungsi_saat_belum_ada_pesan_keluar(): void
+    {
+        extract($this->pasangan());
+
+        // Skenario pasien baru membalas (hanya pesan masuk, belum ada
+        // outbound untuk nomor ini) — sebelumnya crash di merge Eloquent
+        // Collection kosong → "Call to a member function getKey() on array".
+        $this->assertSame(0, MessageLog::where('penerima_no_hp', '6281234567890')->count());
+
+        $this->actingAs($this->superadmin())
+            ->getJson(route('admin.respon.timeline', '6281234567890'))
+            ->assertOk()
+            ->assertJsonStructure(['signature', 'html'])
+            ->assertJsonPath('signature', fn ($signature) => $signature !== '' && $signature !== '0');
+    }
+
+    #[Test]
     public function form_balas_tanpa_isi_ditolak(): void
     {
         extract($this->pasangan());

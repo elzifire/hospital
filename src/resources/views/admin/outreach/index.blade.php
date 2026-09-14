@@ -30,7 +30,6 @@
     ];
 
     $statusLabel = \App\Models\MessageLog::LABEL_STATUS;
-    $ruleLabel   = ['h-7' => 'H-7', 'h-1' => 'H-1', 'manual' => 'Manual'];
 @endphp
 
 <div class="space-y-6">
@@ -107,7 +106,6 @@
                             <th class="px-5 py-3">Penerima</th>
                             <th class="px-5 py-3">Pesan</th>
                             <th class="px-5 py-3">Template</th>
-                        
                             <th class="px-5 py-3">Waktu</th>
                             <th class="px-5 py-3">Status</th>
                             <th class="px-5 py-3 text-right">Aksi</th>
@@ -124,13 +122,6 @@
                                     <p class="truncate text-xs text-slate-600" title="{{ $log->konten }}">{{ \Illuminate\Support\Str::limit($log->konten, 90) }}</p>
                                 </td>
                                 <td class="px-5 py-3 text-xs text-slate-500">{{ $log->template?->judul ?? '—' }}</td>
-                                <td class="px-5 py-3">
-                                    @if ($log->rule)
-                                        <span class="rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-inset ring-amber-200/70">{{ $ruleLabel[$log->rule] ?? $log->rule }}</span>
-                                    @else
-                                        <span class="text-xs text-slate-300">—</span>
-                                    @endif
-                                </td> --}}
                                 <td class="whitespace-nowrap px-5 py-3 text-xs text-slate-500">
                                     {{ $log->created_at->format('d M Y, H:i') }}
                                     @if ($log->status === 'menunggu' && $log->kirim_pada)

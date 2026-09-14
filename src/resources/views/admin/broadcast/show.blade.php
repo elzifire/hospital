@@ -13,15 +13,26 @@
         'dibatalkan' => 'bg-slate-100 text-slate-500 ring-slate-200/70',
     ];
 
-    $ruleLabel = [
-        'h-7' => 'H-7', 'h-1' => 'H-1', 'h' => 'Hari-H',
-        'tidak_datang' => 'Tidak Datang', 'manual' => 'Manual',
+    $statusText = [
+        'terkirim'   => 'text-emerald-600',
+        'mengirim'   => 'text-sky-600',
+        'menunggu'   => 'text-amber-600',
+        'gagal'      => 'text-rose-600',
+        'dibatalkan' => 'text-slate-500',
     ];
 
-    $jenisLabel  = ['outreach' => 'Outreach', 'follow_up' => 'Follow Up'];
+    $ruleLabel = [
+        'h-7' => 'H-7', 'h-1' => 'H-1', 'h' => 'Hari-H',
+        'tidak_datang' => 'Tidak Datang', 'manual' => 'Manual', 'balasan' => 'Balasan',
+    ];
+
+    $jenisLabel  = ['outreach' => 'Outreach', 'follow_up' => 'Follow Up', 'respon' => 'Respon'];
     $statusLabel = \App\Models\MessageLog::LABEL_STATUS;
 
-    $indeksRiwayat = $log->jenis === 'outreach' ? 'admin.outreach.index' : 'admin.follow-up.index';
+    $indeksRiwayat = $log->jenis === 'outreach' ? 'admin.outreach.index' : ($log->jenis === 'respon' ? 'admin.respon.index' : 'admin.follow-up.index');
+
+    $inicial = strtoupper(substr(trim((string) $log->penerima_nama), 0, 1)) ?: '?';
+    $final = in_array($log->status, ['terkirim', 'gagal', 'dibatalkan']);
 
     // Baris parameter template (label param dibentuk di PHP agar tidak
     // bentrok dengan sintaks Blade).
@@ -31,7 +42,6 @@
     }
 
     // Tahapan timeline status: [label, selesai?, waktu, catatan]
-    $final = in_array($log->status, ['terkirim', 'gagal', 'dibatalkan']);
     $tahapan = [
         ['Pesan dibuat', true, $log->created_at?->translatedFormat('d M Y, H:i'), 'Dari '.($ruleLabel[$log->rule] ?? $log->rule).($log->creator ? ' · oleh '.$log->creator->name : '')],
         ['Dijadwalkan', (bool) $log->kirim_pada, $log->kirim_pada?->translatedFormat('d M Y, H:i'), $log->kirim_pada ? 'Menunggu waktu pengiriman tiba' : 'Menunggu giliran untuk dikirim'],
@@ -50,7 +60,11 @@
                 <span class="rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-inset ring-amber-200/70">{{ $ruleLabel[$log->rule] ?? $log->rule }}</span>
                 <span class="rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-semibold text-sky-700 ring-1 ring-inset ring-sky-200/70">{{ $jenisLabel[$log->jenis] ?? $log->jenis }}</span>
             </div>
-            <p class="mt-1 font-mono text-xs text-slate-400">#LOG-{{ str_pad((string) $log->id, 6, '0', STR_PAD_LEFT) }}</p>
+            <p class="mt-1.5 text-xs text-slate-400">
+                <span class="font-mono">#LOG-{{ str_pad((string) $log->id, 6, '0', STR_PAD_LEFT) }}</span>
+                · dibuat {{ $log->created_at?->translatedFormat('d M Y, H:i') }}
+                @if ($log->creator) · oleh {{ $log->creator->name }} @endif
+            </p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
             @if ($log->status === 'gagal')
@@ -90,16 +104,48 @@
         <div class="space-y-6 lg:col-span-2">
             {{-- Isi pesan --}}
             <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <div class="border-b border-slate-100 px-5 py-4">
-                    <h3 class="text-sm font-bold text-slate-900">Isi Pesan</h3>
-                    <p class="mt-0.5 text-xs text-slate-500">{{ $log->template?->judul ?? '—' }}{{ $log->template?->kode ? ' · '.$log->template->kode : '' }}</p>
+                <div class="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="flex min-w-0 items-center gap-3">
+                        <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-sky-50 text-sm font-bold text-sky-700 ring-1 ring-inset ring-sky-100">{{ $inicial }}</div>
+                        <div class="min-w-0">
+                            <p class="truncate text-sm font-bold text-slate-900">{{ $log->penerima_nama }}</p>
+                            <p class="text-xs text-slate-400">
+                                <span class="font-mono">{{ $log->penerima_no_hp }}</span>
+                                @if ($log->pnpp?->nip) <span>· NIP {{ $log->pnpp->nip }}</span> @endif
+                                @if ($log->pnpp?->satker?->nama) <span>· {{ $log->pnpp->satker->nama }}</span> @endif
+                            </p>
+                        </div>
+                    </div>
+                    <div class="text-left sm:text-right">
+                        <p class="text-sm font-semibold text-slate-700">{{ $log->template?->judul ?? 'Tanpa template' }}</p>
+                        <p class="text-[11px] text-slate-400">{{ $log->template?->kode ?? 'Pesan teks bebas' }}</p>
+                    </div>
                 </div>
                 <div class="px-5 py-4">
-                    <div class="rounded-2xl bg-[#dcf8c6] p-4 ring-1 ring-inset ring-emerald-200/60">
-                        <p class="whitespace-pre-line text-sm leading-relaxed text-slate-800">{{ $log->konten }}</p>
+                    <div class="mx-auto max-w-2xl">
+                        <div class="rounded-2xl bg-[#dcf8c6] p-4 shadow-sm ring-1 ring-inset ring-emerald-200/50">
+                            <div class="mb-2 flex items-center justify-between gap-2">
+                                <p class="text-[11px] font-bold uppercase tracking-wide text-emerald-800/70">RS Bhayangkara Bogor</p>
+                                <span class="inline-flex items-center gap-1 text-xs {{ $statusText[$log->status] ?? 'text-slate-400' }}">
+                                    @if ($log->status === 'terkirim')
+                                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+                                    @elseif (in_array($log->status, ['gagal', 'dibatalkan']))
+                                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+                                    @else
+                                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                                    @endif
+                                    {{ $statusLabel[$log->status] ?? $log->status }}
+                                </span>
+                            </div>
+                            <p class="whitespace-pre-line text-sm leading-relaxed text-slate-800">{{ $log->konten }}</p>
+                        </div>
+                        <p class="mt-2 text-center text-[11px] text-slate-400">
+                            Dikirim via {{ $log->provider ?? '—' }}
+                            @if ($log->sent_at) · diterima {{ $log->sent_at?->translatedFormat('d M Y, H:i') }} @endif
+                        </p>
                     </div>
                     @if ($log->status === 'gagal' && $log->error)
-                        <div class="mt-4 rounded-xl bg-rose-50 px-4 py-3 ring-1 ring-inset ring-rose-200">
+                        <div class="mx-auto mt-4 max-w-2xl rounded-xl bg-rose-50 px-4 py-3 ring-1 ring-inset ring-rose-200">
                             <p class="text-xs font-semibold uppercase tracking-wide text-rose-500">Pesan gagal terkirim</p>
                             <p class="mt-1 text-sm text-rose-700">{{ $log->error }}</p>
                         </div>
@@ -163,7 +209,7 @@
                 @if ($balasan->isEmpty())
                     <p class="px-5 py-6 text-sm text-slate-400">Belum ada balasan dari pasien.</p>
                 @else
-                    <ul class="divide-y divide-slate-100">
+                    <ul class="max-h-80 divide-y divide-slate-100 overflow-y-auto">
                         @foreach ($balasan as $b)
                             <li class="flex gap-3 px-5 py-3">
                                 <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
@@ -219,6 +265,39 @@
                 </ol>
             </div>
 
+            {{-- Info pengiriman --}}
+            <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                <div class="border-b border-slate-100 px-5 py-4">
+                    <h3 class="text-sm font-bold text-slate-900">Info Pengiriman</h3>
+                </div>
+                <dl class="divide-y divide-slate-100 text-sm">
+                    <div class="flex items-center justify-between gap-4 px-5 py-3">
+                        <dt class="shrink-0 text-slate-400">Dibuat</dt>
+                        <dd class="text-right font-medium text-slate-700">{{ $log->created_at?->translatedFormat('d M Y, H:i') }}</dd>
+                    </div>
+                    <div class="flex items-center justify-between gap-4 px-5 py-3">
+                        <dt class="shrink-0 text-slate-400">Dijadwalkan</dt>
+                        <dd class="text-right font-medium text-slate-700">{{ $log->kirim_pada?->translatedFormat('d M Y, H:i') ?? '—' }}</dd>
+                    </div>
+                    <div class="flex items-center justify-between gap-4 px-5 py-3">
+                        <dt class="shrink-0 text-slate-400">Terkirim</dt>
+                        <dd class="text-right font-medium text-slate-700">{{ $log->sent_at?->translatedFormat('d M Y, H:i') ?? '—' }}</dd>
+                    </div>
+                    <div class="flex items-center justify-between gap-4 px-5 py-3">
+                        <dt class="shrink-0 text-slate-400">Provider</dt>
+                        <dd class="text-right font-medium text-slate-700">{{ $log->provider ?? '—' }}</dd>
+                    </div>
+                    <div class="flex items-center justify-between gap-4 px-5 py-3">
+                        <dt class="shrink-0 text-slate-400">ID Pesan WhatsApp</dt>
+                        <dd class="max-w-[180px] truncate text-right font-mono text-xs text-slate-700" title="{{ $log->provider_message_id }}">{{ $log->provider_message_id ?? '—' }}</dd>
+                    </div>
+                    <div class="flex items-center justify-between gap-4 px-5 py-3">
+                        <dt class="shrink-0 text-slate-400">Dibuat oleh</dt>
+                        <dd class="text-right font-medium text-slate-700">{{ $log->creator?->name ?? 'Sistem' }}</dd>
+                    </div>
+                </dl>
+            </div>
+
             {{-- Pemetaan template Meta --}}
             <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div class="border-b border-slate-100 px-5 py-4">
@@ -253,52 +332,6 @@
                             <p class="text-xs text-slate-400">Tidak ada parameter (template statis).</p>
                         @endif
                     </div>
-                </div>
-            </div>
-
-            {{-- Info pengiriman --}}
-            <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <div class="border-b border-slate-100 px-5 py-4">
-                    <h3 class="text-sm font-bold text-slate-900">Info Pengiriman</h3>
-                </div>
-                <dl class="divide-y divide-slate-100 text-sm">
-                    <div class="flex items-center justify-between px-5 py-3">
-                        <dt class="text-slate-400">Dibuat</dt>
-                        <dd class="font-medium text-slate-700">{{ $log->created_at?->translatedFormat('d M Y, H:i') }}</dd>
-                    </div>
-                    <div class="flex items-center justify-between px-5 py-3">
-                        <dt class="text-slate-400">Dijadwalkan</dt>
-                        <dd class="font-medium text-slate-700">{{ $log->kirim_pada?->translatedFormat('d M Y, H:i') ?? '—' }}</dd>
-                    </div>
-                    <div class="flex items-center justify-between px-5 py-3">
-                        <dt class="text-slate-400">Terkirim</dt>
-                        <dd class="font-medium text-slate-700">{{ $log->sent_at?->translatedFormat('d M Y, H:i') ?? '—' }}</dd>
-                    </div>
-                    <div class="flex items-center justify-between px-5 py-3">
-                        <dt class="text-slate-400">Provider</dt>
-                        <dd class="font-medium text-slate-700">{{ $log->provider ?? '—' }}</dd>
-                    </div>
-                    <div class="flex items-center justify-between px-5 py-3">
-                        <dt class="text-slate-400">ID Pesan WhatsApp</dt>
-                        <dd class="max-w-[180px] truncate font-mono text-xs text-slate-700" title="{{ $log->provider_message_id }}">{{ $log->provider_message_id ?? '—' }}</dd>
-                    </div>
-                    <div class="flex items-center justify-between px-5 py-3">
-                        <dt class="text-slate-400">Dibuat oleh</dt>
-                        <dd class="font-medium text-slate-700">{{ $log->creator?->name ?? 'Sistem' }}</dd>
-                    </div>
-                </dl>
-            </div>
-
-            {{-- Penerima --}}
-            <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <div class="border-b border-slate-100 px-5 py-4">
-                    <h3 class="text-sm font-bold text-slate-900">Penerima</h3>
-                </div>
-                <div class="space-y-2 px-5 py-4">
-                    <p class="text-sm font-bold text-slate-800">{{ $log->penerima_nama }}</p>
-                    <p class="text-xs text-slate-500">NIP/NRP {{ $log->pnpp?->nip ?? '—' }}</p>
-                    <p class="text-xs text-slate-500">{{ $log->pnpp?->satker?->nama ?? '—' }}</p>
-                    <p class="font-mono text-xs text-slate-600">{{ $log->penerima_no_hp }}</p>
                 </div>
             </div>
         </div>

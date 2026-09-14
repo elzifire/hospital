@@ -12,7 +12,9 @@ use Illuminate\Support\Collection;
  * Orkestrator pesan broadcast berbasis penjadwalan (reminders):
  *  - generate(jenis) → buat message_logs untuk reminder yang jatuh ke
  *    rule aktif jenis tsb. (outreach: H-7 & H-1; follow up: H-1, hari-H,
- *    dan tidak-datang) memakai template yang dipilih per rule (Setting).
+ *    dan tidak-datang) memakai template yang dipilih per rule (Setting);
+ *    jadwal yang punya template sendiri (form Digital Reminder) memakai
+ *    template itu sebagai pengganti (override) default rule.
  *  - sweepStatus() → tandai reminder lewat tanpa kunjungan sebagai
  *    tidak_datang (bahan rule follow up no-show).
  *  - batalkan() → pesan yang belum terkirim.
@@ -105,7 +107,7 @@ class BroadcastService
     protected function reminderUntukRule(string $rule, ?int $poliId = null): Collection
     {
         return Reminder::query()
-            ->with('pnpp.satker', 'poli', 'dokter')
+            ->with('pnpp.satker', 'poli', 'dokter', 'messageTemplate')
             ->when($poliId !== null, fn ($query) => $query->where('poli_id', $poliId))
             ->when(
                 $rule === 'tidak_datang',
@@ -129,8 +131,12 @@ class BroadcastService
 
     protected function buatPesan(BroadcastRule $aturan, Reminder $reminder, ?User $oleh): MessageLog
     {
+        // Template level penjadwalan (dipilih di form) menang atas
+        // template default rule — jatuh ke default saat tidak dipilih.
+        $template = $reminder->messageTemplate ?? $aturan->template;
+
         return MessageLog::create(
-            $this->pesan->atribut($aturan->template, $reminder->pnpp, $reminder, $aturan->jenis, $aturan->rule, $oleh),
+            $this->pesan->atribut($template, $reminder->pnpp, $reminder, $aturan->jenis, $aturan->rule, $oleh),
         );
     }
 }

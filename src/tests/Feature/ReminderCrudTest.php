@@ -4,10 +4,12 @@ namespace Tests\Feature;
 
 use App\Models\Dokter;
 use App\Models\Kunjungan;
+use App\Models\MessageTemplate;
 use App\Models\Pnpp;
 use App\Models\Poli;
 use App\Models\Reminder;
 use App\Models\Satker;
+use App\Models\TemplateCategory;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -201,6 +203,97 @@ class ReminderCrudTest extends TestCase
             ->assertRedirect(route('admin.digital-reminder.index'));
 
         $this->assertModelMissing($reminder);
+    }
+
+    #[Test]
+    public function create_dan_edit_mendukung_pilihan_template_pesan(): void
+    {
+        extract($this->pasangan());
+
+        $kategori = TemplateCategory::where('slug', 'digital-reminder')->firstOrFail();
+        $lain = TemplateCategory::where('slug', 'outreach')->firstOrFail();
+
+        $template = MessageTemplate::create([
+            'template_category_id' => $kategori->id,
+            'judul' => 'Pengingat Kontrol Uji',
+            'channel' => 'WhatsApp',
+            'konten' => 'Halo {nama}, kontrol Anda di {poli} pada {tanggal} pukul {jam}.',
+            'is_active' => true,
+        ]);
+        MessageTemplate::create([
+            'template_category_id' => $kategori->id,
+            'judul' => 'Template Nonaktif',
+            'channel' => 'WhatsApp',
+            'konten' => '…',
+            'is_active' => false,
+        ]);
+        MessageTemplate::create([
+            'template_category_id' => $lain->id,
+            'judul' => 'Template Outreach Uji',
+            'channel' => 'WhatsApp',
+            'konten' => '…',
+            'is_active' => true,
+        ]);
+
+        // Dropdown hanya template aktif kategori Digital Reminder
+        $this->actingAs($this->superadmin())
+            ->get(route('admin.digital-reminder.create'))
+            ->assertOk()
+            ->assertSee('Pengingat Kontrol Uji')
+            ->assertDontSee('Template Nonaktif')
+            ->assertDontSee('Template Outreach Uji');
+
+        // Disimpan ke semua kombinasi pasien × poli
+        $this->post(route('admin.digital-reminder.store'), [
+            'pnpp_ids' => [$budi->id, $siti->id],
+            'poli_ids' => [$poliUmum->id, $poliGigi->id],
+            'tanggal' => today()->addDays(3)->format('Y-m-d'),
+            'jam' => '09:30',
+            'message_template_id' => $template->id,
+        ])->assertRedirect(route('admin.digital-reminder.index'));
+
+        $this->assertSame(4, Reminder::where('message_template_id', $template->id)->count());
+
+        // Edit: template terpilih tampil, dan bisa dikosongkan kembali
+        $reminder = Reminder::first();
+        $this->actingAs($this->superadmin())
+            ->get(route('admin.digital-reminder.edit', $reminder))
+            ->assertOk()
+            ->assertSee('Pengingat Kontrol Uji');
+
+        $this->put(route('admin.digital-reminder.update', $reminder), [
+            'poli_id' => $poliUmum->id,
+            'dokter_id' => $dokterUmum->id,
+            'tanggal' => $reminder->tanggal->format('Y-m-d'),
+            'jam' => '09:30',
+            'home_visit' => '0',
+            'status' => 'terjadwal',
+            'message_template_id' => '',
+        ])->assertRedirect(route('admin.digital-reminder.index'));
+
+        $this->assertNull($reminder->refresh()->message_template_id);
+    }
+
+    #[Test]
+    public function template_nonaktif_ditolak_validasi(): void
+    {
+        extract($this->pasangan());
+
+        $nonaktif = MessageTemplate::create([
+            'judul' => 'Template Nonaktif',
+            'channel' => 'WhatsApp',
+            'konten' => '…',
+            'is_active' => false,
+        ]);
+
+        $this->actingAs($this->superadmin())
+            ->post(route('admin.digital-reminder.store'), [
+                'pnpp_ids' => [$budi->id],
+                'poli_ids' => [$poliUmum->id],
+                'tanggal' => today()->addDay()->format('Y-m-d'),
+                'jam' => '09:00',
+                'message_template_id' => $nonaktif->id,
+            ])->assertSessionHasErrors('message_template_id');
     }
 
     #[Test]

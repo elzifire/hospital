@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Dokter;
 use App\Models\Kunjungan;
+use App\Models\MessageTemplate;
 use App\Models\Pnpp;
 use App\Models\Poli;
 use App\Models\Reminder;
@@ -63,6 +64,7 @@ class DigitalReminderController extends Controller
                         'pnpp_id' => $pnppId,
                         'poli_id' => $poliId,
                         'dokter_id' => null,
+                        'message_template_id' => $data['message_template_id'] ?? null,
                         'tanggal' => $data['tanggal'],
                         'jam' => $data['jam'],
                         'home_visit' => (bool) ($data['home_visit'] ?? false),
@@ -107,6 +109,7 @@ class DigitalReminderController extends Controller
         return view('admin.digital-reminder.edit', [
             'reminder' => $reminder,
             'polis' => $this->daftarPoliAktif(),
+            'templates' => $this->daftarTemplate(),
             'dokters' => Dokter::query()
                 ->when($this->batasiPoli(), fn ($q) => $q->where('poli_id', $this->poliAktif()))
                 ->orderBy('nama')
@@ -126,6 +129,7 @@ class DigitalReminderController extends Controller
         $reminder->update([
             'poli_id' => $data['poli_id'],
             'dokter_id' => $data['dokter_id'] ?? null,
+            'message_template_id' => $data['message_template_id'] ?? null,
             'tanggal' => $data['tanggal'],
             'jam' => $data['jam'],
             'home_visit' => (bool) ($data['home_visit'] ?? false),
@@ -195,6 +199,7 @@ class DigitalReminderController extends Controller
                     'nullable',
                     Rule::exists('dokters', 'id')->where('poli_id', $request->integer('poli_id')),
                 ],
+                'message_template_id' => $this->aturanTemplate(),
                 'tanggal' => ['required', 'date'],
                 'jam' => ['required', 'date_format:H:i'],
                 'home_visit' => ['nullable', 'boolean'],
@@ -207,6 +212,7 @@ class DigitalReminderController extends Controller
             'pnpp_ids.*' => ['integer', Rule::exists('pnpps', 'id')],
             'poli_ids' => ['required', 'array', 'min:1'],
             'poli_ids.*' => array_merge(['integer', Rule::exists('polis', 'id')], $this->pembatasanPoli()),
+            'message_template_id' => $this->aturanTemplate(),
             'tanggal' => ['required', 'date', 'after_or_equal:today'],
             'jam' => ['required', 'date_format:H:i'],
             'home_visit' => ['nullable', 'boolean'],
@@ -239,6 +245,7 @@ class DigitalReminderController extends Controller
             'pnpps' => $pnpps,
             'satkers' => Satker::orderBy('nama')->get(['id', 'nama']),
             'polis' => $this->daftarPoliAktif(),
+            'templates' => $this->daftarTemplate(),
             'poliAwal' => $this->batasiPoli() ? [(string) $this->poliAktif()] : [],
             'filters' => ['q' => $q, 'satker' => $satkerId],
         ];
@@ -280,6 +287,32 @@ class DigitalReminderController extends Controller
     protected function bolehAkses(Reminder $reminder): bool
     {
         return ! $this->batasiPoli() || (int) $reminder->poli_id === $this->poliAktif();
+    }
+
+    /**
+     * Rule validasi template pesan — opsional, harus template aktif.
+     */
+    protected function aturanTemplate(): array
+    {
+        return [
+            'nullable',
+            'integer',
+            Rule::exists('message_templates', 'id')->where('is_active', true),
+        ];
+    }
+
+    /**
+     * Template WhatsApp aktif untuk dropdown form penjadwalan — khusus
+     * kategori "Digital Reminder" (seeder TemplateCategorySeeder) supaya
+     * tidak bercampur dengan template modul lain.
+     */
+    protected function daftarTemplate(): Collection
+    {
+        return MessageTemplate::query()
+            ->whereHas('category', fn ($q) => $q->where('slug', 'digital-reminder'))
+            ->where('is_active', true)
+            ->orderBy('judul')
+            ->get(['id', 'judul', 'konten', 'template_category_id']);
     }
 
     /**
