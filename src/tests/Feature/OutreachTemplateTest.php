@@ -9,6 +9,7 @@ use App\Models\Pnpp;
 use App\Models\Poli;
 use App\Models\Reminder;
 use App\Models\Satker;
+use App\Models\TemplateCategory;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -51,6 +52,7 @@ class OutreachTemplateTest extends TestCase
             'channel' => 'WhatsApp',
             'konten' => 'Halo {nama}, jadwal Anda di {poli} pada {tanggal} pukul {jam}.',
             'is_active' => true,
+            'template_category_id' => TemplateCategory::where('slug', 'outreach')->firstOrFail()->id,
             'meta_param_tokens' => $params ?? ['nama', 'tanggal'],
             'meta_template_name' => 'jadwal_poli',
             'meta_language' => 'id',

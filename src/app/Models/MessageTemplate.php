@@ -60,6 +60,27 @@ class MessageTemplate extends Model
     }
 
     /**
+     * Daftar variabel dinamis PNPP yang bisa dipakai dalam konten template.
+     *
+     * @return array<int, array{var: string, desc: string, contoh: string}>
+     */
+    public static function variables(): array
+    {
+        return [
+            ['var' => '{nama}',            'desc' => 'Nama lengkap PNPP',                 'contoh' => 'Bripka Joko Susanto'],
+            ['var' => '{nip}',             'desc' => 'NIP / NRP anggota',                 'contoh' => '85031234'],
+            ['var' => '{satker}',          'desc' => 'Satuan kerja / Polda / Polres',     'contoh' => 'Polresta Bogor Kota'],
+            ['var' => '{poli}',            'desc' => 'Nama poliklinik / instalasi',       'contoh' => 'Poli Penyakit Dalam'],
+            ['var' => '{dokter}',          'desc' => 'Nama dokter pemeriksa',             'contoh' => 'dr. Hendra Pratama, Sp.PD'],
+            ['var' => '{tanggal}',         'desc' => 'Tanggal jadwal kontrol',            'contoh' => 'Senin, 08 Sep 2026'],
+            ['var' => '{jam}',             'desc' => 'Waktu pemeriksaan',                'contoh' => '09:00 WIB'],
+            ['var' => '{obat}',            'desc' => 'Nama obat / resep berkala',         'contoh' => 'Amlodipine 10mg'],
+            ['var' => '{no_antrian}',      'desc' => 'Nomor tiket antrean',               'contoh' => 'A-024'],
+            ['var' => '{link_konfirmasi}', 'desc' => 'Tautan konfirmasi WhatsApp Web',   'contoh' => 'https://rs-bhayangkara.id/c/8f2a'],
+        ];
+    }
+
+    /**
      * Urutan token yang menjadi parameter template Meta ({{1}}, {{2}},
      * …): pakai meta_param_tokens bila diisi, selain itu urutan
      * kemunculan pertama token di konten.

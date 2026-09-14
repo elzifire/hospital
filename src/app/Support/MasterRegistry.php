@@ -2,14 +2,18 @@
 
 namespace App\Support;
 
+use App\Broadcasting\PhoneFormat;
 use App\Models\Dokter;
 use App\Models\Jadwal;
 use App\Models\PenyakitKronis;
 use App\Models\PenyakitMenahun;
 use App\Models\Pnpp;
 use App\Models\Poli;
+use App\Models\ResponManual;
 use App\Models\Satker;
 use DateTimeImmutable;
+use Illuminate\Support\Carbon;
+use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 
 /**
  * Registri konfigurasi import/export untuk semua data master.
@@ -204,6 +208,23 @@ class MasterRegistry
                     $model->penyakit()->sync($relations['penyakit'] ?? []);
                     $model->penyakitMenahun()->sync($relations['penyakit_menahun'] ?? []);
                 },
+            ],
+
+            'respon' => [
+                'label' => 'Respon',
+                'permission' => 'manage respon',
+                'model' => ResponManual::class,
+                'eager' => [],
+                'headers' => ['Nama', 'NRP/NIP', 'No. HP', 'Satker', 'Isi'],
+                'sample' => ['Budi Santoso', '198501012010011001', '081234567890', 'Dinas Kesehatan', 'Baik, saya hadir kontrol.'],
+                'toRow' => fn (ResponManual $m) => [
+                    $m->nama ?? '',
+                    $m->nrp_nip ?? '',
+                    $m->no_hp ?? '',
+                    $m->satker ?? '',
+                    $m->isi ?? '',
+                ],
+                'parse' => fn (array $row) => self::parseResponManual($row),
             ],
         ];
     }
@@ -426,6 +447,89 @@ class MasterRegistry
         }
 
         return $result;
+    }
+
+    // ------------------------------------------------------------------
+    // Parser respon (balasan pasien — input manual & import Excel)
+    // ------------------------------------------------------------------
+
+    private static function parseResponManual(array $row): array
+    {
+        $nama = self::field($row, 'Nama');
+        $nrpNip = self::field($row, 'NRP/NIP');
+        $satker = self::field($row, 'Satker');
+        $isi = self::field($row, 'Isi');
+        $waktuRaw = (string) ($row['Waktu Masuk'] ?? '');
+        $noHp = self::responWaPhone(self::field($row, 'No. HP'));
+        $errors = [];
+
+        if ($noHp === null) {
+            $errors[] = 'No. HP wajib diisi';
+        }
+
+        if ($isi === '') {
+            $errors[] = 'Isi wajib diisi';
+        }
+
+        $waktu = self::parseResponWaktu($waktuRaw);
+        if ($waktuRaw !== '' && $waktu === null) {
+            $errors[] = 'Waktu Masuk tidak valid (format YYYY-MM-DD HH:MM)';
+        }
+
+        return [
+            'data' => [
+                'nama' => $nama !== '' ? $nama : null,
+                'nrp_nip' => $nrpNip !== '' ? $nrpNip : null,
+                'no_hp' => $noHp,
+                'satker' => $satker !== '' ? $satker : null,
+                'isi' => $isi,
+                'waktu' => $waktu ?? now(),
+                'sumber' => ResponManual::SUMBER_IMPORT,
+            ],
+            'unique' => ['no_hp' => $noHp, 'isi' => $isi, 'sumber' => ResponManual::SUMBER_IMPORT],
+            'relations' => [],
+            'errors' => $errors,
+        ];
+    }
+
+    /**
+     * No. HP menjadi string digit lalu dikonversi ke format WA (628…),
+     * konsisten dengan data balasan dari webhook.
+     */
+    private static function responWaPhone(?string $value): ?string
+    {
+        $digits = self::normalizeDigits($value);
+        if ($digits === null) {
+            return null;
+        }
+
+        return PhoneFormat::toWa($digits);
+    }
+
+    private static function parseResponWaktu(string $value): ?Carbon
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return null;
+        }
+
+        // Sel tanggal Excel sering terbaca sebagai bilangan seri (mis. 46259.5).
+        if (is_numeric($value) && (float) $value > 30000) {
+            try {
+                return Carbon::instance(ExcelDate::excelToDateTimeObject((float) $value));
+            } catch (\Throwable) {
+                return null;
+            }
+        }
+
+        foreach (['Y-m-d H:i:s', 'Y-m-d H:i', 'Y-m-d', 'd/m/Y H:i', 'd/m/Y', 'd-m-Y H:i', 'd-m-Y'] as $format) {
+            $date = DateTimeImmutable::createFromFormat($format, $value);
+            if ($date && $date->format($format) === $value) {
+                return Carbon::instance($date);
+            }
+        }
+
+        return null;
     }
 
     // ------------------------------------------------------------------

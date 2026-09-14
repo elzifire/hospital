@@ -37,7 +37,7 @@
             ['name' => 'nama', 'label' => 'Nama Lengkap', 'required' => true, 'span' => 2],
             ['name' => 'nik', 'label' => 'NIK', 'optional' => true,
                 'attrs' => 'inputmode="numeric" maxlength="16"', 'placeholder' => 'Nomor Induk Kependudukan'],
-            ['name' => 'nip', 'label' => 'NIP/NRP', 'optional' => true,
+            ['name' => 'nip', 'label' => 'NIP/NRP', 'required' => true,
                 'attrs' => 'inputmode="numeric" maxlength="50"', 'placeholder' => 'Nomor Induk Pegawai'],
             ['name' => 'jabatan', 'label' => 'Jabatan', 'required' => true, 'span' => 2],
             ['name' => 'ttl', 'label' => 'Tempat, Tanggal Lahir', 'required' => true,
@@ -251,7 +251,7 @@
 
                 {{-- Aksi --}}
                 <div class="flex flex-col gap-3 border-t border-slate-100 pt-6 sm:flex-row sm:items-center sm:justify-between">
-                    <p class="text-xs text-slate-400">Dengan mengirim formulir, Anda menyetujui data diverifikasi oleh petugas rumah sakit.</p>
+                    <p class="text-xs text-gray-950"><span class="font-bold text-rose-600">*</span> Dengan mengirim formulir, Anda menyetujui data diverifikasi oleh petugas rumah sakit.</p>
                     <button type="submit"
                             class="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-8 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2">
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" /></svg>

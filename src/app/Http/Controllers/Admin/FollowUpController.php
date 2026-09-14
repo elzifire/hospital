@@ -3,19 +3,22 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Broadcasting\BroadcastService;
-use App\Http\Controllers\Controller;
 use App\Models\MessageLog;
 use Illuminate\Http\Request;
 
 /**
  * Modul Follow Up — riwayat pesan tindak lanjut (rule H-1, hari-H, dan
- * tidak-datang) yang digenerate dari penjadwalan Digital Reminder.
+ * tidak-datang) yang digenerate dari penjadwalan Digital Reminder, plus
+ * form kirim pesan manual yang diwarisi dari ManualBroadcastController.
+ *
+ * Berbeda dengan Outreach, opsi template pada form manual hanya menampilkan
+ * template kategori "Follow Up" (sesuai seeder TemplateCategorySeeder).
  */
-class FollowUpController extends Controller
+class FollowUpController extends ManualBroadcastController
 {
     /**
      * Riwayat pesan follow up — data nyata, dengan ringkasan status,
-     * pencarian, filter status/aturan, dan pembatalan.
+     * pencarian, filter status/aturan (termasuk manual), dan pembatalan.
      */
     public function index(Request $request)
     {
@@ -84,5 +87,30 @@ class FollowUpController extends Controller
         return redirect()
             ->route('admin.follow-up.index')
             ->with('success', $pesan);
+    }
+
+    protected function jenisManual(): string
+    {
+        return 'follow_up';
+    }
+
+    protected function kategoriManual(): ?string
+    {
+        return 'follow-up';
+    }
+
+    protected function viewManual(): string
+    {
+        return 'admin.follow-up.manual';
+    }
+
+    protected function viewEdit(): string
+    {
+        return 'admin.follow-up.edit';
+    }
+
+    protected function routeIndex(): string
+    {
+        return 'admin.follow-up.index';
     }
 }

@@ -1,6 +1,9 @@
 @php
     $method = $method ?? 'POST';
     $kirimPesan = $kirimPesan ?? true;
+    $jenis = $jenis ?? 'outreach';
+    $jenisLabel = $jenisLabel ?? 'Outreach';
+    $jenisDesc = $jenisDesc ?? 'Undangan jadwal (riwayat modul Outreach).';
     $tokenJadwal = ['hari_tanggal', 'waktu_kunjungan', 'poli_layanan', 'poli', 'dokter', 'tanggal', 'jam'];
     $alpineOutreachData = [
         'selected' => $selectedIds,
@@ -258,10 +261,10 @@
             </div>
             <div class="space-y-3 px-5 py-4">
                 <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3 transition has-[:checked]:border-sky-400 has-[:checked]:bg-sky-50/60">
-                    <input type="radio" name="jenis" value="outreach" checked class="mt-1 h-4 w-4 border-slate-300 text-sky-600 focus:ring-sky-500">
+                    <input type="radio" name="jenis" value="{{ $jenis }}" checked class="mt-1 h-4 w-4 border-slate-300 text-sky-600 focus:ring-sky-500">
                     <span>
-                        <span class="block text-sm font-semibold text-slate-800">Outreach</span>
-                        <span class="block text-xs text-slate-500">Undangan jadwal (riwayat modul Outreach).</span>
+                        <span class="block text-sm font-semibold text-slate-800">{{ $jenisLabel }}</span>
+                        <span class="block text-xs text-slate-500">{{ $jenisDesc }}</span>
                     </span>
                 </label>
             </div>

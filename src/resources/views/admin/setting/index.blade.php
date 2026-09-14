@@ -40,15 +40,6 @@
         simulatedText: '',
         viewMode: 'simulated'
     },
-    categoryModal: {
-        open: false,
-        isEdit: false,
-        id: null,
-        nama: '',
-        warna: 'sky',
-        deskripsi: '',
-        is_active: true
-    },
     deleteModal: {
         open: false,
         actionUrl: '',
@@ -94,26 +85,6 @@
         this.previewModal.simulatedText = sim;
         this.previewModal.viewMode = 'simulated';
         this.previewModal.open = true;
-    },
-
-    openCreateCategory() {
-        this.categoryModal.isEdit = false;
-        this.categoryModal.id = null;
-        this.categoryModal.nama = '';
-        this.categoryModal.warna = 'sky';
-        this.categoryModal.deskripsi = '';
-        this.categoryModal.is_active = true;
-        this.categoryModal.open = true;
-    },
-
-    openEditCategory(c) {
-        this.categoryModal.isEdit = true;
-        this.categoryModal.id = c.id;
-        this.categoryModal.nama = c.nama;
-        this.categoryModal.warna = c.warna || 'sky';
-        this.categoryModal.deskripsi = c.deskripsi || '';
-        this.categoryModal.is_active = !!c.is_active;
-        this.categoryModal.open = true;
     },
 
     confirmDelete(url, name, type) {
@@ -269,15 +240,12 @@
                 <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600 font-bold tabular-nums">{{ $stats['total_template'] }}</span>
             </button>
 
-            <button @click="activeTab = 'kategori'"
-                    :class="activeTab === 'kategori'
-                        ? 'border-sky-600 text-sky-600 font-bold'
-                        : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700 font-medium'"
-                    class="group inline-flex items-center gap-2 border-b-2 py-3 px-1 text-sm transition">
+            <a href="{{ route('admin.setting.kategori.index') }}"
+               class="group inline-flex items-center gap-2 border-b-2 border-transparent py-3 px-1 text-sm font-medium text-slate-500 transition hover:border-slate-300 hover:text-slate-700">
                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 0 0 5.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 0 0 9.568 3Z" /></svg>
                 <span>Kelola Kategori</span>
                 <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600 font-bold tabular-nums">{{ $stats['total_kategori'] }}</span>
-            </button>
+            </a>
 
             <button @click="activeTab = 'aturan'"
                     :class="activeTab === 'aturan'
@@ -297,7 +265,7 @@
     <div x-show="activeTab === 'template'" class="space-y-6">
 
         {{-- Box Variabel Tersedia --}}
-        <div class="rounded-2xl bg-gradient-to-br from-white to-slate-50/60 p-5 shadow-xs ring-1 ring-slate-200">
+        {{-- <div class="rounded-2xl bg-gradient-to-br from-white to-slate-50/60 p-5 shadow-xs ring-1 ring-slate-200">
             <div class="flex items-start gap-3.5">
                 <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-600 ring-1 ring-sky-100">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" /></svg>
@@ -323,7 +291,7 @@
                     </div>
                 </div>
             </div>
-        </div>
+        </div> --}}
 
         {{-- Server-Side Filter & Search Bar (Dengan Event JS Debounce) --}}
         <form id="filterForm" method="GET" action="{{ route('admin.setting.index') }}" class="rounded-2xl bg-white p-4 shadow-xs ring-1 ring-slate-200">
@@ -502,13 +470,12 @@
                                                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" /></svg>
                                             </button>
 
-                                            {{-- Duplicate --}}
-                                            <form method="POST" action="{{ route('admin.setting.template.duplicate', $t) }}">
-                                                @csrf
-                                                <button type="submit" title="Duplikasi Template" class="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700">
-                                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 8.25V6a2.25 2.25 0 0 0-2.25-2.25H6A2.25 2.25 0 0 0 3.75 6v8.25A2.25 2.25 0 0 0 6 16.5h2.25m8.25-8.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-7.5A2.25 2.25 0 0 1 8.25 18v-1.5m8.25-8.25h-6a2.25 2.25 0 0 0-2.25 2.25v6" /></svg>
-                                                </button>
-                                            </form>
+                                            {{-- Edit --}}
+                                            <a href="{{ route('admin.setting.template.edit', $t) }}"
+                                                    title="Edit Template"
+                                                    class="rounded-lg p-1.5 text-slate-400 transition hover:bg-sky-50 hover:text-sky-600">
+                                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" /></svg>
+                                            </a>
 
                                             {{-- Delete --}}
                                             <button type="button"
@@ -534,92 +501,7 @@
     </div>
 
     {{-- ======================================================== --}}
-    {{-- TAB 2: KATEGORI TEMPLATE --}}
-    {{-- ======================================================== --}}
-    <div x-show="activeTab === 'kategori'" class="space-y-6">
-        <div class="flex items-center justify-between">
-            <div>
-                <h3 class="text-base font-bold text-slate-900">Daftar Kategori Pesan</h3>
-                <p class="text-xs text-slate-500">Kelola klasifikasi template pesan untuk memudahkan integrasi broadcast modul terkait.</p>
-            </div>
-            <button @click="openCreateCategory()"
-                    class="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-sky-700">
-                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-                Tambah Kategori
-            </button>
-        </div>
-
-        <div class="rounded-2xl bg-white shadow-xs ring-1 ring-slate-200 overflow-hidden">
-            <div class="overflow-x-auto">
-                <table class="w-full text-left text-xs">
-                    <thead class="bg-slate-100 text-slate-600 font-bold uppercase tracking-wider text-[10px] border-b border-slate-200">
-                        <tr>
-                            <th class="py-3 px-4 w-10 text-center">No</th>
-                            <th class="py-3 px-4">Kategori</th>
-                            <th class="py-3 px-4 w-28">Warna</th>
-                            <th class="py-3 px-4">Deskripsi</th>
-                            <th class="py-3 px-4 w-36 text-center">Jumlah Template</th>
-                            <th class="py-3 px-4 w-20 text-center">Aksi</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100 font-medium">
-                        @foreach ($categories as $c)
-                            @php
-                                $color = $colorMap[$c->warna] ?? $colorMap['sky'];
-                            @endphp
-                            <tr class="hover:bg-slate-50/60">
-                                <td class="py-3 px-4 text-center font-mono text-slate-400">{{ $loop->iteration }}</td>
-                                <td class="py-3 px-4">
-                                    <div class="flex items-center gap-2.5">
-                                        <span class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg {{ $color['bg'] }} {{ $color['text'] }} ring-1 {{ $color['ring'] }}">
-                                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 0 0 3 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 0 0 5.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 0 0 9.568 3Z" /></svg>
-                                        </span>
-                                        <div class="min-w-0">
-                                            <p class="font-bold text-slate-900">{{ $c->nama }}</p>
-                                            <p class="font-mono text-[10px] text-slate-400">{{ $c->slug }}</p>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td class="py-3 px-4">
-                                    <span class="inline-flex items-center gap-1.5">
-                                        <span class="inline-block h-2 w-2 rounded-full {{ $color['dot'] }}"></span>
-                                        <span class="text-[11px] font-semibold capitalize text-slate-500">{{ $c->warna }}</span>
-                                    </span>
-                                </td>
-                                <td class="py-3 px-4">
-                                    <p class="max-w-sm truncate text-slate-500" title="{{ $c->deskripsi }}">{{ $c->deskripsi ?: 'Tidak ada deskripsi' }}</p>
-                                </td>
-                                <td class="py-3 px-4 text-center">
-                                    <span class="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-700 tabular-nums">
-                                        {{ $c->templates_count }}
-                                    </span>
-                                </td>
-                                <td class="py-3 px-4">
-                                    <div class="flex items-center justify-center gap-0.5">
-                                        <button type="button"
-                                                @click="openEditCategory(@js($c))"
-                                                title="Edit Kategori"
-                                                class="rounded-lg p-1.5 text-slate-400 transition hover:bg-sky-50 hover:text-sky-600">
-                                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" /></svg>
-                                        </button>
-                                        <button type="button"
-                                                @click="confirmDelete('{{ route('admin.setting.kategori.destroy', $c) }}', '{{ $c->nama }}', 'Kategori Template')"
-                                                title="Hapus Kategori"
-                                                class="rounded-lg p-1.5 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600">
-                                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></svg>
-                                        </button>
-                                    </div>
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    {{-- ======================================================== --}}
-    {{-- TAB 3: ATURAN PESAN (partial terpisah) --}}
+    {{-- TAB 2: ATURAN PESAN (partial terpisah) --}}
     {{-- ======================================================== --}}
     @include('admin.setting._aturan')
 
@@ -725,94 +607,6 @@
                         Tutup
                     </button>
                 </div>
-            </div>
-        </div>
-    </div>
-
-    {{-- ======================================================== --}}
-    {{-- MODAL TAMBAH / EDIT KATEGORI TEMPLATE --}}
-    {{-- ======================================================== --}}
-    <div x-cloak x-show="categoryModal.open" 
-         class="fixed inset-0 z-50 overflow-y-auto"
-         aria-labelledby="modal-title" role="dialog" aria-modal="true">
-        <div class="flex min-h-screen items-center justify-center p-4 text-center sm:p-0">
-            <div x-show="categoryModal.open" 
-                 x-transition:enter="ease-out duration-300"
-                 x-transition:enter-start="opacity-0"
-                 x-transition:enter-end="opacity-100"
-                 x-transition:leave="ease-in duration-200"
-                 x-transition:leave-start="opacity-100"
-                 x-transition:leave-end="opacity-0"
-                 @click="categoryModal.open = false"
-                 class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity"></div>
-
-            <div x-show="categoryModal.open"
-                 x-transition:enter="ease-out duration-300"
-                 x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-                 x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
-                 x-transition:leave="ease-in duration-200"
-                 x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
-                 x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-                 class="relative w-full max-w-md transform overflow-hidden rounded-3xl bg-white text-left shadow-2xl transition-all">
-                
-                <form :action="categoryModal.isEdit ? '{{ url('admin/setting/kategori') }}/' + categoryModal.id : '{{ route('admin.setting.kategori.store') }}'" method="POST">
-                    @csrf
-                    <template x-if="categoryModal.isEdit">
-                        <input type="hidden" name="_method" value="PUT">
-                    </template>
-
-                    <div class="border-b border-slate-100 px-6 py-4 flex items-center justify-between">
-                        <div>
-                            <h3 class="text-base font-bold text-slate-900" x-text="categoryModal.isEdit ? 'Edit Kategori' : 'Tambah Kategori Baru'"></h3>
-                            <p class="text-xs text-slate-500">Tentukan nama kategori dan warna aksen untuk pengelompokan.</p>
-                        </div>
-                        <button type="button" @click="categoryModal.open = false" class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">
-                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
-                        </button>
-                    </div>
-
-                    <div class="space-y-4 p-6">
-                        <div>
-                            <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Nama Kategori <span class="text-rose-500">*</span></label>
-                            <input type="text" name="nama" x-model="categoryModal.nama" required placeholder="Contoh: Jadwal & Kontrol"
-                                   class="block w-full rounded-xl border-0 py-2.5 px-3.5 text-xs text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-inset focus:ring-sky-500">
-                        </div>
-
-                        <div>
-                            <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Pilih Warna Badge Aksen</label>
-                            <div class="grid grid-cols-6 gap-2">
-                                @foreach (['emerald', 'sky', 'amber', 'rose', 'purple', 'indigo'] as $w)
-                                    @php $c = $colorMap[$w]; @endphp
-                                    <label class="flex flex-col items-center gap-1 cursor-pointer">
-                                        <input type="radio" name="warna" value="{{ $w }}" x-model="categoryModal.warna" class="sr-only">
-                                        <span class="flex h-9 w-9 items-center justify-center rounded-xl {{ $c['bg'] }} ring-2 transition"
-                                              :class="categoryModal.warna === '{{ $w }}' ? 'ring-slate-900 scale-110 shadow-sm' : 'ring-transparent opacity-70 hover:opacity-100'">
-                                            <span class="h-3 w-3 rounded-full {{ $c['dot'] }}"></span>
-                                        </span>
-                                        <span class="text-[9px] font-bold capitalize text-slate-500">{{ $w }}</span>
-                                    </label>
-                                @endforeach
-                            </div>
-                        </div>
-
-                        <div>
-                            <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Deskripsi</label>
-                            <textarea name="deskripsi" x-model="categoryModal.deskripsi" rows="2" placeholder="Jelaskan tujuan atau konteks kategori ini..."
-                                      class="block w-full rounded-xl border-0 py-2.5 px-3.5 text-xs text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-inset focus:ring-sky-500"></textarea>
-                        </div>
-                    </div>
-
-                    <div class="flex items-center justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4">
-                        <button type="button" @click="categoryModal.open = false"
-                                class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50">
-                            Batal
-                        </button>
-                        <button type="submit"
-                                class="rounded-xl bg-sky-600 px-5 py-2 text-xs font-bold text-white hover:bg-sky-700">
-                            Simpan Kategori
-                        </button>
-                    </div>
-                </form>
             </div>
         </div>
     </div>

@@ -32,6 +32,7 @@ use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\RegisterPnppController;
+use App\Http\Controllers\WhatsAppWebhookController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -121,16 +122,28 @@ Route::middleware('auth')->group(function () {
             Route::put('outreach/{group}', [OutreachController::class, 'update'])->name('outreach.update');
         });
 
-        // Follow Up: riwayat & generate pesan tindak lanjut (H-1, hari-H, tidak datang).
+        // Follow Up: riwayat & generate pesan tindak lanjut (H-1, hari-H, tidak datang)
+        // + kirim pesan manual mengikuti pola yang sama dengan Outreach —
+        // opsi template dibatasi kategori Follow Up (lihat controller).
         Route::middleware('can:manage follow-up')->group(function () {
             Route::get('follow-up', [FollowUpController::class, 'index'])->name('follow-up.index');
+            Route::get('follow-up/create', [FollowUpController::class, 'create'])->name('follow-up.create');
+            Route::post('follow-up', [FollowUpController::class, 'store'])->name('follow-up.store');
             Route::post('follow-up/generate', [FollowUpController::class, 'generate'])->name('follow-up.generate');
+            Route::get('follow-up/{group}/edit', [FollowUpController::class, 'edit'])->name('follow-up.edit');
+            Route::put('follow-up/{group}', [FollowUpController::class, 'update'])->name('follow-up.update');
         });
 
         // Respon: balasan pesan WhatsApp per nomor telepon (masuk via webhook)
+        // + input manual & import Excel/CSV per batch (queue).
         Route::middleware('can:manage respon')->group(function () {
             Route::get('respon', [ResponController::class, 'index'])->name('respon.index');
             Route::get('respon/{nomor}', [ResponController::class, 'show'])->name('respon.show');
+            Route::post('respon/manual', [ResponController::class, 'storeManual'])->name('respon.manual-store');
+            Route::delete('respon/manual/{responManual}', [ResponController::class, 'destroy'])->name('respon.manual-destroy');
+            Route::post('respon/import/upload', [ResponController::class, 'importUpload'])->name('respon.import-upload');
+            Route::post('respon/import/confirm', [ResponController::class, 'importConfirm'])->name('respon.import-confirm');
+            Route::post('respon/import/cancel', [ResponController::class, 'importCancel'])->name('respon.import-cancel');
         });
 
         // Aksi atas riwayat pesan (dipakai lintas modul broadcast):
@@ -147,13 +160,18 @@ Route::middleware('auth')->group(function () {
             Route::get('/template', [SettingController::class, 'template'])->name('template');
             Route::put('/aturan/{aturan}', [BroadcastRuleController::class, 'update'])->name('aturan.update');
 
-            // CRUD Kategori
+            // CRUD Kategori — halaman terpisah agar tambah & edit lebih lega.
+            Route::get('kategori', [TemplateCategoryController::class, 'index'])->name('kategori.index');
+            Route::get('kategori/create', [TemplateCategoryController::class, 'create'])->name('kategori.create');
             Route::post('kategori', [TemplateCategoryController::class, 'store'])->name('kategori.store');
+            Route::get('kategori/{kategori}/edit', [TemplateCategoryController::class, 'edit'])->name('kategori.edit');
             Route::put('kategori/{kategori}', [TemplateCategoryController::class, 'update'])->name('kategori.update');
             Route::delete('kategori/{kategori}', [TemplateCategoryController::class, 'destroy'])->name('kategori.destroy');
 
             // CRUD Template Pesan — dikelola hanya via sinkronisasi Meta.
+            Route::get('template/{template}/edit', [MessageTemplateController::class, 'edit'])->name('template.edit');
             Route::delete('template/{template}', [MessageTemplateController::class, 'destroy'])->name('template.destroy');
+            Route::put('template/{template}', [MessageTemplateController::class, 'update'])->name('template.update');
             Route::post('template/{template}/duplicate', [MessageTemplateController::class, 'duplicate'])->name('template.duplicate');
             Route::post('template/sync-meta', [TemplateMetaSyncController::class, 'sync'])->name('template.sync-meta');
 
@@ -224,23 +242,9 @@ Route::middleware('auth')->group(function () {
     });
 });
 
-// Route::get('/whatsapp/webhook', function (\Illuminate\Http\Request $request) {
-//     $verifyToken = 'ELZIFIRE_WA_VERIFY_2026';
-
-//     if (
-//         $request->query('hub_mode') === 'subscribe' &&
-//         $request->query('hub_verify_token') === $verifyToken
-//     ) {
-//         return response($request->query('hub_challenge'), 200);
-//     }
-
-//     return response('Forbidden', 403);
-// });
-
-// Route::post('/whatsapp/webhook', function (\Illuminate\Http\Request $request) {
-//     Log::info('WhatsApp Webhook', $request->all());
-
-//     return response()->json([
-//         'status' => 'ok'
-//     ]);
-// });
+// Webhook masuk Meta WhatsApp Cloud API — verifikasi endpoint (GET) dan
+// penerima balasan/pesan pasien (POST) diproses di
+// WhatsAppWebhookController -> WebhookHandler (di luar CSRF, lihat
+// bootstrap/app.php, karena Meta menandatangani body dengan HMAC).
+Route::get('/whatsapp/webhook', [WhatsAppWebhookController::class, 'verify']);
+Route::post('/whatsapp/webhook', [WhatsAppWebhookController::class, 'handle']);

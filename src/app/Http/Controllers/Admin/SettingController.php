@@ -56,18 +56,7 @@ class SettingController extends Controller
             ->get(['id', 'judul']);
 
         // Daftar Variabel Dinamis untuk PNPP
-        $variables = [
-            ['var' => '{nama}',            'desc' => 'Nama lengkap PNPP',                 'contoh' => 'Bripka Joko Susanto'],
-            ['var' => '{nip}',             'desc' => 'NIP / NRP anggota',                 'contoh' => '85031234'],
-            ['var' => '{satker}',          'desc' => 'Satuan kerja / Polda / Polres',     'contoh' => 'Polresta Bogor Kota'],
-            ['var' => '{poli}',            'desc' => 'Nama poliklinik / instalasi',       'contoh' => 'Poli Penyakit Dalam'],
-            ['var' => '{dokter}',          'desc' => 'Nama dokter pemeriksa',             'contoh' => 'dr. Hendra Pratama, Sp.PD'],
-            ['var' => '{tanggal}',         'desc' => 'Tanggal jadwal kontrol',            'contoh' => 'Senin, 08 Sep 2026'],
-            ['var' => '{jam}',             'desc' => 'Waktu pemeriksaan',                'contoh' => '09:00 WIB'],
-            ['var' => '{obat}',            'desc' => 'Nama obat / resep berkala',         'contoh' => 'Amlodipine 10mg'],
-            ['var' => '{no_antrian}',      'desc' => 'Nomor tiket antrean',               'contoh' => 'A-024'],
-            ['var' => '{link_konfirmasi}', 'desc' => 'Tautan konfirmasi WhatsApp Web',   'contoh' => 'https://rs-bhayangkara.id/c/8f2a'],
-        ];
+        $variables = MessageTemplate::variables();
 
         return view('admin.setting.index', [
             'tab' => $tab,

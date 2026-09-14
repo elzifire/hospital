@@ -9,6 +9,20 @@ use Illuminate\Support\Str;
 
 class TemplateCategoryController extends Controller
 {
+    public function index()
+    {
+        $categories = TemplateCategory::withCount('templates')
+            ->orderBy('nama')
+            ->get();
+
+        return view('admin.setting.kategori.index', compact('categories'));
+    }
+
+    public function create()
+    {
+        return view('admin.setting.kategori.create');
+    }
+
     public function store(Request $request)
     {
         $data = $request->validate([
@@ -29,8 +43,13 @@ class TemplateCategoryController extends Controller
 
         $cat = TemplateCategory::create($data);
 
-        return redirect()->route('admin.setting.index', ['tab' => 'kategori'])
+        return redirect()->route('admin.setting.kategori.index')
             ->with('success', "Kategori template \"{$cat->nama}\" berhasil ditambahkan.");
+    }
+
+    public function edit(TemplateCategory $kategori)
+    {
+        return view('admin.setting.kategori.edit', compact('kategori'));
     }
 
     public function update(Request $request, TemplateCategory $kategori)
@@ -46,7 +65,7 @@ class TemplateCategoryController extends Controller
 
         $kategori->update($data);
 
-        return redirect()->route('admin.setting.index', ['tab' => 'kategori'])
+        return redirect()->route('admin.setting.kategori.index')
             ->with('success', "Kategori template \"{$kategori->nama}\" berhasil diperbarui.");
     }
 
@@ -62,7 +81,7 @@ class TemplateCategoryController extends Controller
 
         $kategori->delete();
 
-        return redirect()->route('admin.setting.index', ['tab' => 'kategori'])
+        return redirect()->route('admin.setting.kategori.index')
             ->with('success', "Kategori \"{$nama}\" berhasil dihapus.");
     }
 }

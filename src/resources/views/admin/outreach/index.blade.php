@@ -107,7 +107,7 @@
                             <th class="px-5 py-3">Penerima</th>
                             <th class="px-5 py-3">Pesan</th>
                             <th class="px-5 py-3">Template</th>
-                            {{-- <th class="px-5 py-3">Aturan</th> --}}
+                        
                             <th class="px-5 py-3">Waktu</th>
                             <th class="px-5 py-3">Status</th>
                             <th class="px-5 py-3 text-right">Aksi</th>

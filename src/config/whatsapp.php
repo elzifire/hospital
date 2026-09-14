@@ -38,4 +38,9 @@ return [
         'jeda_kirim' => (int) env('WA_JEDA_KIRIM', 30),
     ],
 
+    'webhook' => [
+        'verify_token' => env('WA_WEBHOOK_VERIFY_TOKEN'),
+        'app_secret' => env('WA_APP_SECRET'),
+    ],
+
 ];
