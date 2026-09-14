@@ -26,7 +26,7 @@ use App\Http\Controllers\Admin\Setting\BroadcastRuleController;
 use App\Http\Controllers\Admin\Setting\MessageTemplateController;
 use App\Http\Controllers\Admin\Setting\TemplateCategoryController;
 use App\Http\Controllers\Admin\Setting\TemplateExportController;
-use App\Http\Controllers\Admin\Setting\TemplateImportController;
+use App\Http\Controllers\Admin\Setting\TemplateMetaSyncController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\AuthController;
@@ -74,6 +74,10 @@ Route::middleware('auth')->group(function () {
             Route::get('kunjungan/create', [KunjunganController::class, 'create'])->name('kunjungan.create');
             Route::post('kunjungan', [KunjunganController::class, 'store'])->name('kunjungan.store');
 
+            // Catat kunjungan dari penjadwalan Digital Reminder (mode
+            // "Dari Jadwal" di form tambah kunjungan).
+            Route::post('kunjungan/catat', [KunjunganController::class, 'catatDariReminder'])->name('kunjungan.catat');
+
             // Riwayat kunjungan satu PNPP (tambah/edit/hapus baris poli).
             Route::get('pnpp/{pnpp}/kunjungan', [PnppController::class, 'kunjungan'])->name('pnpp.kunjungan');
             Route::post('pnpp/{pnpp}/kunjungan', [KunjunganController::class, 'storeUntukPasien'])->name('pnpp.kunjungan.store');
@@ -113,6 +117,8 @@ Route::middleware('auth')->group(function () {
             Route::get('outreach/create', [OutreachController::class, 'create'])->name('outreach.create');
             Route::post('outreach', [OutreachController::class, 'store'])->name('outreach.store');
             Route::post('outreach/generate', [OutreachController::class, 'generate'])->name('outreach.generate');
+            Route::get('outreach/{group}/edit', [OutreachController::class, 'edit'])->name('outreach.edit');
+            Route::put('outreach/{group}', [OutreachController::class, 'update'])->name('outreach.update');
         });
 
         // Follow Up: riwayat & generate pesan tindak lanjut (H-1, hari-H, tidak datang).
@@ -146,20 +152,14 @@ Route::middleware('auth')->group(function () {
             Route::put('kategori/{kategori}', [TemplateCategoryController::class, 'update'])->name('kategori.update');
             Route::delete('kategori/{kategori}', [TemplateCategoryController::class, 'destroy'])->name('kategori.destroy');
 
-            // CRUD Template Pesan
-            Route::post('template', [MessageTemplateController::class, 'store'])->name('template.store');
-            Route::put('template/{template}', [MessageTemplateController::class, 'update'])->name('template.update');
+            // CRUD Template Pesan — dikelola hanya via sinkronisasi Meta.
             Route::delete('template/{template}', [MessageTemplateController::class, 'destroy'])->name('template.destroy');
             Route::post('template/{template}/duplicate', [MessageTemplateController::class, 'duplicate'])->name('template.duplicate');
+            Route::post('template/sync-meta', [TemplateMetaSyncController::class, 'sync'])->name('template.sync-meta');
 
-            // Export & Import
+            // Export
             Route::get('export', [TemplateExportController::class, 'download'])->name('export.download');
             Route::get('export/template', [TemplateExportController::class, 'template'])->name('export.template');
-
-            Route::get('import', [TemplateImportController::class, 'index'])->name('import.index');
-            Route::post('import/upload', [TemplateImportController::class, 'upload'])->name('import.upload');
-            Route::post('import/confirm', [TemplateImportController::class, 'confirm'])->name('import.confirm');
-            Route::post('import/cancel', [TemplateImportController::class, 'cancel'])->name('import.cancel');
         });
 
         // Profil (self-service): ubah nama & password milik sendiri.

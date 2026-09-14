@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\MessageLog;
+use App\Models\MessageTemplate;
 use App\Models\Pnpp;
 use App\Models\Satker;
 use App\Models\User;
@@ -44,12 +45,18 @@ class OutreachManualTest extends TestCase
         ], $attrs));
     }
 
-    protected function templateMetaDefault(): array
+    protected function buatTemplate(): MessageTemplate
     {
-        return [
-            'nama' => (string) config('whatsapp.meta.fallback_template'),
-            'bahasa' => (string) config('whatsapp.meta.fallback_language', 'en_US'),
-        ];
+        return MessageTemplate::create([
+            'judul' => 'Jadwal Poli',
+            'kode' => 'TMP-'.str()->random(6),
+            'channel' => 'WhatsApp',
+            'konten' => 'Halo {nama}, jadwal Anda di {poli} pada {tanggal} pukul {jam}.',
+            'is_active' => true,
+            'meta_param_tokens' => ['nama', 'tanggal'],
+            'meta_template_name' => 'jadwal_poli',
+            'meta_language' => 'id',
+        ]);
     }
 
     #[Test]
@@ -91,14 +98,16 @@ class OutreachManualTest extends TestCase
     }
 
     #[Test]
-    public function kirim_manual_membuat_pesan_terkirim_dengan_template_default(): void
+    public function kirim_manual_membuat_pesan_terkirim_dengan_template(): void
     {
         $pnpp = $this->buatPnpp();
+        $template = $this->buatTemplate();
 
         $this->actingAs($this->superadmin())
             ->post(route('admin.outreach.store'), [
                 'pnpp_ids' => [$pnpp->id],
                 'jenis' => 'outreach',
+                'message_template_id' => $template->id,
             ])
             ->assertRedirect(route('admin.outreach.index'));
 
@@ -109,10 +118,26 @@ class OutreachManualTest extends TestCase
         $this->assertSame('terkirim', $log->status);
         $this->assertSame('Budi Santoso', $log->penerima_nama);
         $this->assertSame('6281234567890', $log->penerima_no_hp);
-        $this->assertSame($this->templateMetaDefault()['nama'], $log->meta_template_name);
-        $this->assertSame($this->templateMetaDefault()['bahasa'], $log->meta_language);
-        $this->assertSame([], (array) $log->template_params);
+        $this->assertSame($template->id, $log->message_template_id);
+        $this->assertSame('jadwal_poli', $log->meta_template_name);
+        $this->assertSame('id', $log->meta_language);
+        $this->assertSame(['Budi Santoso', '{tanggal}'], (array) $log->template_params);
         $this->assertNull($log->reminder_id);
+    }
+
+    #[Test]
+    public function kirim_manual_tanpa_template_ditolak(): void
+    {
+        $pnpp = $this->buatPnpp();
+
+        $this->actingAs($this->superadmin())
+            ->post(route('admin.outreach.store'), [
+                'pnpp_ids' => [$pnpp->id],
+                'jenis' => 'outreach',
+            ])
+            ->assertSessionHasErrors('message_template_id');
+
+        $this->assertSame(0, MessageLog::count());
     }
 
     #[Test]
@@ -126,6 +151,7 @@ class OutreachManualTest extends TestCase
             ->post(route('admin.outreach.store'), [
                 'pnpp_ids' => [$pnpp->id],
                 'jenis' => 'outreach',
+                'message_template_id' => $this->buatTemplate()->id,
                 'mode' => 'sekarang',
                 'kirim_pada' => '',
             ])
@@ -148,6 +174,7 @@ class OutreachManualTest extends TestCase
             ->post(route('admin.outreach.store'), [
                 'pnpp_ids' => [$budi->id, $siti->id],
                 'jenis' => 'outreach',
+                'message_template_id' => $this->buatTemplate()->id,
             ])
             ->assertRedirect(route('admin.outreach.index'));
 
@@ -166,6 +193,7 @@ class OutreachManualTest extends TestCase
             ->post(route('admin.outreach.store'), [
                 'pnpp_ids' => [$pnpp->id],
                 'jenis' => 'outreach',
+                'message_template_id' => $this->buatTemplate()->id,
             ])
             ->assertRedirect(route('admin.outreach.index'))
             ->assertSessionHas('error');
@@ -173,7 +201,7 @@ class OutreachManualTest extends TestCase
         $this->assertDatabaseHas('message_logs', [
             'pnpp_id' => $pnpp->id,
             'status' => 'gagal',
-            'error' => 'Nomor WhatsApp pasien tidak valid.',
+            'error' => 'Pasien tidak memiliki nomor WhatsApp yang valid.',
         ]);
     }
 
@@ -195,6 +223,7 @@ class OutreachManualTest extends TestCase
             ->post(route('admin.outreach.store'), [
                 'pnpp_ids' => [$pnpp->id],
                 'jenis' => 'follow_up',
+                'message_template_id' => $this->buatTemplate()->id,
             ])
             ->assertForbidden();
     }
@@ -227,6 +256,7 @@ class OutreachManualTest extends TestCase
             ->post(route('admin.outreach.store'), [
                 'pnpp_ids' => [$pnpp->id],
                 'jenis' => 'outreach',
+                'message_template_id' => $this->buatTemplate()->id,
                 'mode' => 'jadwalkan',
                 'kirim_pada' => $kirimPada,
             ])
@@ -276,6 +306,7 @@ class OutreachManualTest extends TestCase
             ->post(route('admin.outreach.store'), [
                 'pnpp_ids' => [$pnpp->id],
                 'jenis' => 'outreach',
+                'message_template_id' => $this->buatTemplate()->id,
             ]);
 
         $log = MessageLog::where('pnpp_id', $pnpp->id)->first();

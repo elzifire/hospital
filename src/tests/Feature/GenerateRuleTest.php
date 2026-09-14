@@ -37,7 +37,7 @@ class GenerateRuleTest extends TestCase
     protected function skenario(): array
     {
         $satker = Satker::create(['kode' => 'TEST', 'nama' => 'Satker Uji']);
-        $poli = Poli::create(['kode' => 'UMUM', 'nama' => 'Poli Umum']);
+        $poli = Poli::create(['kode' => 'UMUM-GEN', 'nama' => 'Poli Umum']);
         $dokter = Dokter::create(['poli_id' => $poli->id, 'nama' => 'dr. Rina']);
 
         $budi = Pnpp::create(['nama' => 'Budi Santoso', 'nip' => '123', 'satker_id' => $satker->id, 'no_hp' => '081234567890']);

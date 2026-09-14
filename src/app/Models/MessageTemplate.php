@@ -17,11 +17,18 @@ class MessageTemplate extends Model
         'judul',
         'kode',
         'channel',
+        'meta_template_id',
         'meta_template_name',
         'meta_language',
         'meta_param_tokens',
+        'meta_status',
+        'meta_category',
+        'meta_components',
+        'meta_updated_at',
+        'last_synced_at',
         'konten',
         'deskripsi',
+        'image_url',
         'is_active',
         'dipakai_count',
     ];
@@ -32,6 +39,9 @@ class MessageTemplate extends Model
             'is_active' => 'boolean',
             'dipakai_count' => 'integer',
             'meta_param_tokens' => 'array',
+            'meta_components' => 'array',
+            'meta_updated_at' => 'datetime',
+            'last_synced_at' => 'datetime',
         ];
     }
 
@@ -39,7 +49,7 @@ class MessageTemplate extends Model
     {
         static::creating(function ($template) {
             if (empty($template->kode)) {
-                $template->kode = 'TMP-' . strtoupper(Str::random(6));
+                $template->kode = 'TMP-'.strtoupper(Str::random(6));
             }
         });
     }
@@ -73,7 +83,7 @@ class MessageTemplate extends Model
             return $query;
         }
 
-        $term = '%' . trim($search) . '%';
+        $term = '%'.trim($search).'%';
 
         return $query->where(function ($q) use ($term) {
             $q->where('judul', 'ILIKE', $term)
@@ -110,5 +120,13 @@ class MessageTemplate extends Model
         }
 
         return $query->where('is_active', filter_var($status, FILTER_VALIDATE_BOOLEAN));
+    }
+
+    /**
+     * Filter status persetujuan template Meta (APPROVED, PENDING, dst.).
+     */
+    public function scopeMetaStatus(Builder $query, ?string $status): Builder
+    {
+        return blank($status) ? $query : $query->where('meta_status', strtoupper($status));
     }
 }

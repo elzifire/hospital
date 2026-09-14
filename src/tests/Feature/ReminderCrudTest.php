@@ -34,8 +34,8 @@ class ReminderCrudTest extends TestCase
     protected function pasangan(): array
     {
         $satker = Satker::create(['kode' => 'TEST', 'nama' => 'Satker Uji']);
-        $poliUmum = Poli::create(['kode' => 'UMUM', 'nama' => 'Poli Umum']);
-        $poliGigi = Poli::create(['kode' => 'GIGI', 'nama' => 'Poli Gigi']);
+        $poliUmum = Poli::create(['kode' => 'UMUM-RMD', 'nama' => 'Poli Umum']);
+        $poliGigi = Poli::create(['kode' => 'GIGI-RMD', 'nama' => 'Poli Gigi']);
         $dokterUmum = Dokter::create(['poli_id' => $poliUmum->id, 'nama' => 'dr. Rina']);
         $dokterGigi = Dokter::create(['poli_id' => $poliGigi->id, 'nama' => 'drg. Anton']);
 

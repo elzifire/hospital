@@ -19,7 +19,7 @@ class DatabaseSeeder extends Seeder
             FeaturePermissionSeeder::class,
             TujuanKunjunganSeeder::class,
             PoliUserSeeder::class,
-            MessageTemplateSeeder::class,
+            // MessageTemplateSeeder::class,
             BroadcastRuleSeeder::class,
             // MasterDataSeeder::class,
         ]);

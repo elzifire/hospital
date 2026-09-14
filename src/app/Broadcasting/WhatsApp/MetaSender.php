@@ -5,6 +5,7 @@ namespace App\Broadcasting\WhatsApp;
 use App\Models\MessageLog;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 /**
@@ -59,15 +60,44 @@ class MetaSender implements WhatsAppSender
         ];
 
         $params = array_values((array) ($log->template_params ?? []));
+        $components = [];
+
+        // Gambar sampul template (HEADER/IMAGE) — urutkan sebelum body.
+        $gambar = $log->template?->image_url;
+        if (filled($gambar)) {
+            $components[] = [
+                'type' => 'header',
+                'parameters' => [[
+                    'type' => 'image',
+                    'image' => ['link' => (string) $gambar],
+                ]],
+            ];
+        }
 
         if ($params !== []) {
-            $payload['template']['components'] = [[
+            // Template Meta yang memakai placeholder bernama ({{nama}},
+            // {{hari_tanggal}}, …) wajib menyertakan parameter_name sesuai
+            // nama placeholder aslinya — tanpa itu Meta menolak dengan
+            // "(#100) Invalid parameter — Parameter name is missing or empty".
+            $namaParams = array_values($log->template?->tokenParam() ?? []);
+
+            $parameters = [];
+            foreach ($params as $i => $nilai) {
+                $parameter = ['type' => 'text', 'text' => (string) $nilai];
+                if (isset($namaParams[$i]) && $namaParams[$i] !== '') {
+                    $parameter['parameter_name'] = $namaParams[$i];
+                }
+                $parameters[] = $parameter;
+            }
+
+            $components[] = [
                 'type' => 'body',
-                'parameters' => array_map(
-                    fn ($nilai) => ['type' => 'text', 'text' => (string) $nilai],
-                    $params,
-                ),
-            ]];
+                'parameters' => $parameters,
+            ];
+        }
+
+        if ($components !== []) {
+            $payload['template']['components'] = $components;
         }
 
         return $payload;
@@ -86,6 +116,15 @@ class MetaSender implements WhatsAppSender
         $pesan = $respons->json('error.message');
 
         if (is_string($pesan) && $pesan !== '') {
+            Log::warning('Meta Cloud API menolak pesan: '.$pesan, [
+                'status' => $respons->status(),
+                'body' => $respons->body(),
+            ]);
+            Log::channel('whatsapp')->warning('Meta Cloud API menolak pesan: '.$pesan, [
+                'status' => $respons->status(),
+                'body' => $respons->body(),
+            ]);
+
             return 'Meta Cloud API menolak pesan: '.$pesan;
         }
 

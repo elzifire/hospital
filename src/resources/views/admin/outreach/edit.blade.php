@@ -1,16 +1,15 @@
 @extends('layouts.app')
 
-@section('title', 'Kirim Pesan Manual')
-@section('page-title', 'Kirim Pesan Manual')
+@section('title', 'Ubah Pesan Outreach')
+@section('page-title', 'Ubah Pesan Outreach')
 
 @section('content')
 <div class="space-y-6">
     <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-            <h1 class="text-2xl font-bold tracking-tight text-slate-900">Kirim Pesan Manual</h1>
+            <h1 class="text-2xl font-bold tracking-tight text-slate-900">Ubah Pesan Outreach</h1>
             <p class="mt-1 text-sm text-slate-500">
-                Pilih satu atau beberapa pasien sebagai penerima, pilih template pesan bila perlu;
-                sistem mengirim lewat format resmi WhatsApp Business.
+                Perbaiki target, template, atau variabel pesan pada grup ini sebelum dikirim.
             </p>
         </div>
         <a href="{{ route('admin.outreach.index') }}"
@@ -22,22 +21,27 @@
         </a>
     </div>
 
+    <div class="rounded-2xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-700">
+        Grup pesan ini masih <strong>menunggu dikirim</strong>. Simpan perubahan untuk memperbarui
+        pesan yang belum terkirim; target yang dilepas akan dibatalkan.
+    </div>
+
     @include('admin.outreach._filter', [
-        'actionFilter' => route('admin.outreach.create'),
+        'actionFilter' => route('admin.outreach.edit', $kirimGroup),
         'filters' => $filters,
         'satkers' => $satkers,
     ])
 
     @include('admin.outreach._form', [
-        'action' => route('admin.outreach.store'),
-        'method' => 'POST',
-        'kirimPesan' => true,
+        'action' => route('admin.outreach.update', $kirimGroup),
+        'method' => 'PUT',
+        'kirimPesan' => false,
         'templates' => $templates,
         'canKirimIds' => $canKirimIds,
         'selectedIds' => $selectedIds,
         'templateId' => $templateId,
         'varsAwal' => $varsAwal,
-        'submitLabel' => 'Kirim Sekarang',
+        'submitLabel' => 'Simpan Perubahan',
     ])
 </div>
 @endsection

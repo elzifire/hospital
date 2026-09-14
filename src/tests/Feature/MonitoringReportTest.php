@@ -69,7 +69,7 @@ class MonitoringReportTest extends TestCase
         Kunjungan::create(['pnpp_id' => $budi->id, 'tanggal_kunjungan' => '2026-09-01', 'keluhan' => 'Pusing', 'diagnosa' => 'Hipertensi derajat 1']);
         Kunjungan::create(['pnpp_id' => $siti->id, 'tanggal_kunjungan' => '2026-08-15', 'keluhan' => 'Batuk', 'diagnosa' => 'ISPA']);
 
-        $poli = Poli::create(['kode' => 'UMUM', 'nama' => 'Poli Umum']);
+        $poli = Poli::create(['kode' => 'UMUM-MON', 'nama' => 'Poli Umum']);
         $dokter = Dokter::create(['poli_id' => $poli->id, 'nama' => 'dr. Rina Pratiwi', 'spesialisasi' => 'Dokter Umum']);
         Jadwal::create(['dokter_id' => $dokter->id, 'hari' => 'Senin', 'jam_mulai' => '08:00', 'jam_selesai' => '12:00']);
         Jadwal::create(['dokter_id' => $dokter->id, 'hari' => 'Rabu', 'jam_mulai' => '09:00', 'jam_selesai' => '13:00']);

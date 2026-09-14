@@ -18,7 +18,7 @@ use Illuminate\Support\Carbon;
  */
 class MessageRenderer
 {
-    public function render(string $konten, ?Pnpp $pnpp = null, array $meta = []): string
+    public function render(string $konten, ?Pnpp $pnpp = null, array $meta = [], array $kustom = []): string
     {
         $nilai = [
             'nama' => $pnpp?->nama,
@@ -26,12 +26,26 @@ class MessageRenderer
             'satker' => $pnpp?->satker?->nama,
             'obat' => $pnpp ? $pnpp->penyakit->pluck('nama')->implode(', ') : null,
             'poli' => $this->nilaiMeta($meta, 'poli'),
+            'instalasi' => $this->nilaiMeta($meta, 'instalasi') ?? $this->nilaiMeta($meta, 'poli'),
             'dokter' => $this->nilaiMeta($meta, 'dokter'),
             'tanggal' => $this->tanggal($meta),
             'jam' => $this->nilaiMeta($meta, 'jam'),
+            // Alias token template pengingat kunjungan — turunan data jadwal
+            // Digital Reminder (poli/dokter/tanggal/jam dari penjadwalan).
+            'hari_tanggal' => $this->tanggal($meta),
+            'waktu_kunjungan' => $this->nilaiMeta($meta, 'jam'),
+            'poli_layanan' => $this->nilaiMeta($meta, 'poli'),
         ];
 
-        return (string) preg_replace_callback('/\{([a-z_]+)\}/i', function (array $cocok) use ($nilai) {
+        // Override manual (form kirim/ubah): nilai yang diisi petugas
+        // menang atas data pasien & meta untuk token mana pun.
+        foreach ($kustom as $kunci => $isi) {
+            if (is_scalar($isi) && trim((string) $isi) !== '') {
+                $nilai[strtolower((string) $kunci)] = (string) $isi;
+            }
+        }
+
+        return (string) preg_replace_callback('/\{+([a-z_]+)\}+/i', function (array $cocok) use ($nilai) {
             $kunci = strtolower($cocok[1]);
             $isi = $nilai[$kunci] ?? null;
 

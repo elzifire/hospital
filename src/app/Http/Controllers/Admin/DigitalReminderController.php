@@ -9,6 +9,8 @@ use App\Models\Pnpp;
 use App\Models\Poli;
 use App\Models\Reminder;
 use App\Models\Satker;
+use App\Services\KunjunganDaftar;
+use App\Services\PencatatKunjungan;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -22,51 +24,16 @@ use Illuminate\Validation\Rule;
 class DigitalReminderController extends Controller
 {
     /**
-     * Daftar penjadwalan — cari nama/NIP, filter status & poli.
-     * User role poli hanya melihat polinya sendiri.
+     * Daftar penjadwalan — index gabungan Digital Reminder & Kunjungan
+     * (satu tabel: penjadwalan + kunjungan manual), lihat KunjunganDaftar.
      */
     public function index(Request $request)
     {
-        $q = (string) $request->query('q', '');
-        $status = (string) $request->query('status', '');
-        $poliId = (string) $request->query('poli', '');
-
-        $reminders = Reminder::query()
-            ->when($this->batasiPoli(), fn ($query) => $query->where('poli_id', $this->poliAktif()))
-            ->with('pnpp.satker:id,nama', 'poli:id,nama', 'dokter:id,nama')
-            ->withExists('kunjungan as sudah_kunjungan')
-            ->when($q, fn ($query) => $query->where(
-                fn ($sub) => $sub
-                    ->where('catatan', 'like', "%{$q}%")
-                    ->orWhereHas('pnpp', fn ($p) => $p
-                        ->where('nama', 'like', "%{$q}%")
-                        ->orWhere('nip', 'like', "%{$q}%"))
-            ))
-            ->when($status, fn ($query) => $query->where('status', $status))
-            ->when($poliId && ! $this->batasiPoli(), fn ($query) => $query->where('poli_id', $poliId))
-            ->orderByDesc('tanggal')
-            ->orderByDesc('id')
-            ->paginate(10)
-            ->withQueryString();
-
-        $perStatus = Reminder::query()
-            ->when($this->batasiPoli(), fn ($query) => $query->where('poli_id', $this->poliAktif()))
-            ->selectRaw('status, count(*) as total')
-            ->groupBy('status')
-            ->pluck('total', 'status');
-
-        return view('admin.digital-reminder.index', [
-            'reminders' => $reminders,
-            'perStatus' => $perStatus,
-            'total' => (int) $perStatus->sum(),
-            'mendatang' => Reminder::query()
-                ->when($this->batasiPoli(), fn ($query) => $query->where('poli_id', $this->poliAktif()))
-                ->where('status', 'terjadwal')
-                ->whereDate('tanggal', '>=', today())->count(),
-            'polis' => $this->daftarPoliAktif(),
-            'batasiPoli' => $this->batasiPoli(),
-            'filters' => ['q' => $q, 'status' => $status, 'poli' => $poliId],
-        ]);
+        return view('admin.digital-reminder.index', app(KunjunganDaftar::class)->data(
+            $request,
+            $this->batasiPoli(),
+            $this->poliAktif(),
+        ));
     }
 
     /**
@@ -208,45 +175,11 @@ class DigitalReminderController extends Controller
             return back()->with('error', 'Penjadwalan ini sudah memiliki kunjungan tercatat.');
         }
 
-        $detail = (array) ($data['polis'] ?? []);
-        $utama = (int) $reminder->poli_id;
-
-        // Poli terjadwal diutamakan; poli tercentang lain menyusul.
-        $terpilih = array_values(array_unique(array_merge([(string) $utama], array_map('strval', $data['poli_pilih'] ?? []))));
-        $terpilih = array_map('intval', $terpilih);
-
-        DB::transaction(function () use ($data, $detail, $utama, $terpilih, $reminder): void {
-            foreach ($terpilih as $poliId) {
-                $keluhan = $detail[$poliId]['keluhan'] ?? null;
-                $diagnosa = $detail[$poliId]['diagnosa'] ?? null;
-
-                if ($poliId === $utama) {
-                    $keluhan = $keluhan ?? ($data['keluhan'] ?? null);
-                    $diagnosa = $diagnosa ?? ($data['diagnosa'] ?? null);
-                }
-
-                // Hanya baris poli terjadwal yang terhubung ke reminder
-                // (reminder_id unik); poli lain menjadi baris mandiri.
-                $baris = [
-                    'poli_id' => $poliId,
-                    'tanggal_kunjungan' => $data['tanggal_kunjungan'],
-                    'keluhan' => $keluhan,
-                    'diagnosa' => $diagnosa,
-                ];
-
-                if ($poliId === $utama) {
-                    $reminder->kunjungan()->create($baris + ['pnpp_id' => $reminder->pnpp_id]);
-                } else {
-                    $reminder->pnpp->kunjungans()->create($baris);
-                }
-            }
-
-            $reminder->update(['status' => 'selesai']);
-        });
+        $jumlah = app(PencatatKunjungan::class)->dariReminder($reminder, $data);
 
         return redirect()
             ->route('admin.pnpp.kunjungan', $reminder->pnpp_id)
-            ->with('success', 'Kunjungan untuk "'.$reminder->pnpp->nama.'" tercatat ('.count($terpilih).' poli) — penjadwalan selesai.');
+            ->with('success', 'Kunjungan untuk "'.$reminder->pnpp->nama.'" tercatat ('.$jumlah.' poli) — penjadwalan selesai.');
     }
 
     /**

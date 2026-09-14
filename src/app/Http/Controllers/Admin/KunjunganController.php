@@ -6,10 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\Kunjungan;
 use App\Models\Pnpp;
 use App\Models\Poli;
+use App\Models\Reminder;
 use App\Models\Satker;
-use Illuminate\Database\Eloquent\Builder;
+use App\Services\KunjunganDaftar;
+use App\Services\PencatatKunjungan;
 use Illuminate\Http\Request;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
@@ -22,73 +23,23 @@ use Illuminate\Validation\Rule;
 class KunjunganController extends Controller
 {
     /**
-     * Daftar kunjungan — cari nama/NIP, filter poli, periode & rentang
-     * tanggal; dikelompokkan per pasien + tanggal (satu pasien bisa
-     * beberapa poli dalam satu tanggal). User role poli hanya melihat
-     * polinya sendiri.
+     * Daftar kunjungan — index gabungan Digital Reminder & Kunjungan
+     * (satu tabel: penjadwalan + kunjungan manual), lihat KunjunganDaftar.
      */
     public function index(Request $request)
     {
-        $q = (string) $request->query('q', '');
-        $poliId = (string) $request->query('poli', '');
-        $dari = (string) $request->query('dari', '');
-        $sampai = (string) $request->query('sampai', '');
-        $periode = (string) $request->query('periode', '');
-
-        $dasar = fn (Builder $t) => $t->when($this->batasiPoli(), fn ($u) => $u->where('poli_id', $this->poliAktif()));
-
-        $query = Kunjungan::query()
-            ->with('pnpp.satker:id,nama', 'poli:id,nama')
-            ->when($q, fn ($t) => $t->whereHas('pnpp', fn ($p) => $p
-                ->where('nama', 'like', "%{$q}%")
-                ->orWhere('nip', 'like', "%{$q}%")
-                ->orWhere('no_bpjs', 'like', "%{$q}%")))
-            ->when($dari, fn ($t) => $t->where('tanggal_kunjungan', '>=', $dari))
-            ->when($sampai, fn ($t) => $t->where('tanggal_kunjungan', '<=', $sampai))
-            ->when(match ($periode) {
-                'hari-ini' => today()->toDateString(),
-                '7-hari' => today()->subDays(6)->toDateString(),
-                '30-hari' => today()->subDays(29)->toDateString(),
-                default => null,
-            }, fn ($t, $mulai) => $t->where('tanggal_kunjungan', '>=', $mulai))
-            ->when($poliId && ! $this->batasiPoli(), fn ($t) => $t->where('poli_id', $poliId))
-            ->tap($dasar)
-            ->orderByDesc('tanggal_kunjungan')
-            ->orderBy('pnpp_id')
-            ->orderBy('poli_id')
-            ->get();
-
-        // Grup = satu kunjungan (pasien + tanggal); paginate grupnya.
-        $grup = $query->groupBy(fn ($k) => $k->pnpp_id.'|'.$k->tanggal_kunjungan->format('Y-m-d'))->values();
-        $perPage = 10;
-        $halaman = max(1, (int) $request->query('page', 1));
-
-        $kunjungan = new LengthAwarePaginator(
-            $grup->forPage($halaman, $perPage),
-            $grup->count(),
-            $perPage,
-            $halaman,
-            ['path' => $request->url(), 'query' => $request->query()],
-        );
-
-        $dasarCount = fn (Builder $t) => $t->when($this->batasiPoli(), fn ($u) => $u->where('poli_id', $this->poliAktif()));
-
-        return view('admin.kunjungan.index', [
-            'kunjungan' => $kunjungan,
-            'polis' => $this->daftarPoliAktif(),
-            'batasiPoli' => $this->batasiPoli(),
-            'filters' => ['q' => $q, 'poli' => $poliId, 'dari' => $dari, 'sampai' => $sampai, 'periode' => $periode],
-            'total' => Kunjungan::query()->tap($dasarCount)->count(),
-            'hariIni' => Kunjungan::whereDate('tanggal_kunjungan', today())->tap($dasarCount)->count(),
-            'bulanIni' => Kunjungan::whereYear('tanggal_kunjungan', now()->year)->whereMonth('tanggal_kunjungan', now()->month)->tap($dasarCount)->count(),
-            'realisasi' => Kunjungan::whereNotNull('reminder_id')->tap($dasarCount)->count(),
-            'pasien' => Kunjungan::query()->tap($dasarCount)->distinct()->count('pnpp_id'),
-        ]);
+        return view('admin.digital-reminder.index', app(KunjunganDaftar::class)->data(
+            $request,
+            $this->batasiPoli(),
+            $this->poliAktif(),
+        ));
     }
 
     /**
-     * Form tambah kunjungan mandiri: cari pasien lalu catat beberapa
-     * poli sekaligus untuk satu tanggal.
+     * Form tambah kunjungan — dua cara dalam satu halaman:
+     *  "Dari Jadwal": pilih penjadwalan Digital Reminder (poli terjadwal
+     *      terkunci, poli lain opsional) → catat & tandai jadwal selesai.
+     *  "Manual": pilih pasien lalu catat beberapa poli sekaligus.
      */
     public function create(Request $request)
     {
@@ -106,9 +57,29 @@ class KunjunganController extends Controller
             ->orderBy('nama')
             ->get(['id', 'nama', 'nip', 'no_hp', 'satker_id']);
 
+        // Kandidat jadwal mode "Dari Jadwal": status terjadwal & belum
+        // dicatat. User akun poli hanya melihat jadwal polinya sendiri.
+        $reminders = Reminder::query()
+            ->when($this->batasiPoli(), fn ($query) => $query->where('poli_id', $this->poliAktif()))
+            ->with('pnpp.satker:id,nama', 'poli:id,nama')
+            ->when($q || $satkerId, fn ($query) => $query->whereHas('pnpp', fn ($p) => $p
+                ->when($q, fn ($sub) => $sub->where(
+                    fn ($s) => $s->where('nama', 'like', "%{$q}%")
+                        ->orWhere('nip', 'like', "%{$q}%")
+                        ->orWhere('no_hp', 'like', "%{$q}%")
+                ))
+                ->when($satkerId, fn ($sub) => $sub->where('satker_id', $satkerId))))
+            ->where('status', 'terjadwal')
+            ->whereDoesntHave('kunjungan')
+            ->orderBy('tanggal')
+            ->orderBy('jam')
+            ->limit(50)
+            ->get();
+
         return view('admin.kunjungan.create', [
             'pnpps' => $pnpps,
             'satkers' => Satker::orderBy('nama')->get(['id', 'nama']),
+            'reminders' => $reminders,
             'polis' => $this->daftarPoliAktif(),
             'poliTerkunci' => $this->batasiPoli(),
             'filters' => ['q' => $q, 'satker' => $satkerId],
@@ -128,6 +99,37 @@ class KunjunganController extends Controller
         return redirect()
             ->route('admin.kunjungan.index')
             ->with('success', "{$jumlah} catatan poli untuk \"{$pnpp->nama}\" berhasil ditambahkan.");
+    }
+
+    /**
+     * Catat kunjungan dari sebuah penjadwalan (mode "Dari Jadwal" di
+     * form tambah kunjungan). Poli terjadwal terkunci & selalu dicatat;
+     * poli lain yang dicentang ikut menjadi baris mandiri.
+     */
+    public function catatDariReminder(Request $request)
+    {
+        $data = $request->validate([
+            'reminder_id' => ['required', 'integer', Rule::exists('reminders', 'id')],
+            'tanggal_kunjungan' => ['required', 'date'],
+            'poli_pilih' => ['nullable', 'array'],
+            'poli_pilih.*' => array_merge(['integer', Rule::exists('polis', 'id')], $this->pembatasanPoli()),
+            'polis' => ['nullable', 'array'],
+            'polis.*.keluhan' => ['nullable', 'string', 'max:1000'],
+            'polis.*.diagnosa' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $reminder = Reminder::findOrFail($data['reminder_id']);
+        $this->pastikanPoliReminder($reminder);
+
+        if ($reminder->kunjungan()->exists()) {
+            return back()->with('error', 'Penjadwalan ini sudah memiliki kunjungan tercatat.');
+        }
+
+        $jumlah = app(PencatatKunjungan::class)->dariReminder($reminder, $data);
+
+        return redirect()
+            ->route('admin.kunjungan.index')
+            ->with('success', "Kunjungan untuk \"{$reminder->pnpp->nama}\" tercatat ({$jumlah} poli) — penjadwalan selesai.");
     }
 
     /**
@@ -250,6 +252,14 @@ class KunjunganController extends Controller
     protected function bolehAkses(Kunjungan $kunjungan): bool
     {
         return ! $this->batasiPoli() || ($kunjungan->poli_id === null || (int) $kunjungan->poli_id === $this->poliAktif());
+    }
+
+    /**
+     * Cegah akun poli mencatat/mengubah jadwal poli lain (403).
+     */
+    protected function pastikanPoliReminder(Reminder $reminder): void
+    {
+        abort_unless(! $this->batasiPoli() || (int) $reminder->poli_id === $this->poliAktif(), 403, 'Anda hanya dapat mengelola data poli Anda sendiri.');
     }
 
     /**

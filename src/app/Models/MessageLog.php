@@ -43,6 +43,7 @@ class MessageLog extends Model
         'message_template_id',
         'pnpp_id',
         'created_by',
+        'kirim_group',
         'penerima_nama',
         'penerima_no_hp',
         'konten',

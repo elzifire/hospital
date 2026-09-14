@@ -37,9 +37,9 @@ class KunjunganModuleTest extends TestCase
     protected function pasangan(): array
     {
         $satker = Satker::create(['kode' => 'TEST', 'nama' => 'Satker Uji']);
-        $poliUmum = Poli::create(['kode' => 'UMUM', 'nama' => 'Poli Umum']);
-        $poliGigi = Poli::create(['kode' => 'GIGI', 'nama' => 'Poli Gigi']);
-        $poliJantung = Poli::create(['kode' => 'JANTUNG', 'nama' => 'Poli Jantung']);
+        $poliUmum = Poli::create(['kode' => 'UMUM-KUJ', 'nama' => 'Poli Umum']);
+        $poliGigi = Poli::create(['kode' => 'GIGI-KUJ', 'nama' => 'Poli Gigi']);
+        $poliJantung = Poli::create(['kode' => 'JANTUNG-KUJ', 'nama' => 'Poli Jantung']);
 
         $budi = Pnpp::create(['nama' => 'Budi Santoso', 'nip' => '123', 'satker_id' => $satker->id]);
 

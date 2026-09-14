@@ -40,20 +40,6 @@
         simulatedText: '',
         viewMode: 'simulated'
     },
-    templateModal: {
-        open: false,
-        isEdit: false,
-        id: null,
-        category_id: '',
-        judul: '',
-        channel: 'WhatsApp',
-        konten: '',
-        deskripsi: '',
-        is_active: true,
-        meta_template_name: '',
-        meta_language: '',
-        meta_param_tokens: ''
-    },
     categoryModal: {
         open: false,
         isEdit: false,
@@ -94,23 +80,6 @@
         this.notify('Pesan berhasil disalin ke clipboard!');
     },
 
-    insertVariable(v, targetField = 'templateModal.konten') {
-        const textarea = document.getElementById('templateTextarea');
-        if (!textarea) {
-            this.templateModal.konten += ' ' + v;
-            return;
-        }
-        const start = textarea.selectionStart;
-        const end = textarea.selectionEnd;
-        const current = this.templateModal.konten;
-        this.templateModal.konten = current.substring(0, start) + ' ' + v + ' ' + current.substring(end);
-        this.$nextTick(() => {
-            textarea.focus();
-            textarea.setSelectionRange(start + v.length + 2, start + v.length + 2);
-        });
-        this.notify('Variabel ' + v + ' ditambahkan ke teks');
-    },
-
     openLivePreview(t) {
         this.previewModal.title = t.judul;
         this.previewModal.category = t.category ? t.category.nama : 'Umum';
@@ -125,36 +94,6 @@
         this.previewModal.simulatedText = sim;
         this.previewModal.viewMode = 'simulated';
         this.previewModal.open = true;
-    },
-
-    openCreateTemplate() {
-        this.templateModal.isEdit = false;
-        this.templateModal.id = null;
-        this.templateModal.category_id = '{{ $categories->first()?->id ?? '' }}';
-        this.templateModal.judul = '';
-        this.templateModal.channel = 'WhatsApp';
-        this.templateModal.konten = '';
-        this.templateModal.deskripsi = '';
-        this.templateModal.is_active = true;
-        this.templateModal.meta_template_name = '';
-        this.templateModal.meta_language = '';
-        this.templateModal.meta_param_tokens = '';
-        this.templateModal.open = true;
-    },
-
-    openEditTemplate(t) {
-        this.templateModal.isEdit = true;
-        this.templateModal.id = t.id;
-        this.templateModal.category_id = t.template_category_id || '';
-        this.templateModal.judul = t.judul;
-        this.templateModal.channel = t.channel;
-        this.templateModal.konten = t.konten;
-        this.templateModal.deskripsi = t.deskripsi || '';
-        this.templateModal.is_active = !!t.is_active;
-        this.templateModal.meta_template_name = t.meta_template_name || '';
-        this.templateModal.meta_language = t.meta_language || '';
-        this.templateModal.meta_param_tokens = Array.isArray(t.meta_param_tokens) ? t.meta_param_tokens.join(',') : (t.meta_param_tokens || '');
-        this.templateModal.open = true;
     },
 
     openCreateCategory() {
@@ -264,19 +203,15 @@
                     </div>
                 </div>
 
-                {{-- Import Button --}}
-                <a href="{{ route('admin.setting.import.index') }}"
-                   class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 shadow-xs transition hover:bg-slate-50">
-                    <svg class="h-4 w-4 text-sky-600" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" /></svg>
-                    Import Data
-                </a>
-
-                {{-- Tambah Template Button --}}
-                <button @click="openCreateTemplate()"
-                        class="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2">
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-                    Tambah Template
-                </button>
+                {{-- Sinkronkan dari Meta --}}
+                <form method="POST" action="{{ route('admin.setting.template.sync-meta') }}">
+                    @csrf
+                    <button type="submit" title="Tarik template langsung dari Meta WhatsApp (message_templates)"
+                            class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 shadow-xs transition hover:bg-emerald-50">
+                        <svg class="h-4 w-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
+                        Sinkron Meta
+                    </button>
+                </form>
             </div>
         </div>
     </div>
@@ -465,7 +400,6 @@
                 <p class="mt-1 text-xs text-slate-400">Coba sesuaikan kata kunci pencarian atau filter yang dipilih.</p>
                 <div class="mt-4 flex gap-2">
                     <a href="{{ route('admin.setting.index') }}" class="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50">Reset Filter</a>
-                    <button @click="openCreateTemplate()" class="rounded-xl bg-sky-600 px-4 py-2 text-xs font-bold text-white hover:bg-sky-700">Tambah Template Baru</button>
                 </div>
             </div>
         @else
@@ -512,6 +446,19 @@
                                     <td class="py-3 px-4">
                                         <p class="font-bold text-slate-900" title="{{ $t->judul }}">{{ $t->judul }}</p>
                                         <p class="mt-0.5 font-mono text-[10px] font-semibold text-slate-400">{{ $t->kode }}</p>
+                                        @if($t->meta_status)
+                                            @php
+                                                $metaTone = match ($t->meta_status) {
+                                                    'APPROVED' => 'bg-emerald-50 text-emerald-700 ring-emerald-600/20',
+                                                    'PENDING' => 'bg-amber-50 text-amber-700 ring-amber-600/20',
+                                                    'REJECTED' => 'bg-rose-50 text-rose-700 ring-rose-600/20',
+                                                    default => 'bg-slate-100 text-slate-600 ring-slate-300/60',
+                                                };
+                                            @endphp
+                                            <span class="mt-0.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 ring-inset {{ $metaTone }}">
+                                                {{ ucfirst(strtolower($t->meta_status)) }} · Meta
+                                            </span>
+                                        @endif
                                         @if($t->deskripsi)
                                             <p class="mt-0.5 max-w-[13rem] truncate text-[11px] text-slate-400" title="{{ $t->deskripsi }}">{{ $t->deskripsi }}</p>
                                         @endif
@@ -529,6 +476,12 @@
                                             <span>Dipakai <strong class="font-bold text-slate-500 tabular-nums">{{ $t->dipakai_count }}x</strong></span>
                                             <span>&middot;</span>
                                             <span>{{ $t->updated_at?->diffForHumans() }}</span>
+                                            @if ($t->image_url)
+                                                <span class="flex items-center gap-1 text-sky-600" title="Template dengan gambar header (foto)">
+                                                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" /></svg>
+                                                    Foto
+                                                </span>
+                                            @endif
                                         </p>
                                     </td>
                                     <td class="py-3 px-4">
@@ -556,14 +509,6 @@
                                                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 8.25V6a2.25 2.25 0 0 0-2.25-2.25H6A2.25 2.25 0 0 0 3.75 6v8.25A2.25 2.25 0 0 0 6 16.5h2.25m8.25-8.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-7.5A2.25 2.25 0 0 1 8.25 18v-1.5m8.25-8.25h-6a2.25 2.25 0 0 0-2.25 2.25v6" /></svg>
                                                 </button>
                                             </form>
-
-                                            {{-- Edit --}}
-                                            <button type="button"
-                                                    @click="openEditTemplate(@js($t))"
-                                                    title="Edit Template"
-                                                    class="rounded-lg p-1.5 text-slate-400 transition hover:bg-sky-50 hover:text-sky-600">
-                                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" /></svg>
-                                            </button>
 
                                             {{-- Delete --}}
                                             <button type="button"
@@ -780,151 +725,6 @@
                         Tutup
                     </button>
                 </div>
-            </div>
-        </div>
-    </div>
-
-    {{-- ======================================================== --}}
-    {{-- MODAL TAMBAH / EDIT TEMPLATE PESAN --}}
-    {{-- ======================================================== --}}
-    <div x-cloak x-show="templateModal.open" 
-         class="fixed inset-0 z-50 overflow-y-auto"
-         aria-labelledby="modal-title" role="dialog" aria-modal="true">
-        <div class="flex min-h-screen items-center justify-center p-4 text-center sm:p-0">
-            <div x-show="templateModal.open" 
-                 x-transition:enter="ease-out duration-300"
-                 x-transition:enter-start="opacity-0"
-                 x-transition:enter-end="opacity-100"
-                 x-transition:leave="ease-in duration-200"
-                 x-transition:leave-start="opacity-100"
-                 x-transition:leave-end="opacity-0"
-                 @click="templateModal.open = false"
-                 class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity"></div>
-
-            <div x-show="templateModal.open"
-                 x-transition:enter="ease-out duration-300"
-                 x-transition:enter-start="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-                 x-transition:enter-end="opacity-100 translate-y-0 sm:scale-100"
-                 x-transition:leave="ease-in duration-200"
-                 x-transition:leave-start="opacity-100 translate-y-0 sm:scale-100"
-                 x-transition:leave-end="opacity-0 translate-y-4 sm:translate-y-0 sm:scale-95"
-                 class="relative w-full max-w-2xl transform overflow-hidden rounded-3xl bg-white text-left shadow-2xl transition-all">
-                
-                <form :action="templateModal.isEdit ? '{{ url('admin/setting/template') }}/' + templateModal.id : '{{ route('admin.setting.template.store') }}'" method="POST">
-                    @csrf
-                    <template x-if="templateModal.isEdit">
-                        <input type="hidden" name="_method" value="PUT">
-                    </template>
-
-                    <div class="border-b border-slate-100 px-6 py-4 flex items-center justify-between">
-                        <div>
-                            <h3 class="text-base font-bold text-slate-900" x-text="templateModal.isEdit ? 'Edit Template Pesan' : 'Tambah Template Pesan Baru'"></h3>
-                            <p class="text-xs text-slate-500">Isi pesan dan gunakan token variabel dinamis sesuai kebutuhan pengingat.</p>
-                        </div>
-                        <button type="button" @click="templateModal.open = false" class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">
-                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
-                        </button>
-                    </div>
-
-                    <div class="space-y-4 p-6">
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Judul Template <span class="text-rose-500">*</span></label>
-                                <input type="text" name="judul" x-model="templateModal.judul" required placeholder="Contoh: Pengingat Kontrol H-1"
-                                       class="block w-full rounded-xl border-0 py-2.5 px-3.5 text-xs text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-inset focus:ring-sky-500">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Kategori Template</label>
-                                <select name="template_category_id" x-model="templateModal.category_id"
-                                        class="block w-full rounded-xl border-0 py-2.5 px-3.5 text-xs text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-inset focus:ring-sky-500 cursor-pointer">
-                                    <option value="">— Tanpa Kategori —</option>
-                                    @foreach ($categories as $cat)
-                                        <option value="{{ $cat->id }}">{{ $cat->nama }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Saluran Pengiriman</label>
-                                <select name="channel" x-model="templateModal.channel"
-                                        class="block w-full rounded-xl border-0 py-2.5 px-3.5 text-xs text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-inset focus:ring-sky-500 cursor-pointer">
-                                    <option value="WhatsApp">WhatsApp (Rekomendasi)</option>
-                                    <option value="SMS">SMS Gateway</option>
-                                    <option value="Email">Email Notifikasi</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">Deskripsi Singkat</label>
-                                <input type="text" name="deskripsi" x-model="templateModal.deskripsi" placeholder="Untuk keperluan pengingat kontrol rutin..."
-                                       class="block w-full rounded-xl border-0 py-2.5 px-3.5 text-xs text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-inset focus:ring-sky-500">
-                            </div>
-                        </div>
-
-                        <div>
-                            <div class="flex items-center justify-between mb-1.5">
-                                <label class="block text-xs font-bold uppercase tracking-wider text-slate-500">Isi Konten Pesan <span class="text-rose-500">*</span></label>
-                                <span class="text-[11px] text-slate-400 font-mono" x-text="(templateModal.konten ? templateModal.konten.length : 0) + ' karakter'"></span>
-                            </div>
-                            
-                            {{-- Variable Quick Inserters --}}
-                            <div class="mb-2 flex flex-wrap gap-1.5 rounded-xl bg-slate-50 p-2.5 ring-1 ring-slate-200">
-                                <span class="text-[11px] font-bold text-slate-400 self-center mr-1">Sisipkan Token:</span>
-                                @foreach ($variables as $v)
-                                    <button type="button"
-                                            @click="insertVariable('{{ $v['var'] }}')"
-                                            class="rounded-lg bg-white px-2 py-1 text-[10px] font-mono font-bold text-sky-700 shadow-2xs ring-1 ring-slate-200 hover:bg-sky-50 hover:ring-sky-300">
-                                        {{ $v['var'] }}
-                                    </button>
-                                @endforeach
-                            </div>
-
-                            <textarea id="templateTextarea" name="konten" x-model="templateModal.konten" rows="4" required
-                                      placeholder="Ketik isi pesan di sini. Gunakan tombol token di atas untuk menyisipkan variabel otomatis..."
-                                      class="block w-full rounded-xl border-0 py-2.5 px-3.5 text-xs text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-inset focus:ring-sky-500"></textarea>
-                        </div>
-
-                        <div x-show="templateModal.channel === 'WhatsApp'" class="rounded-xl bg-sky-50/60 p-4 ring-1 ring-inset ring-sky-200/70">
-                            <p class="mb-3 text-xs font-bold text-sky-800">Pemetaan Template Meta (WhatsApp Official)</p>
-                            <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                                <div>
-                                    <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-sky-500">Nama Template Meta</label>
-                                    <input type="text" name="meta_template_name" x-model="templateModal.meta_template_name" placeholder="Contoh: promo_h1"
-                                           class="block w-full rounded-lg border-0 py-2 px-3 text-xs text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-inset focus:ring-sky-500">
-                                </div>
-                                <div>
-                                    <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-sky-500">Bahasa Meta</label>
-                                    <input type="text" name="meta_language" x-model="templateModal.meta_language" placeholder="id"
-                                           class="block w-full rounded-lg border-0 py-2 px-3 text-xs text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-inset focus:ring-sky-500">
-                                </div>
-                                <div>
-                                    <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-sky-500">Token Parameter</label>
-                                    <input type="text" name="meta_param_tokens" x-model="templateModal.meta_param_tokens" placeholder="nama,poli,tanggal"
-                                           class="block w-full rounded-lg border-0 py-2 px-3 text-xs text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-inset focus:ring-sky-500">
-                                    <p class="mt-1 text-[10px] text-sky-500">Koma: nama, nip, satker, obat, poli, dokter, tanggal, jam</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="flex items-center gap-2 pt-2">
-                            <input type="checkbox" id="modal_is_active" name="is_active" value="1" x-model="templateModal.is_active"
-                                   class="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500 cursor-pointer">
-                            <label for="modal_is_active" class="text-xs font-medium text-slate-700 cursor-pointer">Aktifkan template ini sekarang agar dapat dipilih pada pengiriman pengingat.</label>
-                        </div>
-                    </div>
-
-                    <div class="flex items-center justify-end gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4">
-                        <button type="button" @click="templateModal.open = false"
-                                class="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50">
-                            Batal
-                        </button>
-                        <button type="submit"
-                                class="rounded-xl bg-sky-600 px-5 py-2 text-xs font-bold text-white hover:bg-sky-700">
-                            Simpan Template
-                        </button>
-                    </div>
-                </form>
             </div>
         </div>
     </div>

@@ -123,7 +123,7 @@
                                 <td class="max-w-[300px] px-5 py-3">
                                     <p class="truncate text-xs text-slate-600" title="{{ $log->konten }}">{{ \Illuminate\Support\Str::limit($log->konten, 90) }}</p>
                                 </td>
-                                {{-- <td class="px-5 py-3 text-xs text-slate-500">{{ $log->template?->judul ?? '—' }}</td>
+                                <td class="px-5 py-3 text-xs text-slate-500">{{ $log->template?->judul ?? '—' }}</td>
                                 <td class="px-5 py-3">
                                     @if ($log->rule)
                                         <span class="rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-inset ring-amber-200/70">{{ $ruleLabel[$log->rule] ?? $log->rule }}</span>
@@ -153,6 +153,12 @@
                                         <a href="{{ route('admin.broadcast.show', $log->id) }}"
                                            class="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-200">Detail</a>
                                         @if ($log->status === 'menunggu')
+                                            @if ($log->kirim_group)
+                                                <a href="{{ route('admin.outreach.edit', $log->kirim_group) }}"
+                                                   class="rounded-lg bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-600 ring-1 ring-inset ring-sky-200 transition hover:bg-sky-100">
+                                                    Ubah
+                                                </a>
+                                            @endif
                                             <button type="button"
                                                     onclick="confirmSubmit('{{ route('admin.broadcast.batalkan', $log->id) }}', {
                                                         title: 'Batalkan pesan?',

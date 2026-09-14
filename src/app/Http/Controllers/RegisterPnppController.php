@@ -7,6 +7,7 @@ use App\Models\RegisterPnpp;
 use App\Models\Satker;
 use App\Models\TujuanKunjungan;
 use App\Support\MasterRegistry;
+use App\Support\TextSanitizer;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -51,6 +52,15 @@ class RegisterPnppController extends Controller
             'rencana_tanggal_kunjungan' => ['required', 'date', 'after_or_equal:today'],
             'rencana_jam_kunjungan' => ['required', 'date_format:H:i'],
         ]);
+
+        // Bersihkan teks bebas dari karakter yang tidak aman untuk database
+        // ber-encoding Windows-1252 (emotikon, simbol di luar Latin1).
+        $teks = ['nama', 'jabatan', 'satker_baru', 'unit', 'ttl', 'alamat', 'tujuan_lainnya'];
+        foreach ($teks as $kolom) {
+            $data[$kolom] = isset($data[$kolom]) && is_string($data[$kolom])
+                ? TextSanitizer::win1252($data[$kolom])
+                : null;
+        }
 
         // Satker wajib: pilih dari daftar ATAU ketik manual.
         if (blank($data['satker_id'] ?? null) && blank($data['satker_baru'] ?? null)) {

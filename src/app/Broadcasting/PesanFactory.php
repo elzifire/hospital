@@ -29,9 +29,10 @@ class PesanFactory
         string $jenis,
         string $rule,
         ?User $oleh = null,
+        array $varsKustom = [],
     ): array {
         $noHp = PhoneFormat::toWa($pnpp->no_hp);
-        $meta = $this->meta($reminder);
+        $meta = $this->meta($reminder, $pnpp);
 
         return [
             'jenis' => $jenis,
@@ -42,33 +43,39 @@ class PesanFactory
             'created_by' => $oleh?->id,
             'penerima_nama' => (string) ($pnpp->nama ?? '—'),
             'penerima_no_hp' => $noHp ?? (string) ($pnpp->no_hp ?? ''),
-            'konten' => $this->renderer->render((string) $template->konten, $pnpp, $meta),
+            'konten' => $this->renderer->render((string) $template->konten, $pnpp, $meta, $varsKustom),
             'status' => $noHp === null ? 'gagal' : 'menunggu',
             'error' => $noHp === null ? 'Pasien tidak memiliki nomor WhatsApp yang valid.' : null,
             'provider' => (string) config('whatsapp.driver'),
             'meta_template_name' => $this->namaTemplateMeta($template),
             'meta_language' => $this->bahasaTemplateMeta($template),
-            'template_params' => $this->params($template, $pnpp, $meta),
+            'template_params' => $this->params($template, $pnpp, $meta, $varsKustom),
         ];
     }
 
     /**
-     * Konteks render ({poli} {dokter} {tanggal} {jam}) derivasi dari
-     * penjadwalan yang dikaitkan — data target (nama/nip) dari PNPP.
+     * Konteks render ({poli} {instalasi} {dokter} {tanggal} {jam})
+     * derivasi dari penjadwalan yang dikaitkan — data target (nama/nip)
+     * dari PNPP. Bila tidak ada penjadwalan, poli & tanggal diambil dari
+     * kunjungan terakhir pasien supaya token tidak tersisa polos.
      *
      * @return array<string, ?string>
      */
-    protected function meta(?Reminder $reminder): array
+    protected function meta(?Reminder $reminder, ?Pnpp $pnpp = null): array
     {
-        if ($reminder === null) {
-            return [];
-        }
+        $kunjungan = $pnpp?->latestKunjungan;
+
+        $poli = $reminder?->poli?->nama
+            ?? $kunjungan?->poli?->nama;
+        $tanggal = $reminder?->tanggal?->format('Y-m-d')
+            ?? $kunjungan?->tanggal_kunjungan?->format('Y-m-d');
 
         return [
-            'poli' => $reminder->poli?->nama,
-            'dokter' => $reminder->dokter?->nama,
-            'tanggal' => $reminder->tanggal?->format('Y-m-d'),
-            'jam' => $reminder->jam?->format('H:i'),
+            'poli' => $poli,
+            'instalasi' => $poli,
+            'dokter' => $reminder?->dokter?->nama,
+            'tanggal' => $tanggal,
+            'jam' => $reminder?->jam?->format('H:i'),
         ];
     }
 
@@ -98,10 +105,10 @@ class PesanFactory
      *
      * @return array<int, string>
      */
-    protected function params(MessageTemplate $template, Pnpp $pnpp, array $meta): array
+    protected function params(MessageTemplate $template, Pnpp $pnpp, array $meta, array $varsKustom = []): array
     {
         return array_map(
-            fn (string $token) => $this->renderer->render('{'.$token.'}', $pnpp, $meta),
+            fn (string $token) => $this->renderer->render('{'.$token.'}', $pnpp, $meta, $varsKustom),
             $template->tokenParam(),
         );
     }

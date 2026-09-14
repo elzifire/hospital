@@ -2,10 +2,9 @@
 
 namespace Tests\Feature;
 
-use App\Broadcasting\WhatsApp\HasilKirim;
+use App\Broadcasting\WhatsApp\AntreanKirim;
 use App\Broadcasting\WhatsApp\LogSender;
 use App\Broadcasting\WhatsApp\MetaSender;
-use App\Broadcasting\WhatsApp\AntreanKirim;
 use App\Jobs\KirimPesanJob;
 use App\Models\MessageLog;
 use App\Models\MessageTemplate;
@@ -150,7 +149,47 @@ class KirimPesanTest extends TestCase
                 && $payload['template']['language']['code'] === 'en_US'
                 && $payload['to'] === '6281234567890'
                 && $payload['template']['components'][0]['parameters'][0]['text'] === 'Budi'
-                && $payload['template']['components'][0]['parameters'][1]['text'] === 'Poli Umum';
+                && ($payload['template']['components'][0]['parameters'][0]['parameter_name'] ?? null) === 'nama'
+                && $payload['template']['components'][0]['parameters'][1]['text'] === 'Poli Umum'
+                && ! isset($payload['template']['components'][0]['parameters'][1]['parameter_name']);
+        });
+    }
+
+    #[Test]
+    public function meta_sender_membangun_payload_header_gambar_sebelum_body(): void
+    {
+        $log = $this->buatLog([
+            'log' => [
+                'template_params' => ['Budi'],
+            ],
+        ]);
+
+        $log->template->update(['image_url' => 'https://rs-bhayangkara.id/images/sampul.jpg']);
+
+        $url = config('whatsapp.meta.base_url')
+            .'/'.config('whatsapp.meta.version')
+            .'/'.config('whatsapp.meta.phone_number_id')
+            .'/messages';
+
+        Http::fake([
+            str_replace('https://', '', $url) => Http::response([
+                'messages' => [['id' => 'wamid.img001']],
+            ], 200),
+        ]);
+
+        $hasil = app(MetaSender::class)->kirim($log);
+
+        $this->assertTrue($hasil->ok);
+
+        Http::assertSent(function ($request) use ($url) {
+            $payload = $request->data();
+            $components = $payload['template']['components'] ?? [];
+
+            return $request->url() === $url
+                && ($components[0]['type'] ?? null) === 'header'
+                && ($components[0]['parameters'][0]['type'] ?? null) === 'image'
+                && ($components[0]['parameters'][0]['image']['link'] ?? null) === 'https://rs-bhayangkara.id/images/sampul.jpg'
+                && ($components[1]['type'] ?? null) === 'body';
         });
     }
 
@@ -242,7 +281,7 @@ class KirimPesanTest extends TestCase
     {
         $log = $this->buatLog();
 
-        $hasil = app(\App\Broadcasting\WhatsApp\AntreanKirim::class)->kirimSinkron([$log]);
+        $hasil = app(AntreanKirim::class)->kirimSinkron([$log]);
 
         $this->assertSame(1, $hasil['terkirim']);
         $this->assertSame(0, $hasil['gagal']);
@@ -254,7 +293,7 @@ class KirimPesanTest extends TestCase
     {
         $log = $this->buatLog(['log' => ['status' => 'terkirim']]);
 
-        $hasil = app(\App\Broadcasting\WhatsApp\AntreanKirim::class)->kirimSinkron([$log]);
+        $hasil = app(AntreanKirim::class)->kirimSinkron([$log]);
 
         $this->assertSame(0, $hasil['terkirim']);
         $this->assertSame(1, $hasil['dilewati']);
