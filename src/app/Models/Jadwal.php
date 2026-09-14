@@ -21,7 +21,7 @@ class Jadwal extends Model
     protected function casts(): array
     {
         return [
-            'jam_mulai'  => 'datetime',
+            'jam_mulai' => 'datetime',
             'jam_selesai' => 'datetime',
         ];
     }

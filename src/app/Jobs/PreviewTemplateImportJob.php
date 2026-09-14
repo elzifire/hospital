@@ -18,6 +18,7 @@ class PreviewTemplateImportJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $timeout = 300;
+
     public int $tries = 1;
 
     public function __construct(
@@ -43,7 +44,7 @@ class PreviewTemplateImportJob implements ShouldQueue
             $parsed = SheetHelper::readToRows(Storage::disk('local')->path($path));
 
             $expectedHeaders = ['Kategori', 'Judul', 'Channel', 'Isi Pesan', 'Deskripsi', 'Status'];
-            
+
             // Map header case-insensitively
             $actualHeaders = $parsed['headers'];
             $headerMap = [];
@@ -95,39 +96,39 @@ class PreviewTemplateImportJob implements ShouldQueue
 
                 $previewRows[] = [
                     'row_number' => $rowNum,
-                    'kategori'   => $kategori ?: 'Umum',
-                    'judul'      => $judul,
-                    'channel'    => $channel,
-                    'konten'     => $konten,
-                    'deskripsi'  => $deskripsi,
-                    'is_active'  => $isActive,
-                    'valid'      => $isRowValid,
-                    'errors'     => $errors,
+                    'kategori' => $kategori ?: 'Umum',
+                    'judul' => $judul,
+                    'channel' => $channel,
+                    'konten' => $konten,
+                    'deskripsi' => $deskripsi,
+                    'is_active' => $isActive,
+                    'valid' => $isRowValid,
+                    'errors' => $errors,
                 ];
             }
 
             $payload = [
-                'total'        => count($previewRows),
-                'valid'        => $valid,
-                'invalid'      => $invalid,
-                'rows'         => $previewRows,
-                'categories'   => array_keys($categories),
+                'total' => count($previewRows),
+                'valid' => $valid,
+                'invalid' => $invalid,
+                'rows' => $previewRows,
+                'categories' => array_keys($categories),
                 'generated_at' => now()->toIso8601String(),
             ];
 
             Storage::disk('local')->put("imports/template_{$this->token}.preview.json", json_encode($payload));
 
             $this->setStatus([
-                'status'  => 'preview_ready',
-                'total'   => count($previewRows),
-                'valid'   => $valid,
+                'status' => 'preview_ready',
+                'total' => count($previewRows),
+                'valid' => $valid,
                 'invalid' => $invalid,
             ]);
         } catch (\Throwable $e) {
-            Log::error("PreviewTemplateImportJob error [{$this->token}]: " . $e->getMessage());
+            Log::error("PreviewTemplateImportJob error [{$this->token}]: ".$e->getMessage());
             $this->setStatus([
                 'status' => 'preview_failed',
-                'error'  => $e->getMessage(),
+                'error' => $e->getMessage(),
             ]);
         }
     }

@@ -26,8 +26,8 @@ class TemplateCategoryController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'nama'      => ['required', 'string', 'max:100'],
-            'warna'     => ['nullable', 'string', 'in:emerald,sky,amber,rose,purple,indigo,teal'],
+            'nama' => ['required', 'string', 'max:100'],
+            'warna' => ['nullable', 'string', 'in:emerald,sky,amber,rose,purple,indigo,teal'],
             'deskripsi' => ['nullable', 'string', 'max:255'],
         ]);
 
@@ -35,7 +35,7 @@ class TemplateCategoryController extends Controller
         $base = $data['slug'];
         $i = 1;
         while (TemplateCategory::where('slug', $data['slug'])->exists()) {
-            $data['slug'] = "{$base}-" . $i++;
+            $data['slug'] = "{$base}-".$i++;
         }
 
         $data['warna'] = $data['warna'] ?? 'sky';
@@ -55,8 +55,8 @@ class TemplateCategoryController extends Controller
     public function update(Request $request, TemplateCategory $kategori)
     {
         $data = $request->validate([
-            'nama'      => ['required', 'string', 'max:100'],
-            'warna'     => ['nullable', 'string', 'in:emerald,sky,amber,rose,purple,indigo,teal'],
+            'nama' => ['required', 'string', 'max:100'],
+            'warna' => ['nullable', 'string', 'in:emerald,sky,amber,rose,purple,indigo,teal'],
             'deskripsi' => ['nullable', 'string', 'max:255'],
         ]);
 

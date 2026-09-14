@@ -13,6 +13,7 @@ use App\Models\Pnpp;
 use App\Models\ResponManual;
 use App\Support\MasterRegistry;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
@@ -202,7 +203,7 @@ class ResponController extends Controller
     }
 
     /**
-     * @return Collection<int, array{arah: string, isi: string, waktu: \Illuminate\Support\Carbon, status?: string, jenis?: string, nama?: string}>
+     * @return Collection<int, array{arah: string, isi: string, waktu: Carbon, status?: string, jenis?: string, nama?: string}>
      */
     protected function timelineData(string $noHp): Collection
     {

@@ -48,7 +48,7 @@ class PenyakitKronisController extends Controller
     public function update(Request $request, PenyakitKronis $penyakit)
     {
         $data = $request->validate([
-            'kode' => ['nullable', 'string', 'max:50', 'unique:penyakit_kronis,kode,' . $penyakit->id],
+            'kode' => ['nullable', 'string', 'max:50', 'unique:penyakit_kronis,kode,'.$penyakit->id],
             'nama' => ['required', 'string', 'max:255'],
         ]);
 

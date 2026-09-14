@@ -10,7 +10,6 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -20,6 +19,7 @@ class ImportTemplateJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $timeout = 600;
+
     public int $tries = 1;
 
     public function __construct(
@@ -61,10 +61,10 @@ class ImportTemplateJob implements ShouldQueue
 
                     if (! isset($categories[$catKey])) {
                         $newCat = TemplateCategory::create([
-                            'nama'      => $catName,
-                            'slug'      => Str::slug($catName),
-                            'warna'     => 'sky',
-                            'deskripsi' => "Kategori otomatis dibuat dari import file.",
+                            'nama' => $catName,
+                            'slug' => Str::slug($catName),
+                            'warna' => 'sky',
+                            'deskripsi' => 'Kategori otomatis dibuat dari import file.',
                             'is_active' => true,
                         ]);
                         $categories[$catKey] = $newCat;
@@ -74,25 +74,25 @@ class ImportTemplateJob implements ShouldQueue
 
                     MessageTemplate::create([
                         'template_category_id' => $category->id,
-                        'judul'                => trim($row['judul']),
-                        'channel'              => trim($row['channel'] ?? 'WhatsApp') ?: 'WhatsApp',
-                        'konten'               => trim($row['konten']),
-                        'deskripsi'            => trim($row['deskripsi'] ?? ''),
-                        'is_active'            => filter_var($row['is_active'] ?? true, FILTER_VALIDATE_BOOLEAN),
+                        'judul' => trim($row['judul']),
+                        'channel' => trim($row['channel'] ?? 'WhatsApp') ?: 'WhatsApp',
+                        'konten' => trim($row['konten']),
+                        'deskripsi' => trim($row['deskripsi'] ?? ''),
+                        'is_active' => filter_var($row['is_active'] ?? true, FILTER_VALIDATE_BOOLEAN),
                     ]);
 
                     $imported++;
                 } catch (\Throwable $e) {
                     $failed++;
-                    $errors[] = "Baris " . ($row['row_number'] ?? '?') . ": " . $e->getMessage();
+                    $errors[] = 'Baris '.($row['row_number'] ?? '?').': '.$e->getMessage();
                 }
             }
 
             $this->setStatus([
-                'status'   => 'completed',
+                'status' => 'completed',
                 'imported' => $imported,
-                'failed'   => $failed,
-                'errors'   => array_slice($errors, 0, 10),
+                'failed' => $failed,
+                'errors' => array_slice($errors, 0, 10),
             ]);
 
             // Clean up files
@@ -101,10 +101,10 @@ class ImportTemplateJob implements ShouldQueue
                 "imports/template_{$this->token}.preview.json",
             ]);
         } catch (\Throwable $e) {
-            Log::error("ImportTemplateJob error [{$this->token}]: " . $e->getMessage());
+            Log::error("ImportTemplateJob error [{$this->token}]: ".$e->getMessage());
             $this->setStatus([
                 'status' => 'failed',
-                'error'  => $e->getMessage(),
+                'error' => $e->getMessage(),
             ]);
         }
     }

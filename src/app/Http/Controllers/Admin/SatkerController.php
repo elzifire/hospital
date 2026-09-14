@@ -42,7 +42,7 @@ class SatkerController extends Controller
     public function update(Request $request, Satker $satker)
     {
         $data = $request->validate([
-            'kode' => ['nullable', 'string', 'max:50', 'unique:satkers,kode,' . $satker->id],
+            'kode' => ['nullable', 'string', 'max:50', 'unique:satkers,kode,'.$satker->id],
             'nama' => ['required', 'string', 'max:255'],
         ]);
 

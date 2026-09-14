@@ -21,7 +21,7 @@ class JadwalController extends Controller
             ])
             ->values();
 
-        $polis   = Poli::orderBy('nama')->get();
+        $polis = Poli::orderBy('nama')->get();
         $dokters = Dokter::with('poli')->orderBy('nama')->get();
 
         return view('admin.jadwal.index', compact('jadwals', 'polis', 'dokters'));
@@ -70,9 +70,9 @@ class JadwalController extends Controller
     private function validated(Request $request): array
     {
         return $request->validate([
-            'dokter_id'   => ['required', 'integer', 'exists:dokters,id'],
-            'hari'        => ['required', 'in:' . implode(',', Jadwal::HARI)],
-            'jam_mulai'   => ['required', 'date_format:H:i'],
+            'dokter_id' => ['required', 'integer', 'exists:dokters,id'],
+            'hari' => ['required', 'in:'.implode(',', Jadwal::HARI)],
+            'jam_mulai' => ['required', 'date_format:H:i'],
             'jam_selesai' => ['required', 'date_format:H:i', 'after:jam_mulai'],
         ]);
     }

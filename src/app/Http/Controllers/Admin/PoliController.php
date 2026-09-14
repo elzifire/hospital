@@ -42,7 +42,7 @@ class PoliController extends Controller
     public function update(Request $request, Poli $poli)
     {
         $data = $request->validate([
-            'kode' => ['nullable', 'string', 'max:50', 'unique:polis,kode,' . $poli->id],
+            'kode' => ['nullable', 'string', 'max:50', 'unique:polis,kode,'.$poli->id],
             'nama' => ['required', 'string', 'max:255'],
         ]);
 

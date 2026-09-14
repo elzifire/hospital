@@ -39,14 +39,14 @@ class MasterDataSeeder extends Seeder
             PenyakitKronis::firstOrCreate(['kode' => $data['kode']], $data);
         }
 
-        $dinkes  = Satker::where('kode', 'DINKES')->first();
-        $bpjs    = Satker::where('kode', 'BPJS')->first();
-        $kemkes  = Satker::where('kode', 'KEMKES')->first();
+        $dinkes = Satker::where('kode', 'DINKES')->first();
+        $bpjs = Satker::where('kode', 'BPJS')->first();
+        $kemkes = Satker::where('kode', 'KEMKES')->first();
 
         $hipertensi = PenyakitKronis::where('kode', 'HTN')->first();
-        $dm         = PenyakitKronis::where('kode', 'DM')->first();
-        $asma       = PenyakitKronis::where('kode', 'ASMA')->first();
-        $jantung    = PenyakitKronis::where('kode', 'JTG')->first();
+        $dm = PenyakitKronis::where('kode', 'DM')->first();
+        $asma = PenyakitKronis::where('kode', 'ASMA')->first();
+        $jantung = PenyakitKronis::where('kode', 'JTG')->first();
 
         $pnpps = [
             [
@@ -90,7 +90,7 @@ class MasterDataSeeder extends Seeder
         ];
 
         foreach ($pnpps as $data) {
-            $penyakit  = $data['penyakit'];
+            $penyakit = $data['penyakit'];
             $kunjungan = $data['kunjungan'];
             unset($data['penyakit'], $data['kunjungan']);
 
@@ -130,15 +130,15 @@ class MasterDataSeeder extends Seeder
             Dokter::firstOrCreate(['nama' => $data['nama']], $data);
         }
 
-        $drRina    = Dokter::where('nama', 'dr. Rina Pratiwi')->first();
-        $drgAndi   = Dokter::where('nama', 'drg. Andi Saputra')->first();
+        $drRina = Dokter::where('nama', 'dr. Rina Pratiwi')->first();
+        $drgAndi = Dokter::where('nama', 'drg. Andi Saputra')->first();
         $drBambang = Dokter::where('nama', 'dr. Bambang Haryanto')->first();
-        $drSari    = Dokter::where('nama', 'dr. Sari Wulandari')->first();
+        $drSari = Dokter::where('nama', 'dr. Sari Wulandari')->first();
 
         $jadwals = [
             ['dokter_id' => $drRina?->id,    'hari' => 'Senin', 'jam_mulai' => '08:00', 'jam_selesai' => '12:00'],
             ['dokter_id' => $drRina?->id,    'hari' => 'Rabu',  'jam_mulai' => '08:00', 'jam_selesai' => '14:00'],
-            ['dokter_id' => $drgAndi?->id,   'hari' => 'Selasa','jam_mulai' => '09:00', 'jam_selesai' => '13:00'],
+            ['dokter_id' => $drgAndi?->id,   'hari' => 'Selasa', 'jam_mulai' => '09:00', 'jam_selesai' => '13:00'],
             ['dokter_id' => $drBambang?->id, 'hari' => 'Kamis', 'jam_mulai' => '08:00', 'jam_selesai' => '11:00'],
             ['dokter_id' => $drSari?->id,    'hari' => 'Jumat', 'jam_mulai' => '08:00', 'jam_selesai' => '12:00'],
         ];

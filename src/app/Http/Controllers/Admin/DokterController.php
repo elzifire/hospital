@@ -13,7 +13,7 @@ class DokterController extends Controller
     public function index()
     {
         $dokters = Dokter::with('poli')->withCount('jadwals')->orderBy('nama')->get();
-        $polis   = Poli::orderBy('nama')->get();
+        $polis = Poli::orderBy('nama')->get();
 
         return view('admin.dokter.index', compact('dokters', 'polis'));
     }
@@ -62,8 +62,8 @@ class DokterController extends Controller
     private function validated(Request $request): array
     {
         return $request->validate([
-            'poli_id'      => ['required', 'integer', 'exists:polis,id'],
-            'nama'         => ['required', 'string', 'max:255'],
+            'poli_id' => ['required', 'integer', 'exists:polis,id'],
+            'nama' => ['required', 'string', 'max:255'],
             'spesialisasi' => ['nullable', 'string', 'max:255'],
         ]);
     }

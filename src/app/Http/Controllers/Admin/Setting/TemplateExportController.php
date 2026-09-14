@@ -35,32 +35,32 @@ class TemplateExportController extends Controller
 
         $rows = $templates->map(function ($t) {
             return [
-                'ID'                  => $t->id,
-                'Kode'                => $t->kode ?? '-',
-                'Kategori'            => $t->category?->nama ?? 'Tanpa Kategori',
-                'Judul'               => $t->judul,
-                'Channel'             => $t->channel,
-                'Isi Pesan'           => $t->konten,
-                'Deskripsi'           => $t->deskripsi ?? '',
-                'Status'              => $t->is_active ? 'Aktif' : 'Nonaktif',
-                'Jumlah Dipakai'      => (string) $t->dipakai_count,
+                'ID' => $t->id,
+                'Kode' => $t->kode ?? '-',
+                'Kategori' => $t->category?->nama ?? 'Tanpa Kategori',
+                'Judul' => $t->judul,
+                'Channel' => $t->channel,
+                'Isi Pesan' => $t->konten,
+                'Deskripsi' => $t->deskripsi ?? '',
+                'Status' => $t->is_active ? 'Aktif' : 'Nonaktif',
+                'Jumlah Dipakai' => (string) $t->dipakai_count,
                 'Terakhir Diperbarui' => $t->updated_at?->format('d/m/Y H:i') ?? '-',
             ];
         })->all();
 
-        $filename = 'template_pesan_' . date('Ymd_His');
+        $filename = 'template_pesan_'.date('Ymd_His');
         $content = SheetHelper::content($rows, $headers, $format);
 
         if ($format === 'xlsx') {
             return response($content, 200, [
-                'Content-Type'        => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                'Content-Disposition' => 'attachment; filename="' . $filename . '.xlsx"',
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'Content-Disposition' => 'attachment; filename="'.$filename.'.xlsx"',
             ]);
         }
 
         return response($content, 200, [
-            'Content-Type'        => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '.csv"',
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'.csv"',
         ]);
     }
 
@@ -75,12 +75,12 @@ class TemplateExportController extends Controller
 
         $sample = [
             [
-                'Kategori'   => 'Jadwal & Kontrol',
-                'Judul'      => 'Pengingat Kontrol Rawat Jalan Contoh',
-                'Channel'    => 'WhatsApp',
-                'Isi Pesan'  => 'Halo {nama}, jadwal kontrol Anda di {poli} pada {tanggal} pukul {jam}. Salam RS Bhayangkara Bogor.',
-                'Deskripsi'  => 'Contoh deskripsi template pengingat kontrol',
-                'Status'     => 'Aktif',
+                'Kategori' => 'Jadwal & Kontrol',
+                'Judul' => 'Pengingat Kontrol Rawat Jalan Contoh',
+                'Channel' => 'WhatsApp',
+                'Isi Pesan' => 'Halo {nama}, jadwal kontrol Anda di {poli} pada {tanggal} pukul {jam}. Salam RS Bhayangkara Bogor.',
+                'Deskripsi' => 'Contoh deskripsi template pengingat kontrol',
+                'Status' => 'Aktif',
             ],
         ];
 
@@ -89,14 +89,14 @@ class TemplateExportController extends Controller
 
         if ($format === 'xlsx') {
             return response($content, 200, [
-                'Content-Type'        => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                'Content-Disposition' => 'attachment; filename="' . $filename . '.xlsx"',
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'Content-Disposition' => 'attachment; filename="'.$filename.'.xlsx"',
             ]);
         }
 
         return response($content, 200, [
-            'Content-Type'        => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '.csv"',
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="'.$filename.'.csv"',
         ]);
     }
 }

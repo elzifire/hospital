@@ -31,6 +31,7 @@ class CsvHelper
                 // Bersihkan BOM dari header pertama.
                 $line[0] = self::stripBom($line[0]);
                 $headers = array_map('trim', $line);
+
                 continue;
             }
 

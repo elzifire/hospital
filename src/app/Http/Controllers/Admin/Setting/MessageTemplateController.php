@@ -22,12 +22,12 @@ class MessageTemplateController extends Controller
     public function update(Request $request, MessageTemplate $template)
     {
         $data = $request->validate([
-            'judul'                => ['required', 'string', 'max:255'],
+            'judul' => ['required', 'string', 'max:255'],
             'template_category_id' => ['nullable', 'exists:template_categories,id'],
-            'channel'              => ['required', 'string', 'in:WhatsApp,SMS,Email'],
-            'konten'               => ['required', 'string'],
-            'deskripsi'            => ['nullable', 'string', 'max:255'],
-            'is_active'            => ['nullable', 'boolean'],
+            'channel' => ['required', 'string', 'in:WhatsApp,SMS,Email'],
+            'konten' => ['required', 'string'],
+            'deskripsi' => ['nullable', 'string', 'max:255'],
+            'is_active' => ['nullable', 'boolean'],
         ]);
 
         $data['is_active'] = $request->boolean('is_active');
