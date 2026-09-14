@@ -230,7 +230,10 @@ class ResponController extends Controller
                 'nama' => $b->nama,
             ]);
 
-        return $keluar->merge($masuk)->sortBy(fn ($item) => $item['waktu']->getTimestamp())->values();
+        return $keluar->toBase()
+            ->merge($masuk->toBase())
+            ->sortBy(fn ($item) => $item['waktu']?->getTimestamp() ?? 0)
+            ->values();
     }
 
     protected function pnppUntukNomor(string $noHp): ?Pnpp
