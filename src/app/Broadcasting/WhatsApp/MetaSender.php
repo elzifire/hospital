@@ -48,6 +48,23 @@ class MetaSender implements WhatsAppSender
     {
         $config = (array) config('whatsapp.meta');
 
+        // Balasan langsung (modul Respon) dikirim sebagai teks bebas —
+        // tanpa template, sehingga tidak rawan galat parameter template
+        // (#132000 / #132012). Meta menerima teks bebas di sesi 24 jam
+        // setelah balasan masuk.
+        if (blank($log->meta_template_name)) {
+            return [
+                'messaging_product' => 'whatsapp',
+                'recipient_type' => 'individual',
+                'to' => $log->penerima_no_hp,
+                'type' => 'text',
+                'text' => [
+                    'preview_url' => false,
+                    'body' => (string) $log->konten,
+                ],
+            ];
+        }
+
         $payload = [
             'messaging_product' => 'whatsapp',
             'recipient_type' => 'individual',
@@ -59,7 +76,11 @@ class MetaSender implements WhatsAppSender
             ],
         ];
 
-        $params = array_values((array) ($log->template_params ?? []));
+        // Selaraskan jumlah parameter teks (body) dengan definisi template
+        // dari snapshot sinkron Meta — potong bila berlebih, genapi dengan
+        // "—" bila kurang. Ini menghindari penolakan "(#132000) Number of
+        // parameters does not match the expected number of params".
+        $params = array_values($this->selarasParams($log, array_values((array) ($log->template_params ?? []))));
         $components = [];
 
         // Gambar sampul template (HEADER/IMAGE) — urutkan sebelum body.
@@ -101,6 +122,54 @@ class MetaSender implements WhatsAppSender
         }
 
         return $payload;
+    }
+
+    /**
+     * Jumlah parameter body yang diharapkan oleh template Meta: indeks
+     * placeholder {{N}} terbesar pada komponen BODY hasil sinkron. Bila
+     * tidak diketahui (template lokal tanpa sinkron) dibiarkan apa adanya.
+     */
+    protected function jumlahBodyParam(MessageLog $log): ?int
+    {
+        $komponen = (array) ($log->template?->meta_components ?? []);
+        $maks = 0;
+
+        foreach ($komponen as $c) {
+            if (strtoupper((string) ($c['type'] ?? '')) !== 'BODY') {
+                continue;
+            }
+
+            $teks = (string) ($c['text'] ?? '');
+            preg_match_all('/\{\{(\d+)\}\}/', $teks, $cocok);
+            foreach ($cocok[1] ?? [] as $nomor) {
+                $maks = max($maks, (int) $nomor);
+            }
+        }
+
+        return $maks > 0 ? $maks : null;
+    }
+
+    /**
+     * @param  array<int, mixed>  $params
+     * @return array<int, mixed>
+     */
+    protected function selarasParams(MessageLog $log, array $params): array
+    {
+        $expected = $this->jumlahBodyParam($log);
+
+        if ($expected === null) {
+            return $params;
+        }
+
+        if (count($params) > $expected) {
+            return array_slice($params, 0, $expected);
+        }
+
+        while (count($params) < $expected) {
+            $params[] = '—';
+        }
+
+        return $params;
     }
 
     protected function url(array $config): string

@@ -79,13 +79,15 @@ class FeaturePermissionSeeder extends Seeder
         Role::findOrCreate('user')->syncPermissions(['view dashboard']);
 
         // Poli: akun petugas/penanggung jawab tiap instalasi — dashboard +
-        // digital reminder + follow up. Data dibatasi ke polinya sendiri
-        // (lihat DigitalReminderController & FollowUpController).
+        // digital reminder + follow up + respon (lihat & balas balasan
+        // pasien polinya sendiri). Data dibatasi ke polinya sendiri
+        // (lihat DigitalReminderController, FollowUpController & ResponController).
         Role::findOrCreate('poli')->syncPermissions([
             'view dashboard',
             'manage digital-reminder',
             'manage kunjungan',
             'manage follow-up',
+            'manage respon',
         ]);
 
         // Bersihkan permission agregat lama beserta relasi role/model-nya.

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Broadcasting\PhoneFormat;
+use App\Broadcasting\WhatsApp\AntreanKirim;
 use App\Http\Controllers\Controller;
 use App\Jobs\ImportMasterJob;
 use App\Jobs\PreviewImportJob;
@@ -12,6 +13,7 @@ use App\Models\Pnpp;
 use App\Models\ResponManual;
 use App\Support\MasterRegistry;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -37,9 +39,21 @@ class ResponController extends Controller
 
         if ($tab === 'balasan') {
             $q = (string) $request->query('q', '');
+            $poliId = $request->user()?->poliId();
+
+            // Akun poli hanya melihat balasan pasien polinya sendiri
+            // (dicari lewat kunjungan PNPP di instalasi tsb.).
+            $scopePoli = fn ($query) => $query->when(
+                $poliId !== null,
+                fn ($sub) => $sub->whereHas(
+                    'pnpp',
+                    fn ($pnpp) => $pnpp->whereHas('kunjungans', fn ($kunjungan) => $kunjungan->where('poli_id', $poliId))
+                ),
+            );
 
             $balasan = MessageReply::query()
                 ->with('pnpp:id,nama')
+                ->tap($scopePoli)
                 ->when($q, fn ($query) => $query->where(
                     fn ($sub) => $sub->where('nama', 'like', "%{$q}%")
                         ->orWhere('no_hp', 'like', "%{$q}%")
@@ -51,10 +65,11 @@ class ResponController extends Controller
 
             $data += [
                 'balasan' => $balasan,
-                'total' => MessageReply::count(),
-                'hariIni' => MessageReply::whereBetween('waktu_masuk', [now()->startOfDay(), now()])->count(),
-                'pasienUnik' => MessageReply::whereNotNull('pnpp_id')->distinct()->count('pnpp_id'),
-                'takTerdaftar' => MessageReply::whereNull('pnpp_id')->count(),
+                'total' => MessageReply::query()->tap($scopePoli)->count(),
+                'hariIni' => MessageReply::query()->tap($scopePoli)->whereBetween('waktu_masuk', [now()->startOfDay(), now()])->count(),
+                'pasienUnik' => MessageReply::query()->tap($scopePoli)->whereNotNull('pnpp_id')->distinct()->count('pnpp_id'),
+                'takTerdaftar' => MessageReply::query()->tap($scopePoli)->whereNull('pnpp_id')->count(),
+                'poliId' => $poliId,
                 'filters' => ['q' => $q],
             ];
         }
@@ -97,13 +112,100 @@ class ResponController extends Controller
     }
 
     /**
-     * Percakapan satu nomor: pesan keluar (broadcast) + balasan masuk,
-     * digabung dalam satu garis waktu.
+     * Percakapan satu nomor: pesan keluar (broadcast/balasan) + balasan
+     * masuk, digabung dalam satu garis waktu.
      */
-    public function show(string $nomor)
+    public function show(Request $request, string $nomor)
     {
         $noHp = PhoneFormat::toWa($nomor) ?? $nomor;
+        $this->pastikanAksesNomor($request, $noHp);
 
+        $pnpp = $this->pnppUntukNomor($noHp);
+
+        return view('admin.respon.show', [
+            'noHp' => $noHp,
+            'pnpp' => $pnpp,
+            'timeline' => $this->timelineData($noHp),
+        ]);
+    }
+
+    /**
+     * Kirim balasan langsung ke pasien (teks bebas). Dipanggil frontend
+     * lewat fetch (JSON event) — tanpa websocket; hasil pengiriman sinkron.
+     */
+    public function balas(Request $request, string $nomor)
+    {
+        $validated = $request->validate([
+            'isi' => ['required', 'string', 'max:5000'],
+        ]);
+
+        $noHp = PhoneFormat::toWa($nomor) ?? $nomor;
+        $this->pastikanAksesNomor($request, $noHp);
+
+        $pnpp = $this->pnppUntukNomor($noHp);
+
+        $log = MessageLog::create([
+            'jenis' => 'respon',
+            'rule' => 'balasan',
+            'pnpp_id' => $pnpp?->id,
+            'created_by' => $request->user()?->id,
+            'penerima_nama' => (string) ($pnpp?->nama ?? 'Nomor Tak Dikenal'),
+            'penerima_no_hp' => $noHp,
+            'konten' => $validated['isi'],
+            'status' => 'menunggu',
+            'provider' => (string) config('whatsapp.driver'),
+            // Tanpa meta_template_name → MetaSender mengirim teks bebas
+            // (bukan template), aman dari galat parameter template.
+            'meta_template_name' => null,
+            'template_params' => [],
+        ]);
+
+        $hasil = app(AntreanKirim::class)->kirimSinkron([$log]);
+        $ok = ($hasil['terkirim'] ?? 0) > 0;
+        $pesan = $ok
+            ? 'Balasan terkirim ke '.$log->penerima_nama.'.'
+            : 'Balasan gagal terkirim: '.($log->refresh()->error ?? 'tidak diketahui.');
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'ok' => $ok,
+                'message' => $pesan,
+                'log' => [
+                    'id' => $log->id,
+                    'arah' => 'keluar',
+                    'isi' => $log->konten,
+                    'status' => $log->status,
+                    'waktu' => ($log->sent_at ?? $log->created_at)?->toIso8601String(),
+                ],
+            ]);
+        }
+
+        return back()->with($ok ? 'success' : 'error', $pesan);
+    }
+
+    /**
+     * Timeline percakapan versi JSON untuk polling JS (event, tanpa
+     * websocket). Signature berubah bila ada pesan baru → frontend
+     * mengganti isi percakapan & memicu event 'respon:baru'.
+     */
+    public function timeline(Request $request, string $nomor)
+    {
+        $noHp = PhoneFormat::toWa($nomor) ?? $nomor;
+        $this->pastikanAksesNomor($request, $noHp);
+
+        $timeline = $this->timelineData($noHp);
+
+        return response()->json([
+            'signature' => $timeline->count().':'.($timeline->last()['waktu']?->toIso8601String() ?? '0'),
+            'html' => view('admin.respon._timeline', ['timeline' => $timeline])->render(),
+        ]);
+    }
+
+    /**
+     * @return Collection<int, array{arah: string, isi: string, waktu: \Illuminate\Support\Carbon, status?: string, jenis?: string, nama?: string}>
+     */
+    protected function timelineData(string $noHp): Collection
+    {
         $keluar = MessageLog::query()
             ->where('penerima_no_hp', $noHp)
             ->orderBy('created_at')
@@ -127,18 +229,34 @@ class ResponController extends Controller
                 'nama' => $b->nama,
             ]);
 
-        $timeline = $keluar->merge($masuk)->sortBy(fn ($item) => $item['waktu'])->values();
+        return $keluar->merge($masuk)->sortBy(fn ($item) => $item['waktu']->getTimestamp())->values();
+    }
 
-        $pnpp = Pnpp::query()
+    protected function pnppUntukNomor(string $noHp): ?Pnpp
+    {
+        return Pnpp::query()
             ->whereNotNull('no_hp')
             ->get()
             ->first(fn (Pnpp $p) => PhoneFormat::toWa($p->no_hp) === $noHp);
+    }
 
-        return view('admin.respon.show', [
-            'noHp' => $noHp,
-            'pnpp' => $pnpp,
-            'timeline' => $timeline,
-        ]);
+    /**
+     * Akun poli hanya boleh melihat & membalas nomor pasien polinya.
+     */
+    protected function pastikanAksesNomor(Request $request, string $noHp): void
+    {
+        $poliId = $request->user()?->poliId();
+
+        if ($poliId === null) {
+            return;
+        }
+
+        $punya = MessageReply::query()
+            ->where('no_hp', $noHp)
+            ->whereHas('pnpp', fn ($pnpp) => $pnpp->whereHas('kunjungans', fn ($kunjungan) => $kunjungan->where('poli_id', $poliId)))
+            ->exists();
+
+        abort_unless($punya, 403, 'Nomor ini bukan pasien poli Anda.');
     }
 
     /**

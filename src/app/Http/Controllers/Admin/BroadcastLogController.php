@@ -23,6 +23,7 @@ class BroadcastLogController extends Controller
     private const PERMISSION_PER_JENIS = [
         'outreach' => 'manage outreach',
         'follow_up' => 'manage follow-up',
+        'respon' => 'manage respon',
     ];
 
     /**

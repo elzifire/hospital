@@ -194,6 +194,86 @@ class KirimPesanTest extends TestCase
     }
 
     #[Test]
+    public function meta_sender_mengirim_teks_bebas_saat_tanpa_template(): void
+    {
+        $log = $this->buatLog([
+            'log' => [
+                'meta_template_name' => null,
+                'template_params' => [],
+            ],
+        ]);
+
+        $url = config('whatsapp.meta.base_url')
+            .'/'.config('whatsapp.meta.version')
+            .'/'.config('whatsapp.meta.phone_number_id')
+            .'/messages';
+
+        Http::fake([
+            str_replace('https://', '', $url) => Http::response([
+                'messages' => [['id' => 'wamid.teks001']],
+            ], 200),
+        ]);
+
+        $hasil = app(MetaSender::class)->kirim($log);
+
+        $this->assertTrue($hasil->ok);
+
+        Http::assertSent(function ($request) use ($url) {
+            $payload = $request->data();
+
+            return $request->url() === $url
+                && $payload['type'] === 'text'
+                && $payload['text']['body'] === 'Halo Budi Santoso.'
+                && ($payload['recipient_type'] ?? null) === 'individual'
+                && ! isset($payload['template']);
+        });
+    }
+
+    #[Test]
+    public function meta_sender_menyelaraskan_jumlah_param_dengan_template_sinkron(): void
+    {
+        $log = $this->buatLog();
+
+        // Template hasil sinkron dari Meta: body memakai 3 placeholder.
+        $log->template->update(['meta_components' => [
+            ['type' => 'BODY', 'text' => 'Halo {{1}}, jadwal Anda {{2}} pukul {{3}}.'],
+        ]]);
+
+        $url = config('whatsapp.meta.base_url')
+            .'/'.config('whatsapp.meta.version')
+            .'/'.config('whatsapp.meta.phone_number_id')
+            .'/messages';
+
+        Http::fake([
+            str_replace('https://', '', $url) => Http::response([
+                'messages' => [['id' => 'wamid.s123']],
+            ], 200),
+        ]);
+
+        // Kurang dari 3 → digenapi dengan "—" (hindari #132000).
+        $log->update(['template_params' => ['Budi', 'Senin']]);
+        app(MetaSender::class)->kirim($log);
+
+        Http::assertSent(function ($request) {
+            $parameters = $request->data()['template']['components'][0]['parameters'] ?? [];
+
+            return count($parameters) === 3
+                && $parameters[2]['text'] === '—';
+        });
+
+        // Lebih dari 3 → dipotong rapi.
+        $log->update(['template_params' => ['Budi', 'Senin', '09:00', 'ekstra']]);
+        app(MetaSender::class)->kirim($log);
+
+        Http::assertSent(function ($request) {
+            $parameters = $request->data()['template']['components'][0]['parameters'] ?? [];
+
+            return count($parameters) === 3
+                && $parameters[2]['text'] === '09:00';
+        });
+    }
+
+    #[Test]
     public function meta_sender_gagal_ketika_api_menolak(): void
     {
         $log = $this->buatLog();

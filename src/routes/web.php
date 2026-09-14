@@ -144,6 +144,11 @@ Route::middleware('auth')->group(function () {
             Route::post('respon/import/upload', [ResponController::class, 'importUpload'])->name('respon.import-upload');
             Route::post('respon/import/confirm', [ResponController::class, 'importConfirm'])->name('respon.import-confirm');
             Route::post('respon/import/cancel', [ResponController::class, 'importCancel'])->name('respon.import-cancel');
+
+            // Balas balasan pasien (teks bebas) + polling timeline via JS
+            // (event, tanpa websocket).
+            Route::post('respon/{nomor}/balas', [ResponController::class, 'balas'])->name('respon.balas');
+            Route::get('respon/{nomor}/timeline', [ResponController::class, 'timeline'])->name('respon.timeline');
         });
 
         // Aksi atas riwayat pesan (dipakai lintas modul broadcast):
