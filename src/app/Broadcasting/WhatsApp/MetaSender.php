@@ -76,41 +76,37 @@ class MetaSender implements WhatsAppSender
             ],
         ];
 
-        // Selaraskan jumlah parameter teks (body) dengan definisi template
-        // dari snapshot sinkron Meta — potong bila berlebih, genapi dengan
-        // "—" bila kurang. Ini menghindari penolakan "(#132000) Number of
-        // parameters does not match the expected number of params".
-        $params = array_values($this->selarasParams($log, array_values((array) ($log->template_params ?? []))));
+        $params = array_values((array) ($log->template_params ?? []));
         $components = [];
 
-        // Gambar sampul template (HEADER/IMAGE) — urutkan sebelum body.
+        // Header — kirim hanya jika template Meta memang pakai IMAGE
+        // HEADER dan local template menyediakan image_url. Template
+        // dengan HEADER teks atau tanpa header diabaikan supaya tidak
+        // terjadi kesalahan format (#132012).
         $gambar = $log->template?->image_url;
         if (filled($gambar)) {
-            $components[] = [
-                'type' => 'header',
-                'parameters' => [[
-                    'type' => 'image',
-                    'image' => ['link' => (string) $gambar],
-                ]],
-            ];
+            $headerMeta = $this->headerMeta($log);
+            if ($headerMeta === null || strtoupper((string) ($headerMeta['subtype'] ?? '')) === 'IMAGE') {
+                $components[] = [
+                    'type' => 'header',
+                    'parameters' => [[
+                        'type' => 'image',
+                        'image' => ['link' => (string) $gambar],
+                    ]],
+                ];
+            }
         }
 
-        if ($params !== []) {
-            // Template Meta yang memakai placeholder bernama ({{nama}},
-            // {{hari_tanggal}}, …) wajib menyertakan parameter_name sesuai
-            // nama placeholder aslinya — tanpa itu Meta menolak dengan
-            // "(#100) Invalid parameter — Parameter name is missing or empty".
-            $namaParams = array_values($log->template?->tokenParam() ?? []);
+        // Body — format parameter bergantung snapshot meta_components:
+        // named template memerlukan parameter_name sesuai nama
+        // placeholder; positional (default) sama sekali tidak boleh
+        // menyertakan parameter_name. Kesalahan ini menyebabkan
+        // Meta menolak dengan (#132012) Parameter format does not
+        // match format in the created template.
+        $isNamed = $this->isNamedTemplate($log);
+        $parameters = $this->bodyParameters($log, $params, $isNamed);
 
-            $parameters = [];
-            foreach ($params as $i => $nilai) {
-                $parameter = ['type' => 'text', 'text' => (string) $nilai];
-                if (isset($namaParams[$i]) && $namaParams[$i] !== '') {
-                    $parameter['parameter_name'] = $namaParams[$i];
-                }
-                $parameters[] = $parameter;
-            }
-
+        if ($parameters !== []) {
             $components[] = [
                 'type' => 'body',
                 'parameters' => $parameters,
@@ -122,6 +118,115 @@ class MetaSender implements WhatsAppSender
         }
 
         return $payload;
+    }
+
+    /**
+     * Bangun array parameter body: named templates mengirim
+     * parameter_name, positional templates hanya text. Untuk positional,
+     * jumlah parameter disesuaikan (dipotong/digenapi) supaya sesuai
+     * slot template.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    protected function bodyParameters(MessageLog $log, array $params, bool $isNamed): array
+    {
+        if ($isNamed) {
+            $names = $this->namedBodyParams($log);
+            if ($names === []) {
+                return [];
+            }
+
+            $localNames = array_values($log->template->tokenParam() ?: []);
+            $valuesByName = ($localNames !== [] && count($localNames) === count($params))
+                ? array_combine($localNames, $params)
+                : [];
+
+            $parameters = [];
+            foreach ($names as $i => $name) {
+                $value = $valuesByName[$name] ?? ($params[$i] ?? '—');
+                $parameters[] = ['type' => 'text', 'text' => (string) $value, 'parameter_name' => $name];
+            }
+
+            return $parameters;
+        }
+
+        $expected = $this->jumlahBodyParam($log);
+
+        if ($expected === null) {
+            $aligned = $params;
+        } elseif (count($params) > $expected) {
+            $aligned = array_slice($params, 0, $expected);
+        } else {
+            $aligned = $params;
+            while (count($aligned) < $expected) {
+                $aligned[] = '—';
+            }
+        }
+
+        $parameters = [];
+        foreach ($aligned as $nilai) {
+            $parameters[] = ['type' => 'text', 'text' => (string) $nilai];
+        }
+
+        return $parameters;
+    }
+
+    /**
+     * Komponen HEADER dari snapshot meta_components — null bila template
+     * tidak punya header (atau belum pernah disinkron Meta).
+     *
+     * @return array<string, mixed>|null
+     */
+    protected function headerMeta(MessageLog $log): ?array
+    {
+        foreach ((array) ($log->template?->meta_components ?? []) as $komponen) {
+            if (strtoupper((string) ($komponen['type'] ?? '')) === 'HEADER') {
+                return (array) $komponen;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Apakah template Meta memakai placeholder bernama ({{nama}}) bukan
+     * posisi ({{1}}). Ditentukan dari isi snapshot meta_components; bila
+     * belum pernah disinkron fallback ke meta_param_tokens lokal.
+     */
+    protected function isNamedTemplate(MessageLog $log): bool
+    {
+        foreach ((array) ($log->template?->meta_components ?? []) as $komponen) {
+            $teks = (string) ($komponen['text'] ?? '');
+            if ($teks !== '' && preg_match('/\{\{[a-z][a-z0-9_]*\}\}/i', $teks)) {
+                return true;
+            }
+        }
+
+        return filled($log->template?->meta_param_tokens ?? null);
+    }
+
+    /**
+     * Nama placeholder body sesuai urutan kemunculannya di snapshot Meta
+     * ({{nama}} → 'nama'). Urutan = urutan parameter yang dikirim.
+     *
+     * @return array<int, string>
+     */
+    protected function namedBodyParams(MessageLog $log): array
+    {
+        foreach ((array) ($log->template?->meta_components ?? []) as $komponen) {
+            if (strtoupper((string) ($komponen['type'] ?? '')) !== 'BODY') {
+                continue;
+            }
+
+            $teks = (string) ($komponen['text'] ?? '');
+            preg_match_all('/\{\{([a-z][a-z0-9_]*)\}\}/i', $teks, $cocok, PREG_SET_ORDER);
+
+            if ($cocok !== []) {
+                return array_values(array_map(static fn ($m) => (string) $m[1], $cocok));
+            }
+        }
+
+        return array_values($log->template?->tokenParam() ?? []);
     }
 
     /**

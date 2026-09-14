@@ -123,6 +123,15 @@ class KirimPesanTest extends TestCase
             ],
         ]);
 
+        // Template Meta memakai placeholder bernama (named parameter) —
+        // snapshot hasil sinkron memuat {{nama}} dan {{poli}}.
+        $log->template->update([
+            'meta_param_tokens' => ['nama', 'poli'],
+            'meta_components' => [
+                ['type' => 'BODY', 'text' => 'Halo {{nama}}, silakan ke {{poli}} hari ini.'],
+            ],
+        ]);
+
         $url = config('whatsapp.meta.base_url')
             .'/'.config('whatsapp.meta.version')
             .'/'.config('whatsapp.meta.phone_number_id')
@@ -141,6 +150,7 @@ class KirimPesanTest extends TestCase
 
         Http::assertSent(function ($request) use ($url) {
             $payload = $request->data();
+            $parameters = $payload['template']['components'][0]['parameters'] ?? [];
 
             return $request->url() === $url
                 && $payload['messaging_product'] === 'whatsapp'
@@ -148,10 +158,10 @@ class KirimPesanTest extends TestCase
                 && $payload['template']['name'] === 'promo_h1'
                 && $payload['template']['language']['code'] === 'en_US'
                 && $payload['to'] === '6281234567890'
-                && $payload['template']['components'][0]['parameters'][0]['text'] === 'Budi'
-                && ($payload['template']['components'][0]['parameters'][0]['parameter_name'] ?? null) === 'nama'
-                && $payload['template']['components'][0]['parameters'][1]['text'] === 'Poli Umum'
-                && ! isset($payload['template']['components'][0]['parameters'][1]['parameter_name']);
+                && $parameters[0]['text'] === 'Budi'
+                && ($parameters[0]['parameter_name'] ?? null) === 'nama'
+                && $parameters[1]['text'] === 'Poli Umum'
+                && ($parameters[1]['parameter_name'] ?? null) === 'poli';
         });
     }
 
@@ -190,6 +200,53 @@ class KirimPesanTest extends TestCase
                 && ($components[0]['parameters'][0]['type'] ?? null) === 'image'
                 && ($components[0]['parameters'][0]['image']['link'] ?? null) === 'https://rs-bhayangkara.id/images/sampul.jpg'
                 && ($components[1]['type'] ?? null) === 'body';
+        });
+    }
+
+    #[Test]
+    public function meta_sender_tidak_kirim_header_image_saat_snapshot_header_bukan_image(): void
+    {
+        $log = $this->buatLog([
+            'log' => [
+                'template_params' => ['Budi'],
+            ],
+        ]);
+
+        // Template Meta punya HEADER tipe TEXT — image_url lokal boleh ada
+        // tapi tidak boleh menghasilkan komponen header IMAGE.
+        $log->template->update([
+            'image_url' => 'https://rs-bhayangkara.id/images/sampul.jpg',
+            'meta_components' => [
+                ['type' => 'HEADER', 'subtype' => 'TEXT', 'text' => 'Info {{1}}'],
+                ['type' => 'BODY', 'text' => 'Halo {{1}}.'],
+            ],
+        ]);
+
+        $url = config('whatsapp.meta.base_url')
+            .'/'.config('whatsapp.meta.version')
+            .'/'.config('whatsapp.meta.phone_number_id')
+            .'/messages';
+
+        Http::fake([
+            str_replace('https://', '', $url) => Http::response([
+                'messages' => [['id' => 'wamid.nohdr']],
+            ], 200),
+        ]);
+
+        $hasil = app(MetaSender::class)->kirim($log);
+
+        $this->assertTrue($hasil->ok);
+
+        Http::assertSent(function ($request) {
+            $components = $request->data()['template']['components'] ?? [];
+
+            foreach ($components as $c) {
+                if (($c['type'] ?? null) === 'header') {
+                    return false;
+                }
+            }
+
+            return true;
         });
     }
 
@@ -257,7 +314,11 @@ class KirimPesanTest extends TestCase
         Http::assertSent(function ($request) {
             $parameters = $request->data()['template']['components'][0]['parameters'] ?? [];
 
+            // Template positional ({{1}}…) — tidak boleh menyertakan
+            // parameter_name, itu penyebab (#132012) di produksi.
             return count($parameters) === 3
+                && ! isset($parameters[0]['parameter_name'])
+                && ! isset($parameters[1]['parameter_name'])
                 && $parameters[2]['text'] === '—';
         });
 
@@ -269,6 +330,7 @@ class KirimPesanTest extends TestCase
             $parameters = $request->data()['template']['components'][0]['parameters'] ?? [];
 
             return count($parameters) === 3
+                && ! isset($parameters[0]['parameter_name'])
                 && $parameters[2]['text'] === '09:00';
         });
     }
