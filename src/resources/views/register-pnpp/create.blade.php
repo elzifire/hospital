@@ -1,13 +1,16 @@
 <!doctype html>
-<html>
+<html lang="id">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Registrasi PNPP — RS Bhayangkara Bogor</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>[x-cloak]{display:none !important;}</style>
   </head>
-  <body>
+  <body class="bg-slate-100 antialiased">
 
-<div class="flex items-center h-screen" x-data="registerForm()">
+<div class="flex min-h-screen items-center justify-center px-4 py-10 sm:px-6 lg:px-8" x-data="registerForm()">
 
     @php
         // ---- Style tokens ---------------------------------------------------
@@ -45,7 +48,7 @@
         ];
     @endphp
 
-    <div class="overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-slate-900/5">
+    <div class="w-full max-w-4xl overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-slate-900/5">
 
         {{-- Header --}}
         <div class="border-b border-slate-100 bg-gradient-to-r from-sky-50 to-slate-50 px-8 py-6">
