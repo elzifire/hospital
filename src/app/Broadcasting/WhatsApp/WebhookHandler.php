@@ -132,6 +132,14 @@ class WebhookHandler
 
         // Balasan otomatis dari bank data auto_replies (dipilih lewat
         // pencocokan pola) di jam operasional, dikirim segera.
+        Log::debug('[webhook] pesan masuk — panggil auto-reply', [
+            'no_hp' => $waId,
+            'nama' => $nama,
+            'isi' => $isi,
+            'waktu' => $waktu->format('Y-m-d H:i:s T'),
+            'message_reply_id' => $balasan->id,
+        ]);
+
         $this->autoReply->balasOtomatis($balasan);
 
         return true;
