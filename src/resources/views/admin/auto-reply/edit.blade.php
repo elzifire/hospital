@@ -1,0 +1,100 @@
+@extends('layouts.app')
+
+@section('title', 'Edit Aturan Auto Reply')
+@section('page-title', 'Edit Aturan Auto Reply')
+
+@section('content')
+<div x-data="{ saving: false }" class="mx-auto max-w-2xl space-y-6">
+
+    {{-- ===== Header + Breadcrumb ===== --}}
+    <div>
+        <nav class="mb-2 flex items-center gap-1.5 text-xs font-medium text-slate-400" aria-label="Breadcrumb">
+            <a href="{{ route('admin.auto-reply.index') }}" class="rounded transition hover:text-sky-600">Auto Reply</a>
+            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>
+            <span class="font-semibold text-slate-600">{{ $aturan->nama }}</span>
+        </nav>
+        <h2 class="text-xl font-bold tracking-tight text-slate-900">Edit Aturan Auto Reply</h2>
+        <p class="mt-0.5 text-sm text-slate-500">Perbarui pola pertanyaan beserta jawaban otomatisnya.</p>
+    </div>
+
+    @include('admin.respon._flash')
+
+    <form action="{{ route('admin.auto-reply.update', $aturan->id) }}" method="POST" @submit="saving = true" x-cloak>
+        @csrf
+        @method('PUT')
+        <div class="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+            <div class="border-b border-slate-100 p-6">
+                <h3 class="text-base font-bold text-slate-900">Informasi Aturan</h3>
+                <p class="mt-0.5 text-sm text-slate-500">Pilih cara pencocokan pesan: semua pesan, sama persis, diawali, mengandung, atau diakhiri.</p>
+            </div>
+
+            <div class="space-y-5 p-6">
+                <div class="grid gap-5 sm:grid-cols-2">
+                    <div>
+                        <label for="kategori" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Kategori <span class="text-rose-500">*</span></label>
+                        <select name="kategori" id="kategori"
+                                class="block w-full rounded-xl border-0 py-2.5 px-3.5 text-sm text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-inset focus:ring-sky-500 transition cursor-pointer @error('kategori') ring-rose-300 focus:ring-rose-500 @enderror">
+                            @foreach (\App\Models\AutoReply::kategoriOptions() as $k => $label)
+                                <option value="{{ $k }}" @selected(old('kategori', $aturan->kategori) === $k)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                        @error('kategori')<p class="mt-1.5 text-xs font-medium text-rose-600">{{ $message }}</p>@enderror
+                    </div>
+                    <div>
+                        <label for="prioritas" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Prioritas</label>
+                        <input type="number" name="prioritas" id="prioritas" value="{{ old('prioritas', $aturan->prioritas) }}" min="0" max="65535"
+                               class="block w-full rounded-xl border-0 py-2.5 px-3.5 text-sm text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-sky-500 transition @error('prioritas') ring-rose-300 focus:ring-rose-500 @enderror">
+                        @error('prioritas')<p class="mt-1.5 text-xs font-medium text-rose-600">{{ $message }}</p>@enderror
+                        <p class="mt-1.5 text-xs text-slate-400">Angka lebih kecil dipakai lebih dulu.</p>
+                    </div>
+                </div>
+
+                <div>
+                    <label for="nama" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Nama Aturan <span class="text-rose-500">*</span></label>
+                    <input type="text" name="nama" id="nama" value="{{ old('nama', $aturan->nama) }}" required placeholder="cth. Jadwal Dokter"
+                           class="block w-full rounded-xl border-0 py-2.5 px-3.5 text-sm text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-sky-500 transition @error('nama') ring-rose-300 focus:ring-rose-500 @enderror">
+                    @error('nama')<p class="mt-1.5 text-xs font-medium text-rose-600">{{ $message }}</p>@enderror
+                </div>
+
+                <div class="grid gap-5 sm:grid-cols-2">
+                    <div>
+                        <label for="cara_cocok" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Cara Cocok <span class="text-rose-500">*</span></label>
+                        <select name="cara_cocok" id="cara_cocok"
+                                class="block w-full rounded-xl border-0 py-2.5 px-3.5 text-sm text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-inset focus:ring-sky-500 transition cursor-pointer @error('cara_cocok') ring-rose-300 focus:ring-rose-500 @enderror">
+                            @foreach (\App\Models\AutoReply::caraCocokLabels() as $k => $label)
+                                <option value="{{ $k }}" @selected(old('cara_cocok', $aturan->cara_cocok) === $k)>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                        @error('cara_cocok')<p class="mt-1.5 text-xs font-medium text-rose-600">{{ $message }}</p>@enderror
+                    </div>
+                    <div>
+                        <label for="pola" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Pola / Kata Kunci</label>
+                        <input type="text" name="pola" id="pola" value="{{ old('pola', $aturan->pola) }}" placeholder="cth. jadwal dokter"
+                               class="block w-full rounded-xl border-0 py-2.5 px-3.5 text-sm text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-sky-500 transition @error('pola') ring-rose-300 focus:ring-rose-500 @enderror">
+                        @error('pola')<p class="mt-1.5 text-xs font-medium text-rose-600">{{ $message }}</p>@enderror
+                        <p class="mt-1.5 text-xs text-slate-400">Wajib diisi kecuali cara cocok "Semua Pesan".</p>
+                    </div>
+                </div>
+
+                <div>
+                    <label for="isi" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Jawaban Otomatis <span class="text-rose-500">*</span></label>
+                    <textarea name="isi" id="isi" rows="4" required placeholder="Tulis jawaban yang dikirim ke pengirim pesan..."
+                              class="block w-full rounded-xl border-0 py-2.5 px-3.5 text-sm text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-sky-500 transition @error('isi') ring-rose-300 focus:ring-rose-500 @enderror">{{ old('isi', $aturan->isi) }}</textarea>
+                    @error('isi')<p class="mt-1.5 text-xs font-medium text-rose-600">{{ $message }}</p>@enderror
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-3 rounded-b-2xl border-t border-slate-100 bg-slate-50/70 p-4">
+                <a href="{{ route('admin.auto-reply.index') }}"
+                   class="rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-xs transition hover:bg-slate-50">Batal</a>
+                <button type="submit" :disabled="saving"
+                        class="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-6 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+                    <svg x-show="!saving" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+                    <svg x-show="saving" x-cloak class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                    <span x-text="saving ? 'Menyimpan...' : 'Simpan Perubahan'"></span>
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+@endsection

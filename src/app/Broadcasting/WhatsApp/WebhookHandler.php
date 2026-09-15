@@ -3,9 +3,9 @@
 namespace App\Broadcasting\WhatsApp;
 
 use App\Broadcasting\PhoneFormat;
-use App\Models\MessageLog;
 use App\Models\MessageReply;
 use App\Models\Pnpp;
+use App\Services\AutoReplyService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -27,7 +27,7 @@ use Illuminate\Support\Facades\Log;
  */
 class WebhookHandler
 {
-    public function __construct(protected AntreanKirim $antrean) {}
+    public function __construct(protected AutoReplyService $autoReply) {}
 
     /**
      * Zona waktu target untuk waktu masuk (WIB) — dipakai menyimpan
@@ -116,7 +116,7 @@ class WebhookHandler
             ? CarbonImmutable::createFromTimestamp($ts, $this->zona())
             : CarbonImmutable::now($this->zona());
 
-        MessageReply::updateOrCreate(
+        $balasan = MessageReply::updateOrCreate(
             ['no_hp' => $waId, 'waktu_masuk' => $waktu],
             [
                 'pnpp_id' => $pnpp?->id,
@@ -130,57 +130,11 @@ class WebhookHandler
             ],
         );
 
-        $this->balasOtomatis($waId, $pnpp?->id, $nama, $waktu);
+        // Balasan otomatis dari bank data auto_replies (dipilih lewat
+        // pencocokan pola) di jam operasional, dikirim segera.
+        $this->autoReply->balasOtomatis($balasan);
 
         return true;
-    }
-
-    /**
-     * Balasan otomatis saat pesan masuk di jam operasional (08:00–22:00
-     * WIB default). Di luar jam tersebut pesan hanya dicatat — petugas
-     * menindaklanjuti setelah jam buka.
-     */
-    protected function balasOtomatis(string $waId, ?int $pnppId, ?string $nama, CarbonImmutable $waktuMasuk): void
-    {
-        if (! (bool) config('whatsapp.auto_reply.enabled', true)) {
-            return;
-        }
-
-        $zona = $this->zona();
-        $lokal = $waktuMasuk->tz($zona);
-        $jam = (int) $lokal->format('G');
-        $buka = (int) str_replace(':', '', (string) config('whatsapp.auto_reply.jam_buka', '08:00'));
-        $tutup = (int) str_replace(':', '', (string) config('whatsapp.auto_reply.jam_tutup', '22:00'));
-
-        // Konversi "HH:MM" → menit-dari-tengah-malam agar mudah dibandingkan.
-        $diBuka = (int) substr((string) $buka, 0, 2) * 60 + (int) substr((string) $buka, 2, 2);
-        $diTutup = (int) substr((string) $tutup, 0, 2) * 60 + (int) substr((string) $tutup, 2, 2);
-        $menit = $jam * 60 + (int) $lokal->format('i');
-
-        if ($menit < $diBuka || $menit >= $diTutup) {
-            return;
-        }
-
-        $pesan = (string) config('whatsapp.auto_reply.pesan', '');
-        if (trim($pesan) === '') {
-            return;
-        }
-
-        $log = MessageLog::create([
-            'jenis' => 'respon',
-            'rule' => 'auto',
-            'pnpp_id' => $pnppId,
-            'penerima_nama' => $nama ?? 'Nomor Tak Dikenal',
-            'penerima_no_hp' => $waId,
-            'konten' => $pesan,
-            'status' => 'menunggu',
-            'provider' => (string) config('whatsapp.driver'),
-            'meta_template_name' => null,
-            'template_params' => [],
-        ]);
-
-        // Kirim sinkron — balasan otomatis harus segera sampai.
-        $this->antrean->kirimSinkron([$log]);
     }
 
     /**

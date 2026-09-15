@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\AutoReplyController;
 use App\Http\Controllers\Admin\BroadcastLogController;
 use App\Http\Controllers\Admin\DigitalReminderController;
 use App\Http\Controllers\Admin\DokterController;
@@ -142,6 +143,7 @@ Route::middleware('auth')->group(function () {
             Route::get('respon/manual', [ResponController::class, 'indexManual'])->name('respon.manual');
             Route::get('respon/import', [ResponController::class, 'indexImport'])->name('respon.import');
             Route::get('respon', [ResponController::class, 'index'])->name('respon.index');
+            Route::get('respon/poll', [ResponController::class, 'poll'])->name('respon.poll');
             Route::get('respon/{nomor}', [ResponController::class, 'show'])->name('respon.show');
             Route::post('respon/manual', [ResponController::class, 'storeManual'])->name('respon.manual-store');
             Route::delete('respon/manual/{responManual}', [ResponController::class, 'destroy'])->name('respon.manual-destroy');
@@ -153,6 +155,18 @@ Route::middleware('auth')->group(function () {
             // (event, tanpa websocket).
             Route::post('respon/{nomor}/balas', [ResponController::class, 'balas'])->name('respon.balas');
             Route::get('respon/{nomor}/timeline', [ResponController::class, 'timeline'])->name('respon.timeline');
+        });
+
+        // Bank data Auto Reply — aturan pencocokan pesan masuk → jawaban
+        // otomatis. Dikelola khusus superadmin (permission "manage auto-reply").
+        Route::prefix('auto-reply')->name('auto-reply.')->middleware('can:manage auto-reply')->group(function () {
+            Route::get('/', [AutoReplyController::class, 'index'])->name('index');
+            Route::get('create', [AutoReplyController::class, 'create'])->name('create');
+            Route::post('/', [AutoReplyController::class, 'store'])->name('store');
+            Route::get('{autoReply}/edit', [AutoReplyController::class, 'edit'])->name('edit');
+            Route::put('{autoReply}', [AutoReplyController::class, 'update'])->name('update');
+            Route::delete('{autoReply}', [AutoReplyController::class, 'destroy'])->name('destroy');
+            Route::post('{autoReply}/toggle', [AutoReplyController::class, 'toggle'])->name('toggle');
         });
 
         // Aksi atas riwayat pesan (dipakai lintas modul broadcast):

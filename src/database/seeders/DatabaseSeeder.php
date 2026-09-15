@@ -22,6 +22,7 @@ class DatabaseSeeder extends Seeder
             // MessageTemplateSeeder::class,
             TemplateCategorySeeder::class,
             BroadcastRuleSeeder::class,
+            AutoReplySeeder::class,
             // MasterDataSeeder::class,
         ]);
     }

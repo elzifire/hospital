@@ -60,13 +60,15 @@ class FeaturePermissionSeeder extends Seeder
         $semua = array_merge(
             ['view dashboard', 'manage users', 'manage roles'],
             self::fiturPermissions(),
+            // Khusus superadmin (tidak diberikan ke admin) — lihat komentar di atas.
+            ['manage auto-reply'],
         );
 
         foreach ($semua as $nama) {
             Permission::findOrCreate($nama);
         }
 
-        // Superadmin: semua fitur + manajemen akun.
+        // Superadmin: semua fitur + manajemen akun + auto-reply.
         Role::findOrCreate('superadmin')->syncPermissions($semua);
 
         // Admin: seluruh fitur operasional + manajemen pengguna

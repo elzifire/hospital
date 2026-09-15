@@ -145,7 +145,7 @@
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
                 <h2 class="text-2xl font-black tracking-tight text-slate-900">Manajemen Template & Kategori</h2>
-                <p class="mt-1 text-sm text-slate-500">Kelola draft pesan otomatis WhatsApp/SMS, variabel dinamis, dan kategori peruntukan.</p>
+                <p class="mt-1 text-sm text-slate-500">Kelola Template pesan whatsapp dan kategori peruntukan.</p>
             </div>
             <div class="flex flex-wrap items-center gap-2">
                 {{-- Dropdown Export --}}

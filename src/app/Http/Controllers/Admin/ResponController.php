@@ -13,6 +13,7 @@ use App\Models\Pnpp;
 use App\Models\ResponManual;
 use App\Support\MasterRegistry;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -25,6 +26,46 @@ class ResponController extends Controller
      * Daftar percakapan WhatsApp (mirip chat list WhatsApp).
      */
     public function index(Request $request)
+    {
+        [$konversasi, $stats, $filters] = $this->daftarKonversasi($request);
+
+        return view('admin.respon.balasan', [
+            'konversasi' => $konversasi,
+            'total' => $stats['total'],
+            'belumDibaca' => $stats['belumDibaca'],
+            'hariIni' => $stats['hariIni'],
+            'pasienUnik' => $stats['pasienUnik'],
+            'takTerdaftar' => $stats['takTerdaftar'],
+            'poliId' => $stats['poliId'],
+            'filters' => $filters,
+            'signature' => $this->signaturePercakapan($stats, $konversasi),
+        ]);
+    }
+
+    /**
+     * Polling JS (tanpa websocket): kembalikan signature + statistik +
+     * HTML daftar percakapan. Frontend mengganti isi list bila berubah.
+     */
+    public function poll(Request $request)
+    {
+        [$konversasi, $stats, $filters] = $this->daftarKonversasi($request);
+
+        return response()->json([
+            'signature' => $this->signaturePercakapan($stats, $konversasi),
+            'stats' => $stats,
+            'html' => view('admin.respon._chatlist', [
+                'konversasi' => $konversasi,
+            ])->render(),
+        ]);
+    }
+
+    /**
+     * Data chat list + statistik, dipakai bersama oleh halaman index
+     * dan endpoint polling.
+     *
+     * @return array{0: LengthAwarePaginator, 1: array<string, int|null>, 2: array<string, string>}
+     */
+    protected function daftarKonversasi(Request $request, int $perPage = 15): array
     {
         $q = (string) $request->query('q', '');
         $poliId = $request->user()?->poliId();
@@ -50,7 +91,7 @@ class ResponController extends Controller
             ->selectRaw('COALESCE(SUM(CASE WHEN "read_at" IS NULL THEN 1 ELSE 0 END), 0) as belum_dibaca')
             ->groupBy('no_hp')
             ->orderByDesc('waktu_terakhir')
-            ->paginate(15)
+            ->paginate($perPage)
             ->withQueryString();
 
         $nomors = $konversasi->pluck('no_hp')->all();
@@ -83,15 +124,36 @@ class ResponController extends Controller
             return $row;
         });
 
-        return view('admin.respon.balasan', [
-            'konversasi' => $konversasi,
+        $stats = [
             'total' => MessageReply::query()->tap($scopePoli)->count(),
             'belumDibaca' => MessageReply::query()->tap($scopePoli)->belumDibaca()->count(),
             'hariIni' => MessageReply::query()->tap($scopePoli)->whereBetween('waktu_masuk', [now()->startOfDay(), now()])->count(),
             'pasienUnik' => MessageReply::query()->tap($scopePoli)->whereNotNull('pnpp_id')->distinct()->count('pnpp_id'),
             'takTerdaftar' => MessageReply::query()->tap($scopePoli)->whereNull('pnpp_id')->count(),
             'poliId' => $poliId,
-            'filters' => ['q' => $q],
+        ];
+
+        return [$konversasi, $stats, ['q' => $q]];
+    }
+
+    /**
+     * Tanda tangan perubahan chat list: kombinasi jumlah + pesan terakhir.
+     * Berubah hanya bila ada data baru → frontend memicu refresh.
+     *
+     * @param  array<string, int|null>  $stats
+     */
+    protected function signaturePercakapan(array $stats, $konversasi): string
+    {
+        $pertama = $konversasi->getCollection()->first();
+        $waktu = $pertama?->waktu_terakhir ? optional($pertama->waktu_terakhir)->toIso8601String() : null;
+
+        return implode(':', [
+            $stats['total'],
+            $stats['belumDibaca'],
+            $stats['hariIni'],
+            $stats['pasienUnik'],
+            $stats['takTerdaftar'],
+            $waktu ?? '0',
         ]);
     }
 
