@@ -351,7 +351,8 @@ class MetaSender implements WhatsAppSender
                 'body' => $respons->body(),
             ]);
 
-            return 'Meta Cloud API menolak pesan: '.$pesan;
+            // return 'Meta Cloud API menolak pesan: '.$pesan;
+            return 'Terjadi Kesalahan sistem saat mengirim pesan WhatsApp. Silakan hubungi IT untuk bantuan.';
         }
 
         return 'Meta Cloud API menolak pesan (HTTP '.$respons->status().'): '.Str::limit($respons->body(), 200);

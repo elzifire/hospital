@@ -22,131 +22,127 @@ use Illuminate\Support\Str;
 class ResponController extends Controller
 {
     /**
-     * Fitur Respon dibagi dalam tab:
-     *  - balasan : balasan WhatsApp pasien yang masuk otomatis via webhook.
-     *  - data    : index terpisah untuk balasan yang dicatat manual/diimpor
-     *              (tabel respon_manuals — beda format, tidak tercampur).
-     *  - manual  : input balasan secara manual.
-     *  - import  : import balasan dari file Excel/CSV (diproses per batch di queue).
+     * Daftar percakapan WhatsApp (mirip chat list WhatsApp).
      */
     public function index(Request $request)
     {
-        $tab = $request->query('tab', 'balasan');
-        if (! in_array($tab, ['balasan', 'data', 'manual', 'import'], true)) {
-            $tab = 'balasan';
-        }
+        $q = (string) $request->query('q', '');
+        $poliId = $request->user()?->poliId();
 
-        $data = ['tab' => $tab];
+        $scopePoli = fn ($query) => $query->when(
+            $poliId !== null,
+            fn ($sub) => $sub->whereHas(
+                'pnpp',
+                fn ($pnpp) => $pnpp->whereHas('kunjungans', fn ($kunjungan) => $kunjungan->where('poli_id', $poliId))
+            ),
+        );
 
-        if ($tab === 'balasan') {
-            $q = (string) $request->query('q', '');
-            $poliId = $request->user()?->poliId();
+        $konversasi = MessageReply::query()
+            ->tap($scopePoli)
+            ->when($q, fn ($query) => $query->where(
+                fn ($sub) => $sub->where('nama', 'like', "%{$q}%")
+                    ->orWhere('no_hp', 'like', "%{$q}%")
+                    ->orWhere('isi_pesan', 'like', "%{$q}%")
+            ))
+            ->select('no_hp')
+            ->selectRaw('MAX("waktu_masuk") as waktu_terakhir')
+            ->selectRaw('COUNT(*) as total_pesan')
+            ->selectRaw('COALESCE(SUM(CASE WHEN "read_at" IS NULL THEN 1 ELSE 0 END), 0) as belum_dibaca')
+            ->groupBy('no_hp')
+            ->orderByDesc('waktu_terakhir')
+            ->paginate(15)
+            ->withQueryString();
 
-            // Akun poli hanya melihat balasan pasien polinya sendiri
-            // (dicari lewat kunjungan PNPP di instalasi tsb.).
-            $scopePoli = fn ($query) => $query->when(
-                $poliId !== null,
-                fn ($sub) => $sub->whereHas(
-                    'pnpp',
-                    fn ($pnpp) => $pnpp->whereHas('kunjungans', fn ($kunjungan) => $kunjungan->where('poli_id', $poliId))
-                ),
-            );
-
-            $konversasi = MessageReply::query()
-                ->tap($scopePoli)
-                ->when($q, fn ($query) => $query->where(
-                    fn ($sub) => $sub->where('nama', 'like', "%{$q}%")
-                        ->orWhere('no_hp', 'like', "%{$q}%")
-                        ->orWhere('isi_pesan', 'like', "%{$q}%")
-                ))
-                ->select('no_hp')
-                ->selectRaw('MAX("waktu_masuk") as waktu_terakhir')
-                ->selectRaw('COUNT(*) as total_pesan')
-                ->selectRaw('COALESCE(SUM(CASE WHEN "read_at" IS NULL THEN 1 ELSE 0 END), 0) as belum_dibaca')
+        $nomors = $konversasi->pluck('no_hp')->all();
+        $pesanTerakhir = $nomors === []
+            ? collect()
+            : MessageReply::query()
+                ->whereIn('no_hp', $nomors)
+                ->orderBy('waktu_masuk')
+                ->get()
                 ->groupBy('no_hp')
-                ->orderByDesc('waktu_terakhir')
-                ->paginate(15)
-                ->withQueryString();
+                ->map->last();
 
-            // Pesan terakhir tiap percakapan (mengisi pratinjau chat list).
-            $nomors = $konversasi->pluck('no_hp')->all();
-            $pesanTerakhir = $nomors === []
-                ? collect()
-                : MessageReply::query()
-                    ->whereIn('no_hp', $nomors)
-                    ->orderBy('waktu_masuk')
-                    ->get()
-                    ->groupBy('no_hp')
-                    ->map->last();
+        $pnppByNomor = Pnpp::query()
+            ->whereNotNull('no_hp')
+            ->get(['id', 'nama', 'no_hp'])
+            ->reduce(function (array $carry, Pnpp $p) {
+                $wa = PhoneFormat::toWa($p->no_hp);
+                $wa !== null && ($carry[$wa] = $p);
 
-            // Identifikasi PNPP untuk nomor yang belum punya pnpp_id.
-            $pnppByNomor = Pnpp::query()
-                ->whereNotNull('no_hp')
-                ->get(['id', 'nama', 'no_hp'])
-                ->reduce(function (array $carry, Pnpp $p) {
-                    $wa = PhoneFormat::toWa($p->no_hp);
-                    $wa !== null && ($carry[$wa] = $p);
+                return $carry;
+            }, []);
 
-                    return $carry;
-                }, []);
+        $konversasi->getCollection()->transform(function ($row) use ($pesanTerakhir, $pnppByNomor) {
+            $terakhir = $pesanTerakhir[$row->no_hp] ?? null;
+            $row->waktu_terakhir = $terakhir?->waktu_masuk;
+            $row->isi_terakhir = $terakhir?->isi_pesan;
+            $row->nama_pengirim = $terakhir?->nama;
+            $row->pnpp = $row->pnpp ?? ($pnppByNomor[$row->no_hp] ?? null);
 
-            $konversasi->getCollection()->transform(function ($row) use ($pesanTerakhir, $pnppByNomor) {
-                $terakhir = $pesanTerakhir[$row->no_hp] ?? null;
-                $row->waktu_terakhir = $terakhir?->waktu_masuk;
-                $row->isi_terakhir = $terakhir?->isi_pesan;
-                $row->nama_pengirim = $terakhir?->nama;
-                $row->pnpp = $row->pnpp ?? ($pnppByNomor[$row->no_hp] ?? null);
+            return $row;
+        });
 
-                return $row;
-            });
+        return view('admin.respon.balasan', [
+            'konversasi' => $konversasi,
+            'total' => MessageReply::query()->tap($scopePoli)->count(),
+            'belumDibaca' => MessageReply::query()->tap($scopePoli)->belumDibaca()->count(),
+            'hariIni' => MessageReply::query()->tap($scopePoli)->whereBetween('waktu_masuk', [now()->startOfDay(), now()])->count(),
+            'pasienUnik' => MessageReply::query()->tap($scopePoli)->whereNotNull('pnpp_id')->distinct()->count('pnpp_id'),
+            'takTerdaftar' => MessageReply::query()->tap($scopePoli)->whereNull('pnpp_id')->count(),
+            'poliId' => $poliId,
+            'filters' => ['q' => $q],
+        ]);
+    }
 
-            $data += [
-                'konversasi' => $konversasi,
-                'total' => MessageReply::query()->tap($scopePoli)->count(),
-                'belumDibaca' => MessageReply::query()->tap($scopePoli)->belumDibaca()->count(),
-                'hariIni' => MessageReply::query()->tap($scopePoli)->whereBetween('waktu_masuk', [now()->startOfDay(), now()])->count(),
-                'pasienUnik' => MessageReply::query()->tap($scopePoli)->whereNotNull('pnpp_id')->distinct()->count('pnpp_id'),
-                'takTerdaftar' => MessageReply::query()->tap($scopePoli)->whereNull('pnpp_id')->count(),
-                'poliId' => $poliId,
-                'filters' => ['q' => $q],
-            ];
-        }
+    /**
+     * Index data respon manual & import (tabel respon_manuals).
+     */
+    public function indexData(Request $request)
+    {
+        $q = (string) $request->query('q', '');
 
-        if ($tab === 'data') {
-            $q = (string) $request->query('q', '');
+        $dataRespon = ResponManual::query()
+            ->when($q, fn ($query) => $query->where(
+                fn ($sub) => $sub->where('nama', 'like', "%{$q}%")
+                    ->orWhere('nrp_nip', 'like', "%{$q}%")
+                    ->orWhere('no_hp', 'like', "%{$q}%")
+                    ->orWhere('satker', 'like', "%{$q}%")
+                    ->orWhere('isi', 'like', "%{$q}%")
+            ))
+            ->orderByDesc('waktu')
+            ->paginate(15)
+            ->withQueryString();
 
-            $dataRespon = ResponManual::query()
-                ->when($q, fn ($query) => $query->where(
-                    fn ($sub) => $sub->where('nama', 'like', "%{$q}%")
-                        ->orWhere('nrp_nip', 'like', "%{$q}%")
-                        ->orWhere('no_hp', 'like', "%{$q}%")
-                        ->orWhere('satker', 'like', "%{$q}%")
-                        ->orWhere('isi', 'like', "%{$q}%")
-                ))
-                ->orderByDesc('waktu')
-                ->paginate(15)
-                ->withQueryString();
+        return view('admin.respon.data', [
+            'dataRespon' => $dataRespon,
+            'totalRespon' => ResponManual::count(),
+            'totalManual' => ResponManual::where('sumber', ResponManual::SUMBER_MANUAL)->count(),
+            'totalImport' => ResponManual::where('sumber', ResponManual::SUMBER_IMPORT)->count(),
+            'filters' => ['q' => $q],
+        ]);
+    }
 
-            $data += [
-                'dataRespon' => $dataRespon,
-                'totalRespon' => ResponManual::count(),
-                'totalManual' => ResponManual::where('sumber', ResponManual::SUMBER_MANUAL)->count(),
-                'totalImport' => ResponManual::where('sumber', ResponManual::SUMBER_IMPORT)->count(),
-                'filters' => ['q' => $q],
-            ];
-        }
+    /**
+     * Form input manual.
+     */
+    public function indexManual()
+    {
+        return view('admin.respon.manual');
+    }
 
-        if ($tab === 'import') {
-            [$status, $preview, $token] = $this->importState();
+    /**
+     * Import Excel/CSV.
+     */
+    public function indexImport(Request $request)
+    {
+        [$status, $preview, $token] = $this->importState();
 
-            $data += [
-                'importStatus' => $status,
-                'preview' => $preview,
-                'importToken' => $preview ? $token : null,
-            ];
-        }
-
-        return view('admin.respon.index', $data);
+        return view('admin.respon.import', [
+            'importStatus' => $status,
+            'preview' => $preview,
+            'importToken' => $preview ? $token : null,
+        ]);
     }
 
     /**
@@ -308,7 +304,7 @@ class ResponController extends Controller
     }
 
     /**
-     * Simpan balasan dari input manual (form di tab "Input Manual").
+     * Simpan balasan dari input manual (form di halaman "Input Manual").
      * Formatnya berbeda dari balasan webhook: nama, nrp/nip, no_hp,
      * satker, isi — disimpan ke tabel respon_manuals yang terpisah.
      */
@@ -343,19 +339,19 @@ class ResponController extends Controller
         ]);
 
         return redirect()
-            ->route('admin.respon.index', ['tab' => 'data'])
+            ->route('admin.respon.data')
             ->with('success', 'Balasan tersimpan sebagai input manual.');
     }
 
     /**
-     * Hapus satu baris data respon manual/import dari tab "Data Respon".
+     * Hapus satu baris data respon manual/import dari halaman "Data Respon".
      */
     public function destroy(ResponManual $responManual)
     {
         $responManual->delete();
 
         return redirect()
-            ->route('admin.respon.index', ['tab' => 'data'])
+            ->route('admin.respon.data')
             ->with('success', 'Data respon dihapus.');
     }
 
@@ -380,7 +376,7 @@ class ResponController extends Controller
         session(['respon_import_token' => $token]);
 
         return redirect()
-            ->route('admin.respon.index', ['tab' => 'import'])
+            ->route('admin.respon.import')
             ->with('success', 'Pratinjau sedang diproses di background (queue). Halaman ini akan diperbarui otomatis.');
     }
 
@@ -397,7 +393,7 @@ class ResponController extends Controller
 
         if (! $token || ($status['status'] ?? null) !== 'preview_ready' || $total === 0 || $totalChunks === 0) {
             return redirect()
-                ->route('admin.respon.index', ['tab' => 'import'])
+                ->route('admin.respon.import')
                 ->withErrors(['file' => 'Data preview kosong. Silakan upload ulang.']);
         }
 
@@ -426,7 +422,7 @@ class ResponController extends Controller
         session(['respon_import_token' => $token]);
 
         return redirect()
-            ->route('admin.respon.index', ['tab' => 'import'])
+            ->route('admin.respon.import')
             ->with('success', 'Import diproses di background (queue). Refresh halaman ini untuk melihat hasilnya.');
     }
 
@@ -446,7 +442,7 @@ class ResponController extends Controller
 
         session()->forget('respon_import_token');
 
-        return redirect()->route('admin.respon.index', ['tab' => 'import']);
+        return redirect()->route('admin.respon.import');
     }
 
     private function importState(): array

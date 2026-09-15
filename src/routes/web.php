@@ -137,6 +137,10 @@ Route::middleware('auth')->group(function () {
         // Respon: balasan pesan WhatsApp per nomor telepon (masuk via webhook)
         // + input manual & import Excel/CSV per batch (queue).
         Route::middleware('can:manage respon')->group(function () {
+            // Setiap fitur = halaman terpisah (bukan tab) agar kode rapi.
+            Route::get('respon/data', [ResponController::class, 'indexData'])->name('respon.data');
+            Route::get('respon/manual', [ResponController::class, 'indexManual'])->name('respon.manual');
+            Route::get('respon/import', [ResponController::class, 'indexImport'])->name('respon.import');
             Route::get('respon', [ResponController::class, 'index'])->name('respon.index');
             Route::get('respon/{nomor}', [ResponController::class, 'show'])->name('respon.show');
             Route::post('respon/manual', [ResponController::class, 'storeManual'])->name('respon.manual-store');

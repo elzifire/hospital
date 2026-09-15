@@ -41,7 +41,7 @@ class ResponImportManualTest extends TestCase
                 'isi' => 'Baik, saya hadir kontrol.',
                 'waktu' => '2026-09-14 10:00',
             ])
-            ->assertRedirect(route('admin.respon.index', ['tab' => 'data']));
+            ->assertRedirect(route('admin.respon.data'));
 
         $this->assertDatabaseHas('respon_manuals', [
             'nama' => 'Budi Santoso',
@@ -64,7 +64,7 @@ class ResponImportManualTest extends TestCase
                 'no_hp' => '6289999999999',
                 'isi' => 'Balasan tanpa waktu',
             ])
-            ->assertRedirect(route('admin.respon.index', ['tab' => 'data']));
+            ->assertRedirect(route('admin.respon.data'));
 
         $this->assertDatabaseCount('respon_manuals', 1);
         $this->assertTrue(
@@ -100,7 +100,7 @@ class ResponImportManualTest extends TestCase
         $this->actingAs($this->superadmin())
             ->post(route('admin.respon.import-upload'), ['file' => $file])
             ->assertSessionHasNoErrors()
-            ->assertRedirect(route('admin.respon.index', ['tab' => 'import']));
+            ->assertRedirect(route('admin.respon.import'));
 
         // Queue sync → preview selesai langsung.
         $token = session('respon_import_token');
@@ -109,7 +109,7 @@ class ResponImportManualTest extends TestCase
 
         $this->actingAs($this->superadmin())
             ->post(route('admin.respon.import-confirm'), ['token' => $token])
-            ->assertRedirect(route('admin.respon.index', ['tab' => 'import']));
+            ->assertRedirect(route('admin.respon.import'));
 
         $this->assertDatabaseHas('respon_manuals', [
             'nama' => 'Budi Santoso',
@@ -174,7 +174,7 @@ class ResponImportManualTest extends TestCase
 
         $this->actingAs($this->superadmin())
             ->delete(route('admin.respon.manual-destroy', $d))
-            ->assertRedirect(route('admin.respon.index', ['tab' => 'data']));
+            ->assertRedirect(route('admin.respon.data'));
 
         $this->assertDatabaseCount('respon_manuals', 0);
     }
