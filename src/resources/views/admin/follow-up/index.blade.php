@@ -38,7 +38,7 @@
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
             <h2 class="text-xl font-bold tracking-tight text-slate-900">Follow Up</h2>
-            <p class="mt-0.5 text-sm text-slate-500">Pesan tindak lanjut jadwal (H-1, hari-H, dan tidak datang) yang dibuat dari penjadwalan.</p>
+            <p class="mt-0.5 text-sm text-slate-500">Pesan tindak lanjut pasien. Aturan generate otomatis (H-1, hari-H, tidak datang) dinonaktifkan sementara.</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
             <a href="{{ route('admin.follow-up.create') }}"

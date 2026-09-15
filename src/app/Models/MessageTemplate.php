@@ -29,6 +29,8 @@ class MessageTemplate extends Model
         'konten',
         'deskripsi',
         'image_url',
+        'meta_media_id',
+        'meta_media_at',
         'is_active',
         'dipakai_count',
     ];
@@ -41,6 +43,7 @@ class MessageTemplate extends Model
             'meta_param_tokens' => 'array',
             'meta_components' => 'array',
             'meta_updated_at' => 'datetime',
+            'meta_media_at' => 'datetime',
             'last_synced_at' => 'datetime',
         ];
     }

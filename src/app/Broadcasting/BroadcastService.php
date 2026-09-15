@@ -11,8 +11,9 @@ use Illuminate\Support\Collection;
 /**
  * Orkestrator pesan broadcast berbasis penjadwalan (reminders):
  *  - generate(jenis) → buat message_logs untuk reminder yang jatuh ke
- *    rule aktif jenis tsb. (outreach: H-7 & H-1; follow up: H-1, hari-H,
- *    dan tidak-datang) memakai template yang dipilih per rule (Setting);
+ *    rule aktif jenis tsb. (saat ini hanya outreach: H-7 & H-1; rule
+ *    follow up H-1/hari-H/tidak-datang dinonaktifkan sementara) memakai
+ *    template yang dipilih per rule (Setting);
  *    jadwal yang punya template sendiri (form Digital Reminder) memakai
  *    template itu sebagai pengganti (override) default rule.
  *  - sweepStatus() → tandai reminder lewat tanpa kunjungan sebagai

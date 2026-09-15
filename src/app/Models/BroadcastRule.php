@@ -15,7 +15,8 @@ class BroadcastRule extends Model
 
     /**
      * Aturan kirim: jarak hari dari tanggal jadwal + deteksi tidak datang.
-     * outreach: h-7, h-1 · follow_up: h-1, h, tidak_datang.
+     * outreach: h-7, h-1 · follow_up: h-1, h, tidak_datang (nonaktif
+     * sementara — tidak di-seed dan dihapus dari DB lewat migrasi).
      */
     public const RULE = ['h-7', 'h-1', 'h', 'tidak_datang'];
 

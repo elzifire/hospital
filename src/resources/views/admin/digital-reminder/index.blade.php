@@ -165,9 +165,9 @@
                 <table class="min-w-full divide-y divide-slate-100 text-sm">
                     <thead class="bg-slate-50/70 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">
                         <tr>
-                            <th class="px-5 py-3">Jadwal</th>
                             <th class="px-5 py-3">Pasien</th>
-                            <th class="px-5 py-3">Poli / Dokter</th>
+                            <th class="px-5 py-3">Jadwal</th>
+                            <th class="px-5 py-3">Poli</th>
                             <th class="px-5 py-3">Jenis</th>
                             <th class="px-5 py-3">Sumber</th>
                             <th class="px-5 py-3">Status</th>
@@ -220,14 +220,15 @@
                                 {{-- ==== Baris penjadwalan (reminder) ==== --}}
                                 @php($r = $baris)
                                 <tr class="hover:bg-slate-50/60">
-                                    <td class="whitespace-nowrap px-5 py-3">
-                                        <p class="font-semibold text-slate-800">{{ $r['tanggal']?->translatedFormat('d M Y') }}</p>
-                                        <p class="text-xs text-slate-400">{{ $r['jam']?->format('H:i') }} WIB</p>
-                                    </td>
                                     <td class="px-5 py-3">
                                         <p class="font-semibold text-slate-800">{{ $r['pasien']?->nama }}</p>
                                         <p class="text-xs text-slate-400">NIP {{ $r['pasien']?->nip ?? '—' }} · {{ $r['pasien']?->satker?->nama ?? '—' }}</p>
                                     </td>
+                                    <td class="whitespace-nowrap px-5 py-3">
+                                        <p class="font-semibold text-slate-800">{{ $r['tanggal']?->translatedFormat('d M Y') }}</p>
+                                        <p class="text-xs text-slate-400">{{ $r['jam']?->format('H:i') }} WIB</p>
+                                    </td>
+                                    
                                     <td class="px-5 py-3">
                                         <p class="text-xs font-medium text-slate-600">{{ $r['poliNama'] ?? '—' }}</p>
                                         <p class="text-xs text-slate-400">{{ $r['dokter'] ?? 'Dokter belum ditentukan' }}</p>

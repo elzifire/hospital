@@ -34,7 +34,7 @@ class SettingAturanTest extends TestCase
             ->assertOk()
             ->assertSee('Aturan Generate Pesan')
             ->assertSee('H-7')
-            ->assertSee('Tidak Datang')
+            ->assertDontSee('Tidak Datang')
             ->assertSee('Tanpa template (rule dilewati)');
     }
 

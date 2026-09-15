@@ -1,7 +1,7 @@
 {{--
     Tab "Aturan Pesan" — pasangkan template ke tiap rule generate
-    (outreach H-7/H-1; follow up H-1/hari-H/tidak datang).
-    Butuh: $aturan (BroadcastRule + template), $templateAktif.
+    (saat ini hanya outreach H-7/H-1; aturan follow up dinonaktifkan
+    sementara). Butuh: $aturan (BroadcastRule + template), $templateAktif.
 --}}
 
 <div x-show="activeTab === 'aturan'" class="space-y-6">
@@ -15,10 +15,11 @@
             <div class="min-w-0">
                 <p class="text-sm font-bold text-slate-900">Aturan Generate Pesan</p>
                 <p class="mt-1 text-xs leading-relaxed text-slate-500">
-                    Pesan outreach &amp; follow up dibuat otomatis dari penjadwalan <strong>Digital Reminder</strong> sesuai aturan di bawah.
+                    Pesan outreach dibuat otomatis dari penjadwalan <strong>Digital Reminder</strong> sesuai aturan di bawah.
                     Pasangkan template aktif untuk mengaktifkan tiap aturan, lalu tekan tombol
-                    <strong>Generate Pesan</strong> di modul Outreach / Follow Up untuk menjalankannya.
+                    <strong>Generate Pesan</strong> di modul Outreach untuk menjalankannya.
                     Aturan tanpa template atau yang dinonaktifkan akan dilewati.
+                    Aturan generate follow up (H-1, hari-H, tidak datang) dinonaktifkan sementara.
                 </p>
             </div>
         </div>

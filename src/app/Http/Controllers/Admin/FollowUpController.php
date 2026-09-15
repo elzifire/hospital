@@ -7,9 +7,9 @@ use App\Models\MessageLog;
 use Illuminate\Http\Request;
 
 /**
- * Modul Follow Up — riwayat pesan tindak lanjut (rule H-1, hari-H, dan
- * tidak-datang) yang digenerate dari penjadwalan Digital Reminder, plus
- * form kirim pesan manual yang diwarisi dari ManualBroadcastController.
+ * Modul Follow Up — riwayat pesan tindak lanjut pasien plus form kirim
+ * pesan manual yang diwarisi dari ManualBroadcastController. Aturan
+ * generate otomatis (H-1, hari-H, tidak-datang) dinonaktifkan sementara.
  *
  * Berbeda dengan Outreach, opsi template pada form manual hanya menampilkan
  * template kategori "Follow Up" (sesuai seeder TemplateCategorySeeder).

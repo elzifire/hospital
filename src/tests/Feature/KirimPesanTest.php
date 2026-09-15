@@ -15,6 +15,7 @@ use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -217,7 +218,7 @@ class KirimPesanTest extends TestCase
         $log->template->update([
             'image_url' => 'https://rs-bhayangkara.id/images/sampul.jpg',
             'meta_components' => [
-                ['type' => 'HEADER', 'subtype' => 'TEXT', 'text' => 'Info {{1}}'],
+                ['type' => 'HEADER', 'format' => 'TEXT', 'text' => 'Info {{1}}'],
                 ['type' => 'BODY', 'text' => 'Halo {{1}}.'],
             ],
         ]);
@@ -248,6 +249,249 @@ class KirimPesanTest extends TestCase
 
             return true;
         });
+    }
+
+    #[Test]
+    public function meta_sender_kirim_header_image_saat_snapshot_format_image(): void
+    {
+        $log = $this->buatLog([
+            'log' => [
+                'template_params' => ['Budi'],
+            ],
+        ]);
+
+        // Snapshot Meta untuk template berfoto: HEADER dengan format IMAGE.
+        $log->template->update([
+            'image_url' => 'https://rs-bhayangkara.id/images/sampul.jpg',
+            'meta_param_tokens' => ['nama'],
+            'meta_components' => [
+                ['type' => 'HEADER', 'format' => 'IMAGE'],
+                ['type' => 'BODY', 'text' => 'Halo {{nama}}.'],
+            ],
+        ]);
+
+        $url = config('whatsapp.meta.base_url')
+            .'/'.config('whatsapp.meta.version')
+            .'/'.config('whatsapp.meta.phone_number_id')
+            .'/messages';
+
+        Http::fake([
+            str_replace('https://', '', $url) => Http::response([
+                'messages' => [['id' => 'wamid.foto001']],
+            ], 200),
+        ]);
+
+        $hasil = app(MetaSender::class)->kirim($log);
+
+        $this->assertTrue($hasil->ok);
+
+        Http::assertSent(function ($request) {
+            $components = $request->data()['template']['components'] ?? [];
+
+            return ($components[0]['type'] ?? null) === 'header'
+                && ($components[0]['parameters'][0]['type'] ?? null) === 'image'
+                && ($components[0]['parameters'][0]['image']['link'] ?? null) === 'https://rs-bhayangkara.id/images/sampul.jpg'
+                && ($components[1]['type'] ?? null) === 'body';
+        });
+    }
+
+    #[Test]
+    public function meta_sender_menggunakan_media_id_untuk_header_gambar(): void
+    {
+        $log = $this->buatLog([
+            'log' => [
+                'template_params' => ['Budi'],
+            ],
+        ]);
+
+        $log->template->update([
+            'image_url' => 'https://rs-bhayangkara.id/images/sampul.jpg',
+            'meta_components' => [
+                ['type' => 'HEADER', 'format' => 'IMAGE'],
+                ['type' => 'BODY', 'text' => 'Halo {{1}}.'],
+            ],
+        ]);
+
+        $url = config('whatsapp.meta.base_url')
+            .'/'.config('whatsapp.meta.version')
+            .'/'.config('whatsapp.meta.phone_number_id')
+            .'/messages';
+        $urlMedia = rtrim((string) $url, 'messages').'media';
+
+        Http::fake([
+            'rs-bhayangkara.id/*' => Http::response('isi-gambar', 200, ['Content-Type' => 'image/jpeg']),
+            str_replace('https://', '', $urlMedia) => Http::response(['id' => '987654321098765'], 200),
+            str_replace('https://', '', $url) => Http::response([
+                'messages' => [['id' => 'wamid.idimg']],
+            ], 200),
+        ]);
+
+        $hasil = app(MetaSender::class)->kirim($log);
+
+        $this->assertTrue($hasil->ok);
+
+        Http::assertSent(function ($request) use ($url) {
+            if ($request->url() !== $url) {
+                return true;
+            }
+
+            $components = $request->data()['template']['components'] ?? [];
+
+            return ($components[0]['type'] ?? null) === 'header'
+                && ($components[0]['parameters'][0]['image']['id'] ?? null) === '987654321098765';
+        });
+
+        $this->assertSame('987654321098765', $log->template->refresh()->meta_media_id);
+        $this->assertNotNull($log->template->meta_media_at);
+    }
+
+    #[Test]
+    public function meta_sender_reuse_media_id_dari_cache(): void
+    {
+        $log = $this->buatLog([
+            'log' => [
+                'template_params' => ['Budi'],
+            ],
+        ]);
+
+        $log->template->update([
+            'image_url' => 'https://rs-bhayangkara.id/images/sampul.jpg',
+            'meta_components' => [
+                ['type' => 'HEADER', 'format' => 'IMAGE'],
+                ['type' => 'BODY', 'text' => 'Halo {{1}}.'],
+            ],
+        ]);
+
+        $url = config('whatsapp.meta.base_url')
+            .'/'.config('whatsapp.meta.version')
+            .'/'.config('whatsapp.meta.phone_number_id')
+            .'/messages';
+        $urlMedia = rtrim((string) $url, 'messages').'media';
+
+        Http::fake([
+            'rs-bhayangkara.id/*' => Http::response('isi-gambar', 200, ['Content-Type' => 'image/jpeg']),
+            str_replace('https://', '', $urlMedia) => Http::response(['id' => '555888777666555'], 200),
+            str_replace('https://', '', $url) => Http::response([
+                'messages' => [['id' => 'wamid.cache']],
+            ], 200),
+        ]);
+
+        app(MetaSender::class)->kirim($log);
+        app(MetaSender::class)->kirim($log->refresh());
+
+        $terekam = collect(Http::recorded());
+        $jumlahUpload = $terekam->filter(fn ($pasang) => str_ends_with($pasang[0]->url(), '/media'))->count();
+        $pakaiMediaDiKirim = $terekam->filter(function ($pasang) use ($url) {
+            if ($pasang[0]->url() !== $url) {
+                return false;
+            }
+
+            return ($pasang[0]->data()['template']['components'][0]['parameters'][0]['image']['id'] ?? null) === '555888777666555';
+        })->count();
+
+        $this->assertSame(1, $jumlahUpload);
+        $this->assertSame(2, $pakaiMediaDiKirim);
+    }
+
+    #[Test]
+    public function meta_sender_fallback_ke_link_saat_upload_gagal(): void
+    {
+        $log = $this->buatLog([
+            'log' => [
+                'template_params' => ['Budi'],
+            ],
+        ]);
+
+        $log->template->update([
+            'image_url' => 'https://rs-bhayangkara.id/images/sampul.jpg',
+            'meta_components' => [
+                ['type' => 'HEADER', 'format' => 'IMAGE'],
+                ['type' => 'BODY', 'text' => 'Halo {{1}}.'],
+            ],
+        ]);
+
+        $url = config('whatsapp.meta.base_url')
+            .'/'.config('whatsapp.meta.version')
+            .'/'.config('whatsapp.meta.phone_number_id')
+            .'/messages';
+
+        Http::fake([
+            'rs-bhayangkara.id/*' => Http::response('', 404),
+            str_replace('https://', '', $url) => Http::response([
+                'messages' => [['id' => 'wamid.link']],
+            ], 200),
+        ]);
+
+        $hasil = app(MetaSender::class)->kirim($log);
+
+        $this->assertTrue($hasil->ok);
+
+        Http::assertSent(function ($request) use ($url) {
+            if ($request->url() !== $url) {
+                return true;
+            }
+
+            $components = $request->data()['template']['components'] ?? [];
+
+            return ($components[0]['type'] ?? null) === 'header'
+                && ($components[0]['parameters'][0]['image']['link'] ?? null) === 'https://rs-bhayangkara.id/images/sampul.jpg';
+        });
+
+        $this->assertNull($log->template->refresh()->meta_media_id);
+    }
+
+    #[Test]
+    public function meta_sender_mengunggah_media_header_dari_storage_public(): void
+    {
+        Storage::fake('public');
+        Storage::disk('public')->put('whatsapp/templates/sampul-lokal.jpg', 'byte-gambar');
+
+        $log = $this->buatLog([
+            'log' => [
+                'template_params' => ['Budi'],
+            ],
+        ]);
+
+        // Template disinkron: gambar header sudah disimpan di storage
+        // publik Laravel dan image_url menunjuk ke berkas lokal.
+        $log->template->update([
+            'image_url' => '/storage/whatsapp/templates/sampul-lokal.jpg',
+            'meta_components' => [
+                ['type' => 'HEADER', 'format' => 'IMAGE'],
+                ['type' => 'BODY', 'text' => 'Halo {{1}}.'],
+            ],
+        ]);
+
+        $url = config('whatsapp.meta.base_url')
+            .'/'.config('whatsapp.meta.version')
+            .'/'.config('whatsapp.meta.phone_number_id')
+            .'/messages';
+        $urlMedia = rtrim((string) $url, 'messages').'media';
+
+        Http::fake([
+            str_replace('https://', '', $urlMedia) => Http::response(['id' => '112233445566'], 200),
+            str_replace('https://', '', $url) => Http::response([
+                'messages' => [['id' => 'wamid.storage']],
+            ], 200),
+        ]);
+
+        $hasil = app(MetaSender::class)->kirim($log);
+
+        $this->assertTrue($hasil->ok);
+        $this->assertSame('112233445566', $log->template->refresh()->meta_media_id);
+
+        Http::assertSent(function ($request) use ($url) {
+            if ($request->url() !== $url) {
+                return true;
+            }
+
+            $parameters = $request->data()['template']['components'][0]['parameters'] ?? [];
+
+            return ($parameters[0]['image']['id'] ?? null) === '112233445566'
+                && ! isset($parameters[0]['image']['link']);
+        });
+
+        Http::assertSent(fn ($request) => $request->url() === $urlMedia);
     }
 
     #[Test]

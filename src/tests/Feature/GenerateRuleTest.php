@@ -25,7 +25,7 @@ class GenerateRuleTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(DatabaseSeeder::class); // termasuk 5 BroadcastRule (template null)
+        $this->seed(DatabaseSeeder::class); // termasuk 2 BroadcastRule (template null)
     }
 
     protected function superadmin(): User
@@ -117,29 +117,23 @@ class GenerateRuleTest extends TestCase
     }
 
     #[Test]
-    public function generate_follow_up_meliputi_h1_hari_h_dan_tidak_datang(): void
+    public function generate_follow_up_tidak_membuat_pesan_tanpa_aturan(): void
     {
         extract($this->skenario());
 
-        BroadcastRule::query()->jenis('follow_up')->update(['message_template_id' => $template->id]);
-
+        // Aturan generate follow up (H-1, hari-H, tidak datang) dihapus
+        // sementara — generate tidak menghasilkan apa pun walau ada jadwal.
         $h1 = $this->buatJadwal($budi, $poli, $dokter, today()->addDay()->format('Y-m-d'));
-        $hariIni = $this->buatJadwal($budi, $poli, $dokter, today()->format('Y-m-d'));
         $noShow = $this->buatJadwal($budi, $poli, $dokter, today()->subDay()->format('Y-m-d'), 'tidak_datang');
-        $terlewatBelumSweep = $this->buatJadwal($budi, $poli, $dokter, today()->subDays(4)->format('Y-m-d')); // terjadwal lewat
 
         $svc = app(BroadcastService::class);
         $svc->sweepStatus();
 
         $hasil = $svc->generate('follow_up');
 
-        // h-1 + hari-H + tidak_datang (2: no-show manual + hasil sweep)
-        $this->assertSame(['dibuat' => 4, 'dilewati' => 0], $hasil);
-
-        $this->assertDatabaseHas('message_logs', ['jenis' => 'follow_up', 'rule' => 'h-1', 'reminder_id' => $h1->id]);
-        $this->assertDatabaseHas('message_logs', ['jenis' => 'follow_up', 'rule' => 'h', 'reminder_id' => $hariIni->id]);
-        $this->assertDatabaseHas('message_logs', ['jenis' => 'follow_up', 'rule' => 'tidak_datang', 'reminder_id' => $noShow->id]);
-        $this->assertDatabaseHas('message_logs', ['jenis' => 'follow_up', 'rule' => 'tidak_datang', 'reminder_id' => $terlewatBelumSweep->id]);
+        $this->assertSame(['dibuat' => 0, 'dilewati' => 0], $hasil);
+        $this->assertSame(0, MessageLog::jenis('follow_up')->count());
+        $this->assertCount(0, BroadcastRule::jenis('follow_up')->get());
     }
 
     #[Test]

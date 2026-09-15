@@ -23,6 +23,7 @@ class DashboardController extends Controller
         $stats = [
             ['label' => 'PNPP DALAM DATABASE',  'value' => $pnppCount, 'note' => '100% dari target data',      'color' => 'blue',   'icon' => 'users'],
             ['label' => 'TARGET PNPP',          'value' => '1.025', 'note' => 'Target data PNPP 2024',       'color' => 'gray',   'icon' => 'target'],
+            ['label' => 'DIGITAL REMINDER',        'value' => '565',   'note' => '55,2% dari target',          'color' => 'yellow', 'icon' => 'bell'],
             ['label' => 'PNPP DI-OUTREACH',     'value' => '650',   'note' => '63,4% dari target',          'color' => 'green',  'icon' => 'send'],
             ['label' => 'RESPON PNPP',           'value' => '390',   'note' => '60,0% dari outreach',        'color' => 'orange', 'icon' => 'chat'],
             ['label' => 'FOLLOW-UP',             'value' => '350',   'note' => '89,7% dari respons',         'color' => 'cyan',   'icon' => 'refresh'],

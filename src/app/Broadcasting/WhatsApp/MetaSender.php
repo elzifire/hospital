@@ -21,6 +21,8 @@ use Illuminate\Support\Str;
  */
 class MetaSender implements WhatsAppSender
 {
+    public function __construct(protected MetaMedia $media) {}
+
     public function kirim(MessageLog $log): HasilKirim
     {
         $config = (array) config('whatsapp.meta');
@@ -79,22 +81,36 @@ class MetaSender implements WhatsAppSender
         $params = array_values((array) ($log->template_params ?? []));
         $components = [];
 
-        // Header — kirim hanya jika template Meta memang pakai IMAGE
-        // HEADER dan local template menyediakan image_url. Template
-        // dengan HEADER teks atau tanpa header diabaikan supaya tidak
-        // terjadi kesalahan format (#132012).
+        // Header — kirim hanya jika template Meta memang pakai media HEADER
+        // dan local template menyediakan image_url. Deteksi tipe dari
+        // snapshot memakai field `format` (atau `subtype` versi lama);
+        // template dengan header teks/tanpa header tidak boleh menerima
+        // komponen image, itu penyebab (#132012) di template berfoto.
+        //
+        // Media dikirim via id hasil upload (MetaMedia) — Meta menolak
+        // link yang tidak terjangkau publik dengan (#132012) "expected
+        // IMAGE, received UNKNOWN". Link dipakai hanya sebagai fallback.
         $gambar = $log->template?->image_url;
-        if (filled($gambar)) {
-            $headerMeta = $this->headerMeta($log);
-            if ($headerMeta === null || strtoupper((string) ($headerMeta['subtype'] ?? '')) === 'IMAGE') {
-                $components[] = [
+        if (filled($gambar)
+            && $log->template !== null
+            && in_array($this->headerMediaType($log), [null, 'IMAGE'], true)) {
+            $mediaId = $this->media->idHeader($log->template);
+
+            $components[] = filled($mediaId)
+                ? [
+                    'type' => 'header',
+                    'parameters' => [[
+                        'type' => 'image',
+                        'image' => ['id' => $mediaId],
+                    ]],
+                ]
+                : [
                     'type' => 'header',
                     'parameters' => [[
                         'type' => 'image',
                         'image' => ['link' => (string) $gambar],
                     ]],
                 ];
-            }
         }
 
         // Body — format parameter bergantung snapshot meta_components:
@@ -169,6 +185,29 @@ class MetaSender implements WhatsAppSender
         }
 
         return $parameters;
+    }
+
+    /**
+     * Tipe media header template Meta (IMAGE/VIDEO/DOCUMENT/GIF) dari
+     * snapshot komponen; null bila template tidak punya header sama
+     * sekali. Field di snapshot adalah `format` (gif dinormalisasi ke
+     * IMAGE karena dikirim dengan cara yang sama).
+     */
+    protected function headerMediaType(MessageLog $log): ?string
+    {
+        $header = $this->headerMeta($log);
+
+        if ($header === null) {
+            return null;
+        }
+
+        $tipe = strtoupper((string) ($header['format'] ?? $header['subtype'] ?? ''));
+
+        if ($tipe === 'GIF') {
+            return 'IMAGE';
+        }
+
+        return $tipe === '' ? null : $tipe;
     }
 
     /**

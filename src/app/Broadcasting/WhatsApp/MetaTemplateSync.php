@@ -6,6 +6,8 @@ use App\Models\MessageTemplate;
 use App\Support\TextSanitizer;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 /**
@@ -38,6 +40,10 @@ class MetaTemplateSync
         $waba = (string) ($config['business_account_id'] ?? '');
         $token = (string) ($config['token'] ?? '');
 
+        Log::channel('whatsapp')->info('Sinkronisasi Meta: memuat endpoint template.', [
+            'url' => "{$base}/{$version}/{$waba}/message_templates",
+        ]);
+
         if ($waba === '') {
             return ['dibuat' => 0, 'diperbarui' => 0, 'jumlah' => 0, 'error' => 'WA_META_BUSINESS_ACCOUNT_ID belum dikonfigurasi.'];
         }
@@ -69,11 +75,33 @@ class MetaTemplateSync
             if ($respon->failed()) {
                 $pesan = (string) ($respon->json('error.message') ?: $respon->reason());
 
+                Log::channel('whatsapp')->warning('Sinkronisasi Meta gagal (HTTP '.$respon->status().').', [
+                    'error' => $pesan,
+                    'body' => Str::limit((string) $respon->body(), 2000),
+                ]);
+
                 return ['dibuat' => $dibuat, 'diperbarui' => $diperbarui, 'jumlah' => $jumlah, 'error' => $pesan];
             }
 
-            foreach ($respon->json('data', []) as $item) {
-                $hasil = $this->simpan((array) $item);
+            $itemHalaman = $respon->json('data', []);
+
+            Log::channel('whatsapp')->info('Sinkronisasi Meta: respons halaman diterima.', [
+                'halaman' => $halaman,
+                'jumlah_item' => count($itemHalaman),
+                'status_http' => $respon->status(),
+            ]);
+
+            foreach ($itemHalaman as $item) {
+                $item = (array) $item;
+
+                Log::channel('whatsapp')->info('Sinkronisasi Meta: template dari respons.', [
+                    'name' => (string) ($item['name'] ?? ''),
+                    'language' => (string) ($item['language'] ?? ''),
+                    'status' => (string) ($item['status'] ?? ''),
+                    'components' => array_values((array) ($item['components'] ?? [])),
+                ]);
+
+                $hasil = $this->simpan($item);
                 $dibuat += $hasil === 'created' ? 1 : 0;
                 $diperbarui += $hasil === 'updated' ? 1 : 0;
                 $jumlah++;
@@ -106,6 +134,24 @@ class MetaTemplateSync
         $konten = $this->teksDariKomponen($komponen);
         $diperbaruiMeta = $this->tanggal($data['updated_time'] ?? null);
 
+        $headerMedia = $this->headerMediaFormat($komponen);
+        $imageUrl = $this->unduhHeaderMedia($nama, $bahasa, $komponen);
+
+        if ($headerMedia !== null && $imageUrl === null) {
+            $templateLama = MessageTemplate::where('meta_template_name', $nama)
+                ->whereNull('meta_template_id')
+                ->when($bahasa !== '', fn ($q) => $q->where('meta_language', $bahasa))
+                ->first();
+
+            if (blank($templateLama->image_url ?? null)) {
+                Log::channel('whatsapp')->warning('Template Meta berheader media — gambar belum terisi dan tidak ada URL media yang bisa diunduh.', [
+                    'meta_template_name' => $nama,
+                    'language' => $bahasa,
+                    'header_format' => $headerMedia,
+                ]);
+            }
+        }
+
         $template = MessageTemplate::where('meta_template_id', $id)->first()
             ?? MessageTemplate::where('meta_template_name', $nama)
                 ->whereNull('meta_template_id')
@@ -126,6 +172,15 @@ class MetaTemplateSync
             'last_synced_at' => now(),
             'is_active' => $status === 'APPROVED',
         ];
+
+        if ($imageUrl !== null) {
+            $dataTemplate['image_url'] = $imageUrl;
+
+            if ($template !== null && $template->image_url !== $imageUrl) {
+                $dataTemplate['meta_media_id'] = null;
+                $dataTemplate['meta_media_at'] = null;
+            }
+        }
 
         if ($template !== null) {
             $template->update($dataTemplate);
@@ -155,6 +210,122 @@ class MetaTemplateSync
                 $nilai = TextSanitizer::win1252($nilai);
             }
         });
+    }
+
+    /**
+     * Format media header dari komponen template (IMAGE/VIDEO/DOCUMENT/
+     * GIF/LOCATION/TEXT) — null bila template tidak punya header sama
+     * sekali. Field di respons Meta adalah `format` (fallback `subtype`).
+     *
+     * @param  array<int, array<string, mixed>>  $komponen
+     */
+    protected function headerMediaFormat(array $komponen): ?string
+    {
+        foreach ($komponen as $c) {
+            if (($c['type'] ?? '') !== 'HEADER') {
+                continue;
+            }
+
+            $format = strtoupper((string) ($c['format'] ?? $c['subtype'] ?? ''));
+
+            return $format === '' ? null : $format;
+        }
+
+        return null;
+    }
+
+    /**
+     * Unduh media header dari snapshot Meta (example.header_handle) ke
+     * storage publik Laravel supaya tidak menggantung ke URL CDN Meta yang
+     * berubah-ubah. Mengembalikan URL relatif (/storage/...) atau null.
+     *
+     * @param  array<int, array<string, mixed>>  $komponen
+     */
+    protected function unduhHeaderMedia(string $nama, string $bahasa, array $komponen): ?string
+    {
+        if ($this->headerMediaFormat($komponen) !== 'IMAGE') {
+            return null;
+        }
+
+        $link = $this->headerMediaLink($komponen);
+
+        if ($link === null) {
+            return null;
+        }
+
+        try {
+            $respons = Http::timeout(30)->get($link);
+        } catch (\Throwable $e) {
+            Log::channel('whatsapp')->warning('MetaTemplateSync: gagal mengambil media header.', [
+                'meta_template_name' => $nama,
+                'link' => $link,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+
+        if ($respons->failed() || $respons->body() === '') {
+            Log::channel('whatsapp')->warning('MetaTemplateSync: media header tidak bisa diunduh.', [
+                'meta_template_name' => $nama,
+                'link' => $link,
+                'status' => $respons->status(),
+            ]);
+
+            return null;
+        }
+
+        $mime = strtolower((string) strtok((string) ($respons->header('Content-Type') ?: 'image/jpeg'), ';'));
+        $ekstensi = match ($mime) {
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            'image/webp' => 'webp',
+            default => null,
+        };
+
+        if ($ekstensi === null) {
+            Log::channel('whatsapp')->warning('MetaTemplateSync: tipe media header tidak didukung.', [
+                'meta_template_name' => $nama,
+                'mime' => $mime,
+            ]);
+
+            return null;
+        }
+
+        $slug = Str::lower(Str::slug($nama, '_'));
+        $tujuan = 'whatsapp/templates/'.$slug.($bahasa !== '' ? '-'.$bahasa : '').'.'.$ekstensi;
+
+        Storage::disk('public')->put($tujuan, $respons->body());
+
+        Log::channel('whatsapp')->info('MetaTemplateSync: media header disimpan ke storage publik.', [
+            'meta_template_name' => $nama,
+            'image_url' => '/storage/'.$tujuan,
+            'mime' => $mime,
+        ]);
+
+        return '/storage/'.$tujuan;
+    }
+
+    /**
+     * URL media header dari contoh snapshot Meta (example.header_handle).
+     * Bisa berupa URL CDN publik (dapat diunduh) atau media handle
+     * (tidak bisa diunduh langsung) — hanya URL http(s) yang dipakai.
+     *
+     * @param  array<int, array<string, mixed>>  $komponen
+     */
+    protected function headerMediaLink(array $komponen): ?string
+    {
+        foreach ($komponen as $komp) {
+            if (($komp['type'] ?? '') !== 'HEADER') {
+                continue;
+            }
+
+            $link = trim((string) (($komp['example']['header_handle'] ?? [])[0] ?? ''));
+
+            return preg_match('#^https?://#i', $link) === 1 ? $link : null;
+        }
+
+        return null;
     }
 
     /**
