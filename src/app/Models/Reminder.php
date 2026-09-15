@@ -31,6 +31,7 @@ class Reminder extends Model
         'status',
         'created_by',
         'catatan',
+        'vars_kustom',
     ];
 
     protected function casts(): array
@@ -39,6 +40,7 @@ class Reminder extends Model
             'tanggal' => 'date',
             'jam' => 'datetime:H:i',
             'home_visit' => 'boolean',
+            'vars_kustom' => 'array',
         ];
     }
 

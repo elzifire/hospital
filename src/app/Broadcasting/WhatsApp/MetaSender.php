@@ -31,10 +31,23 @@ class MetaSender implements WhatsAppSender
             return HasilKirim::gagal('meta', 'Konfigurasi WA_META_TOKEN / WA_META_PHONE_NUMBER_ID belum diisi.');
         }
 
+        $payload = $this->payload($log);
+
+        Log::channel('whatsapp')->debug('MetaSender::kirim', [
+            'log_id' => $log->id,
+            'jenis' => $log->jenis,
+            'rule' => $log->rule,
+            'reminder_id' => $log->reminder_id,
+            'konten' => (string) $log->konten,
+            'meta_template_name' => (string) $log->meta_template_name,
+            'template_params' => (array) ($log->template_params ?? []),
+            'payload' => $payload,
+        ]);
+
         $respons = Http::withToken((string) $config['token'])
             ->timeout((int) ($config['timeout'] ?? 15))
             ->acceptJson()
-            ->post($this->url($config), $this->payload($log));
+            ->post($this->url($config), $payload);
 
         if ($respons->failed()) {
             return HasilKirim::gagal('meta', $this->galat($respons));

@@ -43,4 +43,26 @@ return [
         'app_secret' => env('WA_APP_SECRET'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Balasan otomatis (modul Respon)
+    |--------------------------------------------------------------------------
+    |
+    | Pesan balasan yang masuk via webhook di jam operasional tertentu
+    | langsung dibalas otomatis memakai teks ini (format bebas, bukan
+    | template Meta). Di luar jam operasional, pesan tidak di-reply agar
+    | tidak mengganggu pasien — cukup tercatat sebagai belum dibaca.
+    |
+    */
+
+    'auto_reply' => [
+        'enabled' => (bool) env('WA_AUTO_REPLY_ENABLED', true),
+        'jam_buka' => env('WA_JAM_BUKA', '08:00'),
+        'jam_tutup' => env('WA_JAM_TUTUP', '22:00'),
+        'timezone' => env('WA_TIMEZONE', 'Asia/Jakarta'),
+        'pesan' => env('WA_AUTO_REPLY_PESAN',
+            'Terima kasih, pesan Anda sudah kami terima. '
+            .'Mohon tunggu, petugas kami akan segera membalas.'),
+    ],
+
 ];

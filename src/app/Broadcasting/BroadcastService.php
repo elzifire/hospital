@@ -7,6 +7,7 @@ use App\Models\MessageLog;
 use App\Models\Reminder;
 use App\Models\User;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Orkestrator pesan broadcast berbasis penjadwalan (reminders):
@@ -136,8 +137,24 @@ class BroadcastService
         // template default rule — jatuh ke default saat tidak dipilih.
         $template = $reminder->messageTemplate ?? $aturan->template;
 
+        Log::channel('whatsapp')->debug('BroadcastService::buatPesan', [
+            'jenis' => $aturan->jenis,
+            'rule' => $aturan->rule,
+            'rule_id' => $aturan->id,
+            'reminder_id' => $reminder->id,
+            'pnpp_id' => $reminder->pnpp_id,
+            'template_dipakai' => $template->id,
+            'template_override_reminder' => $reminder->messageTemplate?->id,
+            'template_default_rule' => $aturan->template_id,
+            'poli_id' => $reminder->poli_id,
+            'dokter_id' => $reminder->dokter_id,
+            'tanggal' => $reminder->tanggal?->toDateString(),
+            'jam' => $reminder->jam?->format('H:i'),
+            'vars_kustom' => $reminder->vars_kustom,
+        ]);
+
         return MessageLog::create(
-            $this->pesan->atribut($template, $reminder->pnpp, $reminder, $aturan->jenis, $aturan->rule, $oleh),
+            $this->pesan->atribut($template, $reminder->pnpp, $reminder, $aturan->jenis, $aturan->rule, $oleh, $reminder->vars_kustom ?? []),
         );
     }
 }

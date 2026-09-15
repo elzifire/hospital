@@ -71,6 +71,7 @@ class DigitalReminderController extends Controller
                         'status' => 'terjadwal',
                         'created_by' => $request->user()?->id,
                         'catatan' => $data['catatan'] ?? null,
+                        'vars_kustom' => $this->sanitizeVarsKustom($data['vars_kustom'] ?? null),
                     ]);
                     $jumlah++;
                 }
@@ -135,6 +136,7 @@ class DigitalReminderController extends Controller
             'home_visit' => (bool) ($data['home_visit'] ?? false),
             'status' => $data['status'],
             'catatan' => $data['catatan'] ?? null,
+            'vars_kustom' => $this->sanitizeVarsKustom($data['vars_kustom'] ?? null),
         ]);
 
         return redirect()
@@ -204,6 +206,8 @@ class DigitalReminderController extends Controller
                 'jam' => ['required', 'date_format:H:i'],
                 'home_visit' => ['nullable', 'boolean'],
                 'catatan' => ['nullable', 'string', 'max:500'],
+                'vars_kustom' => ['nullable', 'array'],
+                'vars_kustom.*' => ['nullable', 'string', 'max:200'],
             ];
         }
 
@@ -217,6 +221,8 @@ class DigitalReminderController extends Controller
             'jam' => ['required', 'date_format:H:i'],
             'home_visit' => ['nullable', 'boolean'],
             'catatan' => ['nullable', 'string', 'max:500'],
+            'vars_kustom' => ['nullable', 'array'],
+            'vars_kustom.*' => ['nullable', 'string', 'max:200'],
         ];
     }
 
@@ -299,6 +305,33 @@ class DigitalReminderController extends Controller
             'integer',
             Rule::exists('message_templates', 'id')->where('is_active', true),
         ];
+    }
+
+    /**
+     * Bersihkan variabel kustom dari form — hanya terima nilai string
+     * non-kosong; key yang kosong/null dihapus agar tidak membebani
+     * penyimpanan.
+     *
+     * @return array<string, string>|null
+     */
+    protected function sanitizeVarsKustom(?array $input): ?array
+    {
+        if (! is_array($input)) {
+            return null;
+        }
+
+        $bersih = [];
+
+        foreach ($input as $kunci => $nilai) {
+            $kunci = strtolower(trim((string) $kunci));
+            $nilai = trim((string) $nilai);
+
+            if ($kunci !== '' && $nilai !== '') {
+                $bersih[$kunci] = $nilai;
+            }
+        }
+
+        return $bersih !== [] ? $bersih : null;
     }
 
     /**

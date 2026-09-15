@@ -45,18 +45,45 @@
               const kunci = Object.keys(this.pnppData || {});
               return kunci.length > 0 ? Number(kunci[0]) : null;
           },
-          tokenPribadi() {
-              return ['nama', 'nip', 'satker'];
-          },
+tokenPribadi() {
+               return ['nama', 'nama_pnpp', 'nip', 'nip_pnpp', 'satker', 'satker_pnpp'];
+           },
           isiOtomatisVars() {
-              const pid = this.refPid();
               this.vars = this.vars || {};
+              this.autovars = this.autovars || {};
+              for (const token of Object.keys(this.autovars)) {
+                  delete this.vars[token];
+                  delete this.autovars[token];
+              }
+              const sasaran = this.selected.length > 0
+                  ? this.selected
+                  : Object.keys(this.pnppData || {}).map(Number);
+              if (sasaran.length === 0) return;
               for (const token of this.tokenList()) {
                   if (this.tokenPribadi().includes(token)) continue;
-                  if ((this.vars[token] || '').trim() !== '') continue;
-                  if (pid === null) continue;
-                  const nilai = this.nilaiToken(pid, token);
-                  if (nilai) this.vars[token] = nilai;
+                  let isiSama = null;
+                  let punya = false;
+                  for (const pid of sasaran) {
+                      const nilai = this.nilaiToken(pid, token);
+                      if (nilai === '') continue;
+                      punya = true;
+                      if (isiSama === null) {
+                          isiSama = nilai;
+                      } else if (isiSama !== nilai) {
+                          isiSama = '__BEDA__';
+                      }
+                  }
+                  if (punya && isiSama !== '__BEDA__' && isiSama !== null) {
+                      this.vars[token] = isiSama;
+                      this.autovars[token] = true;
+                  }
+              }
+          },
+          isiOtomatisReferensi() {
+              for (const pid of Object.keys(this.pnppData || {})) {
+                  if (this.reminderIds[pid]) continue;
+                  const r = this.remindersUntuk(Number(pid))[0];
+                  if (r) this.reminderIds[pid] = r.id;
               }
           },
           get allChecked() {
@@ -68,6 +95,7 @@
               } else {
                   this.selected = [...new Set([...this.selected, ...this.allIds])];
               }
+              this.isiOtomatisVars();
           },
           get templatesJadwal() {
               const token = this.activeTemplate()?.token ?? [];
@@ -97,7 +125,7 @@
               });
 }
               }"
-      x-init="isiOtomatisVars()">
+      x-init="isiOtomatisReferensi(); isiOtomatisVars()">
     @csrf
     @if ($method === 'PUT')
         @method('PUT')
@@ -142,7 +170,7 @@
                                 <td class="px-5 py-3">
                                     @if ($validWa || $wajib)
                                         <input type="checkbox" name="pnpp_ids[]" value="{{ $p->id }}"
-                                               x-model="selected"
+                                               x-model="selected" @change="isiOtomatisVars()"
                                                class="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500">
                                     @else
                                         <span class="inline-block h-4 w-4 rounded border border-slate-200 bg-slate-50"></span>

@@ -22,16 +22,17 @@ class MessageRenderer
     {
         $nilai = [
             'nama' => $pnpp?->nama,
+            'nama_pnpp' => $pnpp?->nama,
             'nip' => $pnpp?->nip,
+            'nip_pnpp' => $pnpp?->nip,
             'satker' => $pnpp?->satker?->nama,
+            'satker_pnpp' => $pnpp?->satker?->nama,
             'obat' => $pnpp ? $pnpp->penyakit->pluck('nama')->implode(', ') : null,
             'poli' => $this->nilaiMeta($meta, 'poli'),
             'instalasi' => $this->nilaiMeta($meta, 'instalasi') ?? $this->nilaiMeta($meta, 'poli'),
             'dokter' => $this->nilaiMeta($meta, 'dokter'),
             'tanggal' => $this->tanggal($meta),
             'jam' => $this->nilaiMeta($meta, 'jam'),
-            // Alias token template pengingat kunjungan — turunan data jadwal
-            // Digital Reminder (poli/dokter/tanggal/jam dari penjadwalan).
             'hari_tanggal' => $this->tanggal($meta),
             'waktu_kunjungan' => $this->nilaiMeta($meta, 'jam'),
             'poli_layanan' => $this->nilaiMeta($meta, 'poli'),

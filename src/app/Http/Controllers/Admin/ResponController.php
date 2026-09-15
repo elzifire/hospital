@@ -52,21 +52,58 @@ class ResponController extends Controller
                 ),
             );
 
-            $balasan = MessageReply::query()
-                ->with('pnpp:id,nama')
+            $konversasi = MessageReply::query()
                 ->tap($scopePoli)
                 ->when($q, fn ($query) => $query->where(
                     fn ($sub) => $sub->where('nama', 'like', "%{$q}%")
                         ->orWhere('no_hp', 'like', "%{$q}%")
                         ->orWhere('isi_pesan', 'like', "%{$q}%")
                 ))
-                ->orderByDesc('waktu_masuk')
-                ->paginate(10)
+                ->select('no_hp')
+                ->selectRaw('MAX("waktu_masuk") as waktu_terakhir')
+                ->selectRaw('COUNT(*) as total_pesan')
+                ->selectRaw('COALESCE(SUM(CASE WHEN "read_at" IS NULL THEN 1 ELSE 0 END), 0) as belum_dibaca')
+                ->groupBy('no_hp')
+                ->orderByDesc('waktu_terakhir')
+                ->paginate(15)
                 ->withQueryString();
 
+            // Pesan terakhir tiap percakapan (mengisi pratinjau chat list).
+            $nomors = $konversasi->pluck('no_hp')->all();
+            $pesanTerakhir = $nomors === []
+                ? collect()
+                : MessageReply::query()
+                    ->whereIn('no_hp', $nomors)
+                    ->orderBy('waktu_masuk')
+                    ->get()
+                    ->groupBy('no_hp')
+                    ->map->last();
+
+            // Identifikasi PNPP untuk nomor yang belum punya pnpp_id.
+            $pnppByNomor = Pnpp::query()
+                ->whereNotNull('no_hp')
+                ->get(['id', 'nama', 'no_hp'])
+                ->reduce(function (array $carry, Pnpp $p) {
+                    $wa = PhoneFormat::toWa($p->no_hp);
+                    $wa !== null && ($carry[$wa] = $p);
+
+                    return $carry;
+                }, []);
+
+            $konversasi->getCollection()->transform(function ($row) use ($pesanTerakhir, $pnppByNomor) {
+                $terakhir = $pesanTerakhir[$row->no_hp] ?? null;
+                $row->waktu_terakhir = $terakhir?->waktu_masuk;
+                $row->isi_terakhir = $terakhir?->isi_pesan;
+                $row->nama_pengirim = $terakhir?->nama;
+                $row->pnpp = $row->pnpp ?? ($pnppByNomor[$row->no_hp] ?? null);
+
+                return $row;
+            });
+
             $data += [
-                'balasan' => $balasan,
+                'konversasi' => $konversasi,
                 'total' => MessageReply::query()->tap($scopePoli)->count(),
+                'belumDibaca' => MessageReply::query()->tap($scopePoli)->belumDibaca()->count(),
                 'hariIni' => MessageReply::query()->tap($scopePoli)->whereBetween('waktu_masuk', [now()->startOfDay(), now()])->count(),
                 'pasienUnik' => MessageReply::query()->tap($scopePoli)->whereNotNull('pnpp_id')->distinct()->count('pnpp_id'),
                 'takTerdaftar' => MessageReply::query()->tap($scopePoli)->whereNull('pnpp_id')->count(),
@@ -120,6 +157,9 @@ class ResponController extends Controller
     {
         $noHp = PhoneFormat::toWa($nomor) ?? $nomor;
         $this->pastikanAksesNomor($request, $noHp);
+
+        // Membuka percakapan = membaca balasan masuk (badge merah hilang).
+        MessageReply::tandaiDibaca($noHp);
 
         $pnpp = $this->pnppUntukNomor($noHp);
 
@@ -193,6 +233,10 @@ class ResponController extends Controller
     {
         $noHp = PhoneFormat::toWa($nomor) ?? $nomor;
         $this->pastikanAksesNomor($request, $noHp);
+
+        // Percakapan sedang dibuka → balasan baru ikut ditandai dibaca
+        // agar badge merah di chat list tetap akurat.
+        MessageReply::tandaiDibaca($noHp);
 
         $timeline = $this->timelineData($noHp);
 

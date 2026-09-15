@@ -6,6 +6,7 @@ use App\Models\MessageTemplate;
 use App\Models\Pnpp;
 use App\Models\Reminder;
 use App\Models\User;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Pabrik atribut message_logs untuk satu penerima — dipakai generate
@@ -33,6 +34,34 @@ class PesanFactory
     ): array {
         $noHp = PhoneFormat::toWa($pnpp->no_hp);
         $meta = $this->meta($reminder, $pnpp);
+        $konten = $this->renderer->render((string) $template->konten, $pnpp, $meta, $varsKustom);
+        $params = $this->params($template, $pnpp, $meta, $varsKustom);
+
+        $tersisa = $this->tokenTersisa($konten);
+
+        Log::channel('whatsapp')->debug('PesanFactory::atribut', [
+            'jenis' => $jenis,
+            'rule' => $rule,
+            'template_id' => $template->id,
+            'reminder_id' => $reminder?->id,
+            'pnpp_id' => $pnpp->id,
+            'meta' => $meta,
+            'konten' => $konten,
+            'template_params' => $params,
+            'variabel_mentah' => $tersisa,
+        ]);
+
+        if ($tersisa !== []) {
+            Log::channel('whatsapp')->warning('PesanFactory: variabel mentah tersisa di konten', [
+                'jenis' => $jenis,
+                'rule' => $rule,
+                'template_id' => $template->id,
+                'reminder_id' => $reminder?->id,
+                'pnpp_id' => $pnpp->id,
+                'variabel' => $tersisa,
+                'meta' => $meta,
+            ]);
+        }
 
         return [
             'jenis' => $jenis,
@@ -43,14 +72,27 @@ class PesanFactory
             'created_by' => $oleh?->id,
             'penerima_nama' => (string) ($pnpp->nama ?? '—'),
             'penerima_no_hp' => $noHp ?? (string) ($pnpp->no_hp ?? ''),
-            'konten' => $this->renderer->render((string) $template->konten, $pnpp, $meta, $varsKustom),
+            'konten' => $konten,
             'status' => $noHp === null ? 'gagal' : 'menunggu',
             'error' => $noHp === null ? 'Pasien tidak memiliki nomor WhatsApp yang valid.' : null,
             'provider' => (string) config('whatsapp.driver'),
             'meta_template_name' => $this->namaTemplateMeta($template),
             'meta_language' => $this->bahasaTemplateMeta($template),
-            'template_params' => $this->params($template, $pnpp, $meta, $varsKustom),
+            'template_params' => $params,
         ];
+    }
+
+    /**
+     * Variabel {token} yang masih tersisa mentah di konten ter-render
+     * (nilainya kosong/tidak dikenal saat render) — untuk debug kirim.
+     *
+     * @return array<int, string>
+     */
+    protected function tokenTersisa(string $konten): array
+    {
+        preg_match_all('/\{([a-z_]+)\}/i', $konten, $cocok);
+
+        return array_values(array_unique($cocok[1] ?? []));
     }
 
     /**

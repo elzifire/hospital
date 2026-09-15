@@ -31,6 +31,8 @@
               dokters: @js($dokters->map(fn ($d) => ['id' => $d->id, 'nama' => $d->nama, 'poli_id' => $d->poli_id])),
               templates: @js($templates->map(fn ($t) => ['id' => (int) $t->id, 'judul' => (string) $t->judul, 'konten' => (string) $t->konten, 'token' => $t->tokenParam()])->values()),
               templateId: @js((string) old('message_template_id', $reminder->message_template_id)),
+              varsKustom: @js(old('vars_kustom', $reminder->vars_kustom) ?? []),
+              tokenJadwal: ['poli', 'instalasi', 'poli_layanan', 'dokter', 'tanggal', 'jam', 'hari_tanggal', 'waktu_kunjungan'],
               poliData: @js($polis->mapWithKeys(fn ($po) => [(string) $po->id => $po->nama])),
               pnppPid: {{ (int) $reminder->pnpp_id }},
               pnppData: @js([(string) $reminder->pnpp_id => ['nama' => $reminder->pnpp?->nama ?? '—', 'nip' => $reminder->pnpp?->nip ?? '', 'satker' => $reminder->pnpp?->satker?->nama ?? '']]),
@@ -39,6 +41,13 @@
               },
               pilihTemplate(id) {
                   this.templateId = id;
+              },
+              tokenPribadi() {
+                  return ['nama', 'nama_pnpp', 'nip', 'nip_pnpp', 'satker', 'satker_pnpp'];
+              },
+              tokenLabel(token) {
+                  const labels = { nama: 'Nama', nama_pnpp: 'Nama', nip: 'NIP', nip_pnpp: 'NIP', satker: 'Satker', satker_pnpp: 'Satker', obat: 'Obat', poli: 'Poli', instalasi: 'Instalasi', dokter: 'Dokter', tanggal: 'Tanggal', jam: 'Jam', hari_tanggal: 'Hari/Tanggal', waktu_kunjungan: 'Waktu', poli_layanan: 'Poli Layanan' };
+                  return labels[token] || token;
               },
               tanggalIndonesia(iso) {
                   if (!iso) return '—';
@@ -50,22 +59,22 @@
                   return d ? d.nama : '';
               },
               get dokterOptions() { return this.dokters.filter(d => d.poli_id == this.poliId) },
-              nilaiToken(token) {
-                  switch (token) {
-                      case 'nama': return this.pnppData[this.pnppPid]?.nama || '—';
-                      case 'nip': return this.pnppData[this.pnppPid]?.nip || '—';
-                      case 'satker': return this.pnppData[this.pnppPid]?.satker || '—';
-                      case 'hari_tanggal': return this.tanggal ? this.tanggalIndonesia(this.tanggal) : '—';
-                      case 'tanggal': return this.tanggal || '—';
-                      case 'waktu_kunjungan':
-                      case 'jam': return this.jam || '—';
-                      case 'poli':
-                      case 'instalasi':
-                      case 'poli_layanan': return this.poliData[this.poliId] || '—';
-                      case 'dokter': return this.dokterNama || '—';
-                      default: return '—';
-                  }
-              },
+nilaiToken(token) {
+                   switch (token) {
+                       case 'nama': case 'nama_pnpp': return this.pnppData[this.pnppPid]?.nama || '—';
+                       case 'nip': case 'nip_pnpp': return this.pnppData[this.pnppPid]?.nip || '—';
+                       case 'satker': case 'satker_pnpp': return this.pnppData[this.pnppPid]?.satker || '—';
+                       case 'hari_tanggal': return this.tanggal ? this.tanggalIndonesia(this.tanggal) : '—';
+                       case 'tanggal': return this.tanggal || '—';
+                       case 'waktu_kunjungan':
+                       case 'jam': return this.jam || '—';
+                       case 'poli':
+                       case 'instalasi':
+                       case 'poli_layanan': return this.poliData[this.poliId] || '—';
+                       case 'dokter': return this.dokterNama || '—';
+                       default: return '—';
+                   }
+               },
               previewFor() {
                   const t = this.activeTemplate();
                   if (!t) return '';
@@ -163,6 +172,31 @@
                     </select>
                     <p class="mt-1 text-xs text-slate-400">Opsional — hanya template kategori <strong>Digital Reminder</strong>. Bila dipilih, pesan untuk jadwal ini memakai template ini (menggantikan default aturan modul) saat digenerate.</p>
                     @error('message_template_id')<p class="mt-1 text-xs text-rose-500">{{ $message }}</p>@enderror
+                </div>
+            </div>
+
+            {{-- ===== Variabel pesan kustom ===== --}}
+            <div x-show="activeTemplate() && activeTemplate().token.length > 0" x-cloak
+                 class="space-y-3 border-t border-slate-100 px-5 py-4">
+                <div>
+                    <h3 class="text-sm font-bold text-slate-900">Variabel Pesan</h3>
+                    <p class="mt-0.5 text-xs text-slate-500">Isi manual untuk menimpa nilai otomatis. Kosongkan untuk pakai nilai dari data pasien / jadwal.</p>
+                </div>
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <template x-for="token in (activeTemplate()?.token ?? [])" :key="token">
+                        <div>
+                            <label class="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                                <code class="rounded bg-slate-100 px-1 py-0.5 text-[10px] text-sky-700" x-text="'{' + token + '}'"></code>
+                                <span x-text="tokenLabel(token)"></span>
+                            </label>
+                            <input type="text"
+                                   :name="'vars_kustom[' + token + ']'"
+                                   x-model="varsKustom[token]"
+                                   :readonly="tokenPribadi().includes(token)"
+                                   :placeholder="tokenPribadi().includes(token) ? 'otomatis per penerima' : 'kosong = otomatis'"
+                                   class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400">
+                        </div>
+                    </template>
                 </div>
             </div>
 
