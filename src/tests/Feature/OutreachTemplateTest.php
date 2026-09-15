@@ -111,7 +111,22 @@ class OutreachTemplateTest extends TestCase
             ->assertSee('Pilih template')
             ->assertSee($template->judul)
             ->assertSee('Variabel pesan')
+            ->assertSee('Isi ulang otomatis')
+            ->assertSee('contoh pratinjau')
             ->assertSee('Centang semua');
+    }
+
+    #[Test]
+    public function halaman_follow_up_manual_memakai_form_variabel_otomatis(): void
+    {
+        $template = $this->buatTemplate();
+
+        $this->actingAs($this->superadmin())
+            ->get(route('admin.follow-up.create'))
+            ->assertOk()
+            ->assertSee('Variabel pesan')
+            ->assertSee('Isi ulang otomatis')
+            ->assertSee('contoh pratinjau');
     }
 
     #[Test]

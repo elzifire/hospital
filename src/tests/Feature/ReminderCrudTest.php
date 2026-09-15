@@ -240,6 +240,8 @@ class ReminderCrudTest extends TestCase
             ->get(route('admin.digital-reminder.create'))
             ->assertOk()
             ->assertSee('Pengingat Kontrol Uji')
+            ->assertSee('variabel terisi otomatis')
+            ->assertSee('contoh pratinjau')
             ->assertDontSee('Template Nonaktif')
             ->assertDontSee('Template Outreach Uji');
 

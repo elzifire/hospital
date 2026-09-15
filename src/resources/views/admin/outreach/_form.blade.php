@@ -38,6 +38,26 @@
           pilihTemplate(id) {
               this.templateId = id;
               this.vars = {};
+              this.$nextTick(() => this.isiOtomatisVars());
+          },
+          refPid() {
+              if (this.selected.length > 0) return this.selected[0];
+              const kunci = Object.keys(this.pnppData || {});
+              return kunci.length > 0 ? Number(kunci[0]) : null;
+          },
+          tokenPribadi() {
+              return ['nama', 'nip', 'satker'];
+          },
+          isiOtomatisVars() {
+              const pid = this.refPid();
+              this.vars = this.vars || {};
+              for (const token of this.tokenList()) {
+                  if (this.tokenPribadi().includes(token)) continue;
+                  if ((this.vars[token] || '').trim() !== '') continue;
+                  if (pid === null) continue;
+                  const nilai = this.nilaiToken(pid, token);
+                  if (nilai) this.vars[token] = nilai;
+              }
           },
           get allChecked() {
               return this.allIds.length > 0 && this.allIds.every((id) => this.selected.includes(id));
@@ -75,8 +95,9 @@
                   const isi = this.nilaiToken(pid, token.toLowerCase());
                   return isi !== '' ? isi : '—';
               });
-          }
-      }">
+}
+              }"
+      x-init="isiOtomatisVars()">
     @csrf
     @if ($method === 'PUT')
         @method('PUT')
@@ -172,7 +193,16 @@
 
             <div x-show="activeTemplate() !== null" x-cloak class="space-y-4">
                 <div>
-                    <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Variabel pesan</label>
+                    <div class="mb-1 flex flex-wrap items-center justify-between gap-2">
+                        <label class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Variabel pesan</label>
+                        <button type="button" @click="isiOtomatisVars()"
+                                class="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-sky-700 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-200">
+                            <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/>
+                            </svg>
+                            Isi ulang otomatis
+                        </button>
+                    </div>
                     <div class="grid gap-3 sm:grid-cols-2">
                         <template x-for="(token) in tokenList()" :key="token">
                             <div>
@@ -197,9 +227,9 @@
                                     <input type="text" :name="'vars[' + token + ']'" x-model="vars[token]"
                                            maxlength="255"
                                            class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
-                                           x-bind:placeholder="'otomatis dari data pasien ({} )'.replace('{}', '{' + token + '}')">
+                                           x-bind:placeholder="tokenPribadi().includes(token) ? 'otomatis per penerima ({' + token + '})' : 'kosong = otomatis ({' + token + '})'">
                                 </template>
-                                <p class="mt-0.5 text-[11px] text-slate-400">Kosong = diisi otomatis bila data pasien tersedia, selain itu dibiarkan polos.</p>
+                                <p class="mt-0.5 text-[11px] text-slate-400">Terisi otomatis dari pasien/jadwal acuan dan bisa diubah; {nama}/{nip}/{satker} diisi per penerima pada pratinjau.</p>
                             </div>
                         </template>
                     </div>
@@ -207,13 +237,13 @@
             </div>
 
             {{-- ===== Pratinjau per penerima ===== --}}
-            <div x-show="selected.length > 0" x-cloak class="border-t border-slate-100 pt-4">
+            <div x-show="activeTemplate() !== null" x-cloak class="border-t border-slate-100 pt-4">
                 <div class="mb-3 flex flex-wrap items-center gap-2">
                     <div>
                         <h3 class="text-sm font-bold text-slate-900">Pratinjau per Penerima</h3>
                         <p class="mt-0.5 text-xs text-slate-500">
                             Isi pesan untuk masing-masing penerima sesuai variabel &amp; jadwal yang dipilih.
-                            <span x-show="templatesJadwal" x-cloak>Kosong = diisi otomatis dari data pasien.</span>
+                            {nama} dan variabel lain terisi otomatis per penerima dari data pasien &amp; referensi jadwal.
                         </p>
                     </div>
                     <span class="ml-auto rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-semibold text-sky-700 ring-1 ring-inset ring-sky-200" x-text="selected.length + ' penerima'"></span>
@@ -247,6 +277,21 @@
                             </div>
                         </div>
                     </template>
+                    <template x-if="selected.length === 0 && refPid() !== null" x-cloak>
+                        <div class="rounded-xl border border-dashed border-slate-300 bg-slate-50/60 p-3">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <span class="text-sm font-semibold text-slate-800" x-text="(pnppData[refPid()] || {}).nama || '#' + refPid()"></span>
+                                <span class="ml-auto text-xs text-slate-400">contoh pratinjau</span>
+                            </div>
+                            <div class="mt-2.5 rounded-xl bg-[#dcf8c6] px-3 py-2.5 ring-1 ring-inset ring-emerald-200/60">
+                                <pre class="whitespace-pre-line text-xs leading-relaxed text-slate-800" x-text="previewFor(refPid())"></pre>
+                            </div>
+                        </div>
+                    </template>
+                    <template x-if="selected.length === 0 && refPid() === null" x-cloak>
+                        <p class="rounded-xl border border-dashed border-slate-300 px-4 py-6 text-center text-xs text-slate-400">Tidak ada pasien hasil filter — perbarui saringan untuk melihat pratinjau.</p>
+                    </template>
+                    <p x-show="selected.length === 0 && refPid() !== null" x-cloak class="text-[11px] text-slate-400">Pratinjau memakai pasien pertama hasil filter sebagai contoh — centang penerima untuk pratinjau per orang.</p>
                 </div>
             </div>
         </div>

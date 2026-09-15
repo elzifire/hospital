@@ -82,6 +82,10 @@
               pilihTemplate(id) {
                   this.templateId = id;
               },
+              get contohPid() {
+                  const kunci = Object.keys(this.pnppData || {});
+                  return kunci.length > 0 ? Number(kunci[0]) : null;
+              },
               tanggalIndonesia(iso) {
                   if (!iso) return '—';
                   const d = new Date(iso + 'T00:00:00');
@@ -278,20 +282,20 @@
                                 <option value="{{ $tpl->id }}" {{ (string) old('message_template_id') === (string) $tpl->id ? 'selected' : '' }}>{{ $tpl->judul }}</option>
                             @endforeach
                         </select>
-                        <p class="mt-1 text-xs text-slate-400">Opsional — hanya template kategori <strong>Digital Reminder</strong>. Bila dipilih, semua jadwal dari form ini memakai template ini (menggantikan default aturan modul) saat pesan digenerate. Pratinjau tampil di bawah ketika tanggal, jam, dan pasien terisi.</p>
+                        <p class="mt-1 text-xs text-slate-400">Opsional — hanya template kategori <strong>Digital Reminder</strong>. Bila dipilih, semua jadwal dari form ini memakai template ini (menggantikan default aturan modul) saat pesan digenerate. Pratinjau tampil di bawah begitu template dipilih — variabel terisi otomatis dari tanggal/jam/poli di atas.</p>
                         @error('message_template_id')<p class="mt-1 text-xs text-rose-500">{{ $message }}</p>@enderror
                     </div>
                 </div>
 
                 {{-- ===== Pratinjau per pasien ===== --}}
-                <div x-show="activeTemplate() && pasienPreview.length > 0" x-cloak class="border-t border-slate-100 pt-5">
+                <div x-show="activeTemplate()" x-cloak class="border-t border-slate-100 pt-5">
                     <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
                         <div>
                             <h3 class="text-sm font-bold text-slate-900">Pratinjau Pesan</h3>
-                            <p class="mt-0.5 text-xs text-slate-500">Isi pesan mengikuti template terpilih, tanggal/jam, dan poli di atas — token yang belum terisi ditandai <code class="rounded bg-slate-100 px-1 text-[10px]"> — </code>.</p>
+                            <p class="mt-0.5 text-xs text-slate-500">Isi pesan mengikuti template terpilih, tanggal/jam, dan poli di atas — variabel terisi otomatis, token yang belum terisi ditandai <code class="rounded bg-slate-100 px-1 text-[10px]"> — </code>.</p>
                         </div>
                         <span class="rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-semibold text-sky-700 ring-1 ring-inset ring-sky-200"
-                              x-text="pasienPreview.length + ' pasien'"></span>
+                              x-text="pasienPreview.length ? (pasienPreview.length + ' pasien') : 'contoh'"></span>
                     </div>
                     <div class="space-y-3">
                         <template x-for="pid in pasienPreview" :key="pid">
@@ -306,6 +310,18 @@
                                 </div>
                             </div>
                         </template>
+                        <template x-if="pasienPreview.length === 0 && contohPid !== null" x-cloak>
+                            <div class="rounded-xl border border-dashed border-slate-300 bg-slate-50/60 p-3">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <span class="text-sm font-semibold text-slate-800" x-text="(pnppData[contohPid] || {}).nama || '#' + contohPid"></span>
+                                    <span class="ml-auto text-xs text-slate-400">contoh pratinjau</span>
+                                </div>
+                                <div class="mt-2.5 rounded-xl bg-[#dcf8c6] px-3 py-2.5 ring-1 ring-inset ring-emerald-200/60">
+                                    <pre class="whitespace-pre-line text-xs leading-relaxed text-slate-800" x-text="previewFor(contohPid)"></pre>
+                                </div>
+                            </div>
+                        </template>
+                        <p x-show="pasienPreview.length === 0" x-cloak class="text-[11px] text-slate-400">Pratinjau memakai pasien pertama hasil filter sebagai contoh — centang pasien di langkah 1 untuk pratinjau per pasien.</p>
                     </div>
                 </div>
             </div>
