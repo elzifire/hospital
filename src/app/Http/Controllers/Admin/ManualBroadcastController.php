@@ -373,12 +373,14 @@ abstract class ManualBroadcastController extends Controller
                 $query->whereHas('category', fn ($cat) => $cat->where('slug', $this->kategoriManual()));
             })
             ->orderBy('judul')
-            ->get(['id', 'judul', 'konten', 'template_category_id'])
+            ->get(['id', 'judul', 'konten', 'template_category_id', 'image_url', 'meta_components'])
             ->map(fn (MessageTemplate $t) => [
                 'id' => $t->id,
                 'judul' => (string) $t->judul,
                 'konten' => (string) $t->konten,
                 'token' => $t->tokenParam(),
+                'image_url' => $t->image_url,
+                'buttons' => $this->tombolTemplate($t),
             ])
             ->values()
             ->all();
@@ -547,6 +549,35 @@ abstract class ManualBroadcastController extends Controller
     protected function poliOptions(): array
     {
         return Poli::orderBy('nama')->pluck('nama')->map(fn ($n) => (string) $n)->values()->all();
+    }
+
+    /**
+     * Ekstrak daftar tombol dari komponen BUTTONS template Meta untuk
+     * ditampilkan di form outreach (info tombol + redirect URL untuk
+     * tipe URL / QUICK_REPLY).
+     *
+     * @return array<int, array{type: string, text: string, sub_type?: string, url?: string, payload?: string}>
+     */
+    protected function tombolTemplate(MessageTemplate $template): array
+    {
+        $tombol = [];
+
+        foreach ((array) ($template->meta_components ?? []) as $komponen) {
+            if (strtoupper((string) ($komponen['type'] ?? '')) !== 'BUTTONS') {
+                continue;
+            }
+
+            foreach ((array) ($komponen['buttons'] ?? []) as $btn) {
+                $tombol[] = [
+                    'type' => (string) ($btn['type'] ?? 'QUICK_REPLY'),
+                    'text' => (string) ($btn['text'] ?? ''),
+                    'url' => (string) ($btn['url'] ?? ''),
+                    'payload' => (string) (is_array($btn['parameters'][0] ?? null) ? ($btn['parameters'][0]['text'] ?? '') : ''),
+                ];
+            }
+        }
+
+        return $tombol;
     }
 
     protected function pesanUbah(array $ditahan, array $ditambah, array $dihapus): string

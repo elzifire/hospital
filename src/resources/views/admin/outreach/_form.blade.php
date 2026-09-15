@@ -264,6 +264,39 @@ tokenPribadi() {
                 </div>
             </div>
 
+            {{-- ===== Media & tombol template (dari Meta) ===== --}}
+            <div x-show="activeTemplate() !== null && (activeTemplate().image_url || (activeTemplate().buttons || []).length > 0)" x-cloak class="border-t border-slate-100 pt-4">
+                <h3 class="text-sm font-bold text-slate-900">Media &amp; Tombol Template</h3>
+                <p class="mb-3 mt-0.5 text-xs text-slate-500">
+                    Gambar dan tombol berasal dari template yang sudah disetujui Meta — dirender WhatsApp, bukan bagian isi pesan.
+                </p>
+                <div class="flex flex-wrap gap-4">
+                    <template x-if="activeTemplate().image_url" x-cloak>
+                        <div class="w-44">
+                            <img :src="activeTemplate().image_url" alt="Gambar template"
+                                 class="aspect-[4/3] w-full rounded-xl border border-slate-200 object-cover">
+                            <p class="mt-1 text-center text-[10px] font-semibold uppercase tracking-wide text-slate-400">Header Gambar</p>
+                        </div>
+                    </template>
+                    <template x-if="(activeTemplate().buttons || []).length > 0" x-cloak>
+                        <div class="min-w-56 flex-1">
+                            <div class="flex flex-col gap-2">
+                                <template x-for="(b, i) in activeTemplate().buttons" :key="i">
+                                    <div class="flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50/60 px-3 py-2">
+                                        <span class="text-xs font-semibold text-emerald-900" x-text="b.text"></span>
+                                        <span class="rounded-full bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ring-1 ring-inset ring-emerald-200"
+                                              x-text="b.type"></span>
+                                    </div>
+                                </template>
+                            </div>
+                            <p class="mt-1.5 text-[11px] text-slate-400">
+                                Balasan tombol (mis. HADIR / JADWAL ULANG) otomatis tercatat di Monitoring → Respon.
+                            </p>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
             {{-- ===== Pratinjau per penerima ===== --}}
             <div x-show="activeTemplate() !== null" x-cloak class="border-t border-slate-100 pt-4">
                 <div class="mb-3 flex flex-wrap items-center gap-2">
