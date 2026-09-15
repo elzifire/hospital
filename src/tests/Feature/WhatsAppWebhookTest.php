@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\MessageReply;
 use App\Models\Pnpp;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Config;
@@ -118,6 +119,94 @@ class WhatsAppWebhookTest extends TestCase
         $this->assertDatabaseHas('message_replies', [
             'no_hp' => '6281234567890',
             'isi_pesan' => '[image] Foto surat rujukan',
+            'driver' => 'meta',
+        ]);
+    }
+
+    #[Test]
+    public function pilihan_tombol_template_tersimpan_dengan_labelnya(): void
+    {
+        $payload = $this->balasanPayload();
+        $payload['entry'][0]['changes'][0]['value']['messages'][0] = [
+            'from' => '6281234567890',
+            'id' => 'wamid.BTN1',
+            'timestamp' => '1700000120',
+            'type' => 'button',
+            'button' => ['text' => 'Jadwalkan Kunjungan', 'payload' => 'JADWAL_KUNJUNGAN_V1'],
+            'text' => ['body' => 'Jadwalkan Kunjungan'],
+        ];
+
+        $body = json_encode($payload);
+        $signature = 'sha256='.hash_hmac('sha256', $body, 'rahasia_uji');
+
+        $this->postJson('/whatsapp/webhook', $payload, ['X-Hub-Signature-256' => $signature])
+            ->assertOk()
+            ->assertJson(['status' => 'ok', 'diproses' => 1]);
+
+        $this->assertDatabaseHas('message_replies', [
+            'no_hp' => '6281234567890',
+            'isi_pesan' => 'Jadwalkan Kunjungan',
+            'driver' => 'meta',
+        ]);
+
+        $balasan = MessageReply::where('no_hp', '6281234567890')->firstOrFail();
+        $this->assertSame('JADWAL_KUNJUNGAN_V1', data_get($balasan->payload, 'pesan.button.payload'));
+    }
+
+    #[Test]
+    public function pilihan_interactive_button_reply_tersimpan_dengan_labelnya(): void
+    {
+        $payload = $this->balasanPayload();
+        $payload['entry'][0]['changes'][0]['value']['messages'][0] = [
+            'from' => '6281234567890',
+            'id' => 'wamid.INT1',
+            'timestamp' => '1700000130',
+            'type' => 'interactive',
+            'interactive' => [
+                'type' => 'button_reply',
+                'button_reply' => ['id' => 'feedback_memuaskan', 'title' => 'Memuaskan'],
+            ],
+        ];
+
+        $body = json_encode($payload);
+        $signature = 'sha256='.hash_hmac('sha256', $body, 'rahasia_uji');
+
+        $this->postJson('/whatsapp/webhook', $payload, ['X-Hub-Signature-256' => $signature])
+            ->assertOk()
+            ->assertJson(['status' => 'ok', 'diproses' => 1]);
+
+        $this->assertDatabaseHas('message_replies', [
+            'no_hp' => '6281234567890',
+            'isi_pesan' => 'Memuaskan',
+            'driver' => 'meta',
+        ]);
+    }
+
+    #[Test]
+    public function pilihan_interactive_list_reply_tersimpan_dengan_labelnya(): void
+    {
+        $payload = $this->balasanPayload();
+        $payload['entry'][0]['changes'][0]['value']['messages'][0] = [
+            'from' => '6281234567890',
+            'id' => 'wamid.INT2',
+            'timestamp' => '1700000140',
+            'type' => 'interactive',
+            'interactive' => [
+                'type' => 'list_reply',
+                'list_reply' => ['id' => 'poli_dalam', 'title' => 'Poli Penyakit Dalam'],
+            ],
+        ];
+
+        $body = json_encode($payload);
+        $signature = 'sha256='.hash_hmac('sha256', $body, 'rahasia_uji');
+
+        $this->postJson('/whatsapp/webhook', $payload, ['X-Hub-Signature-256' => $signature])
+            ->assertOk()
+            ->assertJson(['status' => 'ok', 'diproses' => 1]);
+
+        $this->assertDatabaseHas('message_replies', [
+            'no_hp' => '6281234567890',
+            'isi_pesan' => 'Poli Penyakit Dalam',
             'driver' => 'meta',
         ]);
     }

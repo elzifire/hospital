@@ -162,12 +162,41 @@ class WebhookHandler
             return $isi === '' ? null : $isi;
         }
 
+        if ($tipe === 'button' || $tipe === 'interactive') {
+            return $this->bacaIsiTombol($tipe, $pesan[$tipe] ?? []);
+        }
+
         $rincian = array_values(array_filter([
             $pesan[$tipe]['caption'] ?? null,
             $pesan[$tipe]['filename'] ?? null,
         ], fn ($v) => filled($v)));
 
         return '['.$tipe.']'.($rincian !== [] ? ' '.implode(' — ', $rincian) : '');
+    }
+
+    /**
+     * Ambil label pilihan tombol dari pesan `button` (template quick-reply)
+     * maupun `interactive` (button_reply / list_reply). Kembalikan null
+     * bila tidak ada label yang bisa dibaca (payload mentah tetap disimpan
+     * di kolom `payload` message_replies).
+     *
+     * @param  array<string, mixed>  $objek  isi `$pesan[$tipe]`
+     */
+    protected function bacaIsiTombol(string $tipe, array $objek): ?string
+    {
+        if ($tipe === 'button') {
+            $label = trim((string) ($objek['text'] ?? ''));
+
+            return $label !== '' ? $label : null;
+        }
+
+        $sub = match ($objek['type'] ?? '') {
+            'button_reply', 'list_reply' => (string) ($objek[$objek['type']]['title'] ?? ''),
+            default => '',
+        };
+        $label = trim($sub);
+
+        return $label !== '' ? $label : null;
     }
 
     /**
