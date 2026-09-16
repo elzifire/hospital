@@ -142,6 +142,18 @@ class MonitoringReportTest extends TestCase
             'waktu_masuk' => now()->subHours(5),
             'driver' => 'waha',
         ]);
+        MessageReply::create([
+            'pnpp_id' => $budi->id,
+            'no_hp' => '6281234567890',
+            'nama' => 'Budi Santoso',
+            'isi_pesan' => 'HADIR',
+            'waktu_masuk' => now()->subHours(2),
+            'driver' => 'meta',
+            'payload' => [
+                'pesan' => ['type' => 'button', 'text' => 'HADIR'],
+                'metadata' => null,
+            ],
+        ]);
     }
 
     private function superadmin(): User
@@ -352,12 +364,28 @@ class MonitoringReportTest extends TestCase
         $respon->assertOk();
         $respon->assertSee('Baik, saya sudah terima. Terima kasih.');
         $respon->assertSee('Tidak Terdaftar');
+        $respon->assertSee('HADIR'); // balasan tombol (isi label)
+        $respon->assertSee('Tombol'); // kolom Sumber
 
         // Filter respon: hanya nomor tak dikenal
         $takDikenal = $this->get(route('admin.monitoring.report.show', ['respon', 'terdaftar' => 'no']));
         $takDikenal->assertOk();
         $takDikenal->assertSee('Stop broadcast');
         $takDikenal->assertDontSee('Baik, saya sudah terima');
+
+        // Filter respon: hanya pilihan tombol (payload type button/interactive)
+        $tombol = $this->get(route('admin.monitoring.report.show', ['respon', 'jenis' => 'tombol']));
+        $tombol->assertOk();
+        $tombol->assertSee('HADIR');
+        $tombol->assertDontSee('Stop broadcast');
+        $tombol->assertDontSee('Baik, saya sudah terima');
+
+        // Filter respon: hanya teks biasa (bukan dari tombol)
+        $teks = $this->get(route('admin.monitoring.report.show', ['respon', 'jenis' => 'teks']));
+        $teks->assertOk();
+        $teks->assertSee('Stop broadcast');
+        $teks->assertSee('Baik, saya sudah terima');
+        $teks->assertDontSee('HADIR');
     }
 
     #[Test]
