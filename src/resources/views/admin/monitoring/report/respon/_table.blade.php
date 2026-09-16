@@ -46,26 +46,38 @@
 
                         <td class="px-5 py-4">
                             <div class="flex items-center gap-3">
-                                <div class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full {{ $tileTone['violet'] }} text-xs font-bold uppercase">
-                                    {{ strtoupper(Str::substr((string) ($row->nama ?? $row->no_hp), 0, 1)) }}
+                                <div class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full {{ $row->pnpp ? $tileTone['emerald'] : $tileTone['violet'] }} text-xs font-bold uppercase">
+                                    {{ strtoupper(Str::substr((string) ($row->pnpp?->nama ?? $row->nama ?? $row->no_hp), 0, 1)) }}
                                 </div>
                                 <div class="min-w-0">
-                                    <p class="truncate text-sm font-bold text-slate-900">{{ $row->nama ?? 'Nomor Tak Dikenal' }}</p>
+                                    <p class="truncate text-sm font-bold text-slate-900">{{ $row->pnpp?->nama ?? $row->nama ?? 'Nomor Tak Dikenal' }}</p>
                                     <p class="truncate font-mono text-[11px] text-slate-400">{{ $row->no_hp }}</p>
                                 </div>
+                            </div>
+                            <div class="mt-2">
+                                @if ($row->pnpp)
+                                    <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 ring-inset {{ $badgeTone['emerald'] }}">
+                                        <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+                                        Terdaftar
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 ring-inset {{ $badgeTone['slate'] }}">Tidak Terdaftar</span>
+                                @endif
                             </div>
                         </td>
 
                         <td class="whitespace-nowrap px-5 py-4">
                             @if ($row->pnpp)
                                 <div class="flex flex-col gap-0.5">
-                                    <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 ring-inset {{ $badgeTone['emerald'] }}">{{ $row->pnpp->nama }}</span>
                                     @if ($row->pnpp->nip)
-                                        <span class="font-mono text-[11px] text-slate-400">{{ $row->pnpp->nip }}</span>
+                                        <span class="font-mono text-[11px] font-bold text-slate-600">NIP {{ $row->pnpp->nip }}</span>
+                                    @endif
+                                    @if ($row->pnpp->satker)
+                                        <span class="text-[11px] text-slate-400">{{ $row->pnpp->satker->nama }}</span>
                                     @endif
                                 </div>
                             @else
-                                <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-bold ring-1 ring-inset {{ $badgeTone['slate'] }}">Tidak Terdaftar</span>
+                                <span class="text-xs italic text-slate-300">—</span>
                             @endif
                         </td>
 

@@ -972,7 +972,7 @@ class MonitoringRegistry
                     'headers' => ['Waktu Masuk', 'Nama Pengirim', 'No. HP', 'Pasien PNPP', 'NIP/NRP', 'Sumber', 'Isi Balasan'],
                     'toRow' => fn ($m) => [
                         $m->waktu_masuk?->format('Y-m-d H:i') ?? '',
-                        $m->nama ?? '',
+                        $m->pnpp?->nama ?? $m->nama ?? '',
                         $m->no_hp ?? '',
                         $m->pnpp?->nama ?? '',
                         $m->pnpp?->nip ?? '',
