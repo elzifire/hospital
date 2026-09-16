@@ -15,9 +15,10 @@ use Illuminate\Support\Collection;
  * pesan manual yang diwarisi dari ManualBroadcastController. Aturan
  * generate otomatis (H-1, hari-H, tidak-datang) dinonaktifkan sementara.
  *
- * Berbeda dengan Outreach, opsi template pada form manual hanya menampilkan
- * template kategori "Follow Up" (sesuai seeder TemplateCategorySeeder).
- * Daftar penerima hanya menampilkan PNPP yang belum membalas pesan respon.
+ * Form manual menampilkan semua template aktif (kategori bebas). Halaman
+ * create menampilkan saran follow up: pasien yang di-outreach hari ini
+ * dan belum membalas. Daftar penerima hanya menampilkan PNPP yang belum
+ * membalas pesan respon.
  */
 class FollowUpController extends ManualBroadcastController
 {
@@ -63,6 +64,83 @@ class FollowUpController extends ManualBroadcastController
             return $wa === null || ! isset($repliedNoHp[$wa]);
         })->values();
     }
+
+    /**
+     * Algoritma saran follow up: pasien yang sudah menerima pesan outreach
+     * hari ini (status terkirim) namun belum membalas di hari yang sama
+     * disarankan untuk di-follow up — contoh kasus "di-outreach hari ini,
+     * belum balas" dari petugas. Balasan dikenali lewat pnpp_id atau nomor
+     * WhatsApp pada MessageReply; pasien yang sudah di-follow up hari ini
+     * dikecualikan supaya tidak dobel.
+     *
+     * @return Collection<int, array{pnpp: Pnpp, alasan: string}>
+     */
+    protected function saranPenerima(Request $request): Collection
+    {
+        $hariIni = today();
+
+        $logs = MessageLog::query()
+            ->jenis('outreach')
+            ->where('status', 'terkirim')
+            ->whereDate('created_at', $hariIni)
+            ->whereNotNull('pnpp_id')
+            ->with('pnpp.satker:id,nama')
+            ->get()
+            ->unique('pnpp_id');
+
+        if ($logs->isEmpty()) {
+            return collect();
+        }
+
+        $balasById = MessageReply::query()
+            ->whereDate('waktu_masuk', $hariIni)
+            ->whereNotNull('pnpp_id')
+            ->pluck('pnpp_id')
+            ->map(fn ($id) => (int) $id)
+            ->flip()
+            ->all();
+
+        $balasByWa = MessageReply::query()
+            ->whereDate('waktu_masuk', $hariIni)
+            ->whereNotNull('no_hp')
+            ->pluck('no_hp')
+            ->map(fn ($n) => (string) $n)
+            ->flip()
+            ->all();
+
+        $diFollowUpHariIni = MessageLog::query()
+            ->jenis('follow_up')
+            ->where('status', '!=', 'dibatalkan')
+            ->whereDate('created_at', $hariIni)
+            ->whereNotNull('pnpp_id')
+            ->pluck('pnpp_id')
+            ->map(fn ($id) => (int) $id)
+            ->flip()
+            ->all();
+
+        return $logs
+            ->filter(function (MessageLog $log) use ($balasById, $balasByWa, $diFollowUpHariIni) {
+                $pnpp = $log->pnpp;
+
+                if ($pnpp === null || isset($diFollowUpHariIni[(int) $pnpp->id])) {
+                    return false;
+                }
+
+                if (isset($balasById[(int) $pnpp->id])) {
+                    return false;
+                }
+
+                $wa = PhoneFormat::toWa($pnpp->no_hp);
+
+                return $wa !== null && ! isset($balasByWa[$wa]);
+            })
+            ->map(fn (MessageLog $log) => [
+                'pnpp' => $log->pnpp,
+                'alasan' => 'Di-outreach hari ini, belum membalas.',
+            ])
+            ->values();
+    }
+
     /**
      * Riwayat pesan follow up — data nyata, dengan ringkasan status,
      * pencarian, filter status/aturan (termasuk manual), dan pembatalan.
@@ -143,7 +221,7 @@ class FollowUpController extends ManualBroadcastController
 
     protected function kategoriManual(): ?string
     {
-        return 'follow-up';
+        return null;
     }
 
     protected function viewManual(): string

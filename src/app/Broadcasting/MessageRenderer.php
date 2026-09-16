@@ -12,12 +12,35 @@ use Illuminate\Support\Carbon;
  * Token yang dikenali:
  *  {nama} {nip} {satker} {obat}  → data pasien PNPP
  *  {poli} {dokter} {tanggal} {jam} → dari meta (payload alur kirim)
+ *  alias ({nama_pasien}, {nip_pasien}, {nomor_hp}, …) → ikut data PNPP
  *
- * Token yang tidak dikenal / nilainya kosong dibiarkan apa adanya
- * agar mudah terdeteksi dan diperbaiki.
+ * Penulisan token bisa {token}, {{token}}, atau {{ token }} — semuanya
+ * dinormalisasi jadi {token} sebelum dirender. Token yang tidak dikenal
+ * / nilainya kosong dibiarkan apa adanya agar mudah terdeteksi dan
+ * diperbaiki.
  */
 class MessageRenderer
 {
+    /**
+     * Alias token per-pasien → kunci token dasar. Dipakai server saat
+     * render dan juga dibawa ke form (data pasien & tokenPribadi) supaya
+     * pratinjau dan kiriman selalu konsisten.
+     *
+     * @return array<string, string>
+     */
+    public static function aliasPnpp(): array
+    {
+        return [
+            'nama_pasien' => 'nama',
+            'nama_lengkap' => 'nama',
+            'nip_pasien' => 'nip',
+            'satker_pasien' => 'satker',
+            'nomor_hp' => 'no_hp',
+            'no_hp_pasien' => 'no_hp',
+            'nama_pnpp' => 'nama',
+        ];
+    }
+
     public function render(string $konten, ?Pnpp $pnpp = null, array $meta = [], array $kustom = []): string
     {
         $nilai = [
@@ -27,6 +50,7 @@ class MessageRenderer
             'nip_pnpp' => $pnpp?->nip,
             'satker' => $pnpp?->satker?->nama,
             'satker_pnpp' => $pnpp?->satker?->nama,
+            'no_hp' => $pnpp?->no_hp,
             'obat' => $pnpp ? $pnpp->penyakit->pluck('nama')->implode(', ') : null,
             'poli' => $this->nilaiMeta($meta, 'poli'),
             'instalasi' => $this->nilaiMeta($meta, 'instalasi') ?? $this->nilaiMeta($meta, 'poli'),
@@ -45,6 +69,15 @@ class MessageRenderer
                 $nilai[strtolower((string) $kunci)] = (string) $isi;
             }
         }
+
+        // Alias per-pasien menurun dari nilai token dasar final; alias
+        // yang di-override manual tidak diganggu.
+        foreach (static::aliasPnpp() as $alias => $asli) {
+            $nilai[$alias] ??= $nilai[$asli] ?? null;
+        }
+
+        // Normalisasi penulisan rapi {{ token }} / {{token}} → {token}.
+        $konten = (string) preg_replace('/\{\{\s*([a-z_]+)\s*\}\}/i', '{$1}', $konten);
 
         return (string) preg_replace_callback('/\{+([a-z_]+)\}+/i', function (array $cocok) use ($nilai) {
             $kunci = strtolower($cocok[1]);

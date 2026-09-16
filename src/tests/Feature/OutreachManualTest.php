@@ -64,6 +64,16 @@ class OutreachManualTest extends TestCase
         ]);
     }
 
+    protected function jadwalkanGrup(array $data): array
+    {
+        return array_merge([
+            'pnpp_ids' => [],
+            'jenis' => 'outreach',
+            'mode' => 'jadwalkan',
+            'kirim_pada' => now()->addHour()->format('Y-m-d\TH:i'),
+        ], $data);
+    }
+
     protected function buatTemplate(): MessageTemplate
     {
         return MessageTemplate::create([
@@ -227,6 +237,71 @@ class OutreachManualTest extends TestCase
             ]))
             ->assertOk()
             ->assertSee('Tanpa Jadwal');
+    }
+
+    #[Test]
+    public function form_menandai_penerima_yang_sudah_dioutreach_hari_ini(): void
+    {
+        $sudah = $this->buatPnpp();
+        $this->buatReminder($sudah);
+        $belum = $this->buatPnpp(['nama' => 'Belum Dioutreach', 'nip' => '777']);
+        $this->buatReminder($belum);
+
+        // Kirim outreach ke "sudah" hari ini.
+        $this->actingAs($this->superadmin())
+            ->post(route('admin.outreach.store'), [
+                'pnpp_ids' => [$sudah->id],
+                'jenis' => 'outreach',
+                'message_template_id' => $this->buatTemplate()->id,
+            ])
+            ->assertRedirect(route('admin.outreach.index'));
+
+        $response = $this->actingAs($this->superadmin())
+            ->get(route('admin.outreach.create'))
+            ->assertOk();
+
+        $html = $response->getContent();
+        $this->assertStringContainsString('Sudah outreach hari ini', $html);
+        $this->assertStringContainsString('Belum Dioutreach', $html);
+        $this->assertStringNotContainsString('Sudah outreach hari ini'.$belum->nama, $html);
+    }
+
+    #[Test]
+    public function halaman_edit_menandai_penerima_yang_sudah_dioutreach_hari_ini(): void
+    {
+        $budi = $this->buatPnpp();
+        $siti = $this->buatPnpp(['nama' => 'Siti Aminah', 'nip' => '456']);
+        $this->buatReminder($budi);
+        $this->buatReminder($siti);
+
+        // Grup menunggu berisi Budi & Siti (grup ini sendiri jangan
+        // memunculkan tanda — yang dicari pesan lain di luar grup).
+        $this->actingAs($this->superadmin())
+            ->post(route('admin.outreach.store'), $this->jadwalkanGrup([
+                'pnpp_ids' => [$budi->id, $siti->id],
+                'message_template_id' => $this->buatTemplate()->id,
+            ]));
+        $grup = MessageLog::where('pnpp_id', $budi->id)->first()->kirim_group;
+
+        // Outreach lain terpisah dikirim ke Budi hari ini.
+        MessageLog::create([
+            'jenis' => 'outreach', 'rule' => 'manual', 'pnpp_id' => $budi->id,
+            'penerima_nama' => 'Budi Santoso', 'penerima_no_hp' => '6281234567890',
+            'konten' => 'Pesan lain', 'status' => 'terkirim', 'sent_at' => now(),
+            'kirim_group' => (string) str()->uuid(),
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+
+        $response = $this->actingAs($this->superadmin())
+            ->get(route('admin.outreach.edit', $grup))
+            ->assertOk();
+
+        // Tanda hanya muncul untuk Budi yang memang sudah di-outreach
+        // hari ini (lewat grup lain), bukan untuk Siti.
+        $html = $response->getContent();
+        $this->assertStringContainsString('Budi Santoso', $html);
+        $this->assertStringContainsString('Siti Aminah', $html);
+        $this->assertSame(1, substr_count($html, 'Sudah outreach hari ini'));
     }
 
     #[Test]

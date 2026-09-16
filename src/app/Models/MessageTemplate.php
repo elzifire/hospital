@@ -96,9 +96,23 @@ class MessageTemplate extends Model
             return array_values((array) $this->meta_param_tokens);
         }
 
-        preg_match_all('/\{([a-z_]+)\}/i', (string) $this->konten, $cocok);
+        $konten = $this->kontenNormal();
+
+        preg_match_all('/\{([a-z_]+)\}/i', $konten, $cocok);
 
         return array_values(array_unique($cocok[1] ?? []));
+    }
+
+    /**
+     * Konten yang semua penulisan tokennnya dinormalisasi jadi satu
+     * bentuk ({token}) — penulisan rapi {{ token }} dan {{token}} dari
+     * variable Meta ikut dikenali supaya tidak tersisa mentah di kiriman.
+     */
+    public function kontenNormal(): string
+    {
+        $konten = (string) $this->konten;
+
+        return (string) preg_replace('/\{\{\s*([a-z_]+)\s*\}\}/i', '{$1}', $konten);
     }
 
     public function scopeSearch(Builder $query, ?string $search): Builder

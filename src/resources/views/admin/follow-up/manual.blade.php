@@ -9,8 +9,9 @@
         <div>
             <h1 class="text-2xl font-bold tracking-tight text-slate-900">Kirim Pesan Follow Up</h1>
             <p class="mt-1 text-sm text-slate-500">
-                Pilih satu atau beberapa pasien sebagai penerima, pilih template kategori Follow Up;
-                sistem mengirim lewat format resmi WhatsApp Business.
+                Pilih satu atau beberapa pasien sebagai penerima dan template aktif sebagai format pesan;
+                sistem mengirim lewat format resmi WhatsApp Business. Pasien yang di-outreach hari ini
+                namun belum membalas otomatis disarankan untuk di-follow up.
             </p>
         </div>
         <a href="{{ route('admin.follow-up.index') }}"

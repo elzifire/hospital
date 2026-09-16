@@ -42,13 +42,13 @@
             <p class="mt-0.5 text-sm text-slate-500">Penjadwalan kunjungan pasien beserta realisasinya — jadwal dibuat di sini, kunjungan dicatat lewat modul Kunjungan.</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
-            {{-- @can('manage kunjungan')
+            @can('manage kunjungan')
                 <a href="{{ route('admin.kunjungan.create') }}"
                    class="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2">
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
                     Tambah Kunjungan
                 </a>
-            @endcan --}}
+            @endcan
             @can('manage digital-reminder')
                 <a href="{{ route('admin.digital-reminder.create') }}"
                    class="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2">
@@ -165,6 +165,7 @@
                 <table class="min-w-full divide-y divide-slate-100 text-sm">
                     <thead class="bg-slate-50/70 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">
                         <tr>
+                            <th class="text-center">No</th>
                             <th class="px-5 py-3">Pasien</th>
                             <th class="px-5 py-3">Jadwal</th>
                             <th class="px-5 py-3">Poli</th>
@@ -220,6 +221,9 @@
                                 {{-- ==== Baris penjadwalan (reminder) ==== --}}
                                 @php($r = $baris)
                                 <tr class="hover:bg-slate-50/60">
+                                    <td class="whitespace-nowrap px-5 py-3">
+                                        <p class="font-semibold text-slate-800">{{ $loop->iteration + ($items->currentPage() - 1) * $items->perPage() }}</p>
+                                    </td>
                                     <td class="px-5 py-3">
                                         <p class="font-semibold text-slate-800">{{ $r['pasien']?->nama }}</p>
                                         <p class="text-xs text-slate-400">NIP {{ $r['pasien']?->nip ?? '—' }} · {{ $r['pasien']?->satker?->nama ?? '—' }}</p>

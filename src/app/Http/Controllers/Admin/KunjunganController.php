@@ -23,12 +23,12 @@ use Illuminate\Validation\Rule;
 class KunjunganController extends Controller
 {
     /**
-     * Daftar kunjungan — index gabungan Digital Reminder & Kunjungan
-     * (satu tabel: penjadwalan + kunjungan manual), lihat KunjunganDaftar.
+     * Daftar kunjungan — riwayat berobat yang benar-benar tercatat
+     * (manual maupun realisasi dari penjadwalan), lihat KunjunganDaftar.
      */
     public function index(Request $request)
     {
-        return view('admin.digital-reminder.index', app(KunjunganDaftar::class)->data(
+        return view('admin.kunjungan.index', app(KunjunganDaftar::class)->dataKunjungan(
             $request,
             $this->batasiPoli(),
             $this->poliAktif(),

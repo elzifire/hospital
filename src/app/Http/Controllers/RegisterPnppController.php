@@ -62,6 +62,10 @@ class RegisterPnppController extends Controller
                 : null;
         }
 
+        // Nama diubah ke huruf besar agar konsisten dengan pencarian
+        // PostgreSQL yang case-sensitive.
+        $data['nama'] = strtoupper($data['nama']);
+
         // Satker wajib: pilih dari daftar ATAU ketik manual.
         if (blank($data['satker_id'] ?? null) && blank($data['satker_baru'] ?? null)) {
             throw ValidationException::withMessages([

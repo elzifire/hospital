@@ -14,8 +14,9 @@ use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
- * Unifikasi Digital Reminder & Kunjungan: index gabungan yang sama di
- * kedua menu, plus form tambah kunjungan mode "Dari Jadwal".
+ * Pemisahan Digital Reminder & Kunjungan: menu Digital Reminder menampilkan
+ * index gabungan (jadwal + kunjungan manual), sedangkan menu Kunjungan
+ * menampilkan halaman kunjungan tersendiri.
  */
 class KunjunganDaftarTest extends TestCase
 {
@@ -45,7 +46,7 @@ class KunjunganDaftarTest extends TestCase
     }
 
     #[Test]
-    public function index_gabungan_menampilkan_jadwal_dan_kunjungan_manual_di_kedua_menu(): void
+    public function index_digital_reminder_tetap_gabungan_dan_kunjungan_punya_halaman_sendiri(): void
     {
         extract($this->pasangan());
 
@@ -66,17 +67,24 @@ class KunjunganDaftarTest extends TestCase
 
         $this->actingAs($this->superadmin());
 
-        // Konten index gabungan identik di menu Digital Reminder maupun Kunjungan.
-        foreach ([route('admin.kunjungan.index'), route('admin.digital-reminder.index')] as $url) {
-            $this->get($url)
-                ->assertOk()
-                ->assertSee('Daftar Sesi')
-                ->assertSee('Budi Santoso')
-                ->assertSee('Poli A')
-                ->assertSee('Poli B')
-                ->assertSee('Realisasi Reminder')
-                ->assertSee('Manual');
-        }
+        // Digital Reminder: index gabungan (jadwal + kunjungan manual).
+        $this->get(route('admin.digital-reminder.index'))
+            ->assertOk()
+            ->assertSee('Daftar Sesi')
+            ->assertSee('Budi Santoso')
+            ->assertSee('Poli A')
+            ->assertSee('Poli B')
+            ->assertSee('Realisasi Reminder')
+            ->assertSee('Manual');
+
+        // Kunjungan: halaman tersendiri berisi kunjungan tercatat.
+        $this->get(route('admin.kunjungan.index'))
+            ->assertOk()
+            ->assertSee('Daftar Kunjungan')
+            ->assertSee('Budi Santoso')
+            ->assertSee('Poli A')
+            ->assertSee('Poli B')
+            ->assertSee('Manual');
     }
 
     #[Test]

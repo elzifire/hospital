@@ -124,6 +124,98 @@ class KunjunganDaftar
         ];
     }
 
+    /**
+     * Dataset index Kunjungan (halaman tersendiri): hanya kunjungan yang
+     * benar-benar tercatat — manual maupun realisasi dari penjadwalan —
+     * dikelompokkan per pasien + tanggal. Berbeda dari data() gabungan
+     * dengan Digital Reminder agar tujuan tiap modul tidak tercampur.
+     */
+    public function dataKunjungan(Request $request, bool $batasiPoli, ?int $poliAktif): array
+    {
+        $q = (string) $request->query('q', '');
+        $poliId = (string) $request->query('poli', '');
+        $dari = (string) $request->query('dari', '');
+        $sampai = (string) $request->query('sampai', '');
+        $periode = (string) $request->query('periode', '');
+        $mulai = match ($periode) {
+            'hari-ini' => today()->toDateString(),
+            '7-hari' => today()->subDays(6)->toDateString(),
+            '30-hari' => today()->subDays(29)->toDateString(),
+            default => null,
+        };
+
+        $scopePoli = fn (Builder $t) => $t->when($batasiPoli, fn ($u) => $u->where('poli_id', $poliAktif));
+
+        $grup = Kunjungan::query()
+            ->with('pnpp.satker:id,nama', 'poli:id,nama')
+            ->tap($scopePoli)
+            ->when($q, fn ($query) => $query->whereHas('pnpp', fn ($p) => $p
+                ->where('nama', 'like', "%{$q}%")
+                ->orWhere('nip', 'like', "%{$q}%")))
+            ->when($dari, fn ($query) => $query->whereDate('tanggal_kunjungan', '>=', $dari))
+            ->when($sampai, fn ($query) => $query->whereDate('tanggal_kunjungan', '<=', $sampai))
+            ->when($mulai, fn ($query) => $query->whereDate('tanggal_kunjungan', '>=', $mulai))
+            ->orderByDesc('tanggal_kunjungan')
+            ->get()
+            ->groupBy(fn ($k) => $k->pnpp_id.'|'.$k->tanggal_kunjungan->format('Y-m-d'));
+
+        // Filter poli diterapkan per grup (satu pasien bisa beberapa poli).
+        if (! $batasiPoli && $poliId !== '') {
+            $grup = $grup->filter(fn (Collection $baris) => $baris->contains(fn ($k) => (int) $k->poli_id === (int) $poliId));
+        }
+
+        $baris = $grup
+            ->sortByDesc(fn (Collection $baris) => $baris->first()->tanggal_kunjungan?->timestamp ?? 0)
+            ->values()
+            ->map(fn (Collection $blok) => $this->barisKunjungan($blok));
+
+        $perPage = 10;
+        $halaman = max(1, (int) $request->query('page', 1));
+        $items = new LengthAwarePaginator(
+            $baris->slice(($halaman - 1) * $perPage, $perPage)->all(),
+            $baris->count(),
+            $perPage,
+            $halaman,
+            ['path' => $request->url(), 'query' => $request->query()],
+        );
+
+        $withReminder = fn (Collection $blok) => $blok->contains(fn ($k) => filled($k->reminder_id));
+
+        return [
+            'items' => $items,
+            'total' => $baris->count(),
+            'pasien' => $baris->pluck('pnpp_id')->unique()->count(),
+            'barisPoli' => $grup->flatten()->count(),
+            'realisasi' => $grup->filter($withReminder)->count(),
+            'manual' => $grup->reject($withReminder)->count(),
+            'polis' => $this->daftarPoliAktif($batasiPoli, $poliAktif),
+            'batasiPoli' => $batasiPoli,
+            'filters' => ['q' => $q, 'poli' => $poliId, 'dari' => $dari, 'sampai' => $sampai, 'periode' => $periode],
+        ];
+    }
+
+    /**
+     * @param  Collection<int, Kunjungan>  $grup
+     */
+    private function barisKunjungan(Collection $grup): array
+    {
+        $pertama = $grup->first();
+
+        return [
+            'tipe' => 'kunjungan',
+            'tanggal' => $pertama->tanggal_kunjungan,
+            'jam' => null,
+            'pnpp_id' => $pertama->pnpp_id,
+            'pasien' => $pertama->pnpp,
+            'poliBadges' => $grup->filter(fn ($k) => $k->poli)->pluck('poli.nama')->unique()->values()->all(),
+            'diagnosa' => $grup->filter(fn ($k) => $k->diagnosa)->pluck('diagnosa')->implode(' · '),
+            'jumlahPoli' => $grup->pluck('poli_id')->unique()->count(),
+            'sumber' => $grup->contains(fn ($k) => filled($k->reminder_id)) ? 'realisasi' : 'manual',
+            'sumberLabel' => $grup->contains(fn ($k) => filled($k->reminder_id)) ? 'Realisasi Reminder' : 'Manual',
+            'detailUrl' => route('admin.pnpp.kunjungan', $pertama->pnpp_id),
+        ];
+    }
+
     private function barisReminder(Reminder $r): array
     {
         return [

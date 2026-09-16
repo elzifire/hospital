@@ -251,7 +251,7 @@ nilaiToken(pid, token) {
                 <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
                     <div>
                         <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Tanggal <span class="text-rose-500">*</span></label>
-                        <input type="date" name="tanggal" x-model="tanggal" value="{{ old('tanggal') }}" min="{{ today()->format('Y-m-d') }}" required
+                        <input type="date" name="tanggal" x-model="tanggal" value="{{ old('tanggal') }}" required
                                class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
                         @error('tanggal')<p class="mt-1 text-xs text-rose-500">{{ $message }}</p>@enderror
                     </div>
@@ -282,7 +282,7 @@ nilaiToken(pid, token) {
                                   class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">{{ old('catatan') }}</textarea>
                         @error('catatan')<p class="mt-1 text-xs text-rose-500">{{ $message }}</p>@enderror
                     </div>
-                    <div class="md:col-span-2">
+                    {{-- <div class="md:col-span-2">
                         <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Template Pesan WhatsApp</label>
                         <select name="message_template_id" x-model="templateId" @change="pilihTemplate($el.value)"
                                 class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
@@ -293,7 +293,7 @@ nilaiToken(pid, token) {
                         </select>
                         <p class="mt-1 text-xs text-slate-400">Opsional — hanya template kategori <strong>Digital Reminder</strong>. Bila dipilih, semua jadwal dari form ini memakai template ini (menggantikan default aturan modul) saat pesan digenerate. Pratinjau tampil di bawah begitu template dipilih — variabel terisi otomatis dari tanggal/jam/poli di atas.</p>
                         @error('message_template_id')<p class="mt-1 text-xs text-rose-500">{{ $message }}</p>@enderror
-                    </div>
+                    </div> --}}
                 </div>
 
                 {{-- ===== Variabel pesan kustom ===== --}}

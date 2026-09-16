@@ -21,12 +21,14 @@ class RegisterPnppController extends Controller
         $query = RegisterPnpp::query()
             ->with(['satker', 'polis', 'tujuanKunjungans'])
             ->when($request->query('search'), function (Builder $q, string $cari): void {
-                $cari = '%'.trim($cari).'%';
+                $cariAtas = strtoupper(trim($cari));
+                $cariLike = '%'.$cariAtas.'%';
+                $cariRaw = '%'.trim($cari).'%';
                 $q->where(fn (Builder $sub): Builder => $sub
-                    ->where('nama', 'like', $cari)
-                    ->orWhere('nik', 'like', $cari)
-                    ->orWhere('nip', 'like', $cari)
-                    ->orWhere('no_hp', 'like', $cari));
+                    ->where('nama', 'like', $cariLike)
+                    ->orWhere('nik', 'like', $cariRaw)
+                    ->orWhere('nip', 'like', $cariRaw)
+                    ->orWhere('no_hp', 'like', $cariRaw));
             })
             ->when(in_array($status, RegisterPnpp::STATUS, true), fn (Builder $q): Builder => $q->where('status', $status))
             ->latest();

@@ -4,6 +4,7 @@
     $jenis = $jenis ?? 'outreach';
     $jenisLabel = $jenisLabel ?? 'Outreach';
     $jenisDesc = $jenisDesc ?? 'Undangan jadwal (riwayat modul Outreach).';
+    $saranPenerima = $saranPenerima ?? [];
     $tokenJadwal = ['hari_tanggal', 'waktu_kunjungan', 'poli_layanan', 'poli', 'dokter', 'tanggal', 'jam'];
     $alpineOutreachData = [
         'selected' => $selectedIds,
@@ -46,11 +47,12 @@
               return kunci.length > 0 ? Number(kunci[0]) : null;
           },
 tokenPribadi() {
-               return ['nama', 'nama_pnpp', 'nip', 'nip_pnpp', 'satker', 'satker_pnpp'];
+               return ['nama', 'nama_pnpp', 'nip', 'nip_pnpp', 'satker', 'satker_pnpp', 'no_hp', 'nomor_hp', 'no_hp_pasien', 'nama_pasien', 'nama_lengkap', 'nip_pasien', 'satker_pasien'];
            },
           isiOtomatisVars() {
               this.vars = this.vars || {};
               this.autovars = this.autovars || {};
+              console.log('[isi-otomatis-vars] awal', { templateId: this.templateId, token: this.tokenList(), vars: { ...this.vars }, autovars: { ...this.autovars } });
               for (const token of Object.keys(this.autovars)) {
                   delete this.vars[token];
                   delete this.autovars[token];
@@ -58,7 +60,11 @@ tokenPribadi() {
               const sasaran = this.selected.length > 0
                   ? this.selected
                   : Object.keys(this.pnppData || {}).map(Number);
-              if (sasaran.length === 0) return;
+              if (sasaran.length === 0) {
+                  console.warn('[isi-otomatis-vars] tidak ada sasaran untuk mengisi variabel', { selected: this.selected, pnppData: this.pnppData });
+                  return;
+              }
+              const terisi = [];
               for (const token of this.tokenList()) {
                   if (this.tokenPribadi().includes(token)) continue;
                   let isiSama = null;
@@ -76,8 +82,10 @@ tokenPribadi() {
                   if (punya && isiSama !== '__BEDA__' && isiSama !== null) {
                       this.vars[token] = isiSama;
                       this.autovars[token] = true;
+                      terisi.push(token + '=' + isiSama);
                   }
               }
+              console.log('[isi-otomatis-vars] selesai', { token: this.tokenList(), sasaran, terisi, vars: { ...this.vars }, autovars: { ...this.autovars } });
           },
           isiOtomatisReferensi() {
               for (const pid of Object.keys(this.pnppData || {})) {
@@ -104,26 +112,57 @@ tokenPribadi() {
           remindersUntuk(pid) {
               return (this.reminders || []).filter((r) => Number(r.pnpp_id) === Number(pid));
           },
+          remindersGabung(pid, rid) {
+              const r = rid ? (this.reminders || []).find((x) => Number(x.id) === Number(rid)) : null;
+              if (!r || !r.nilai || !r.nilai.tanggal) return null;
+              const grup = (this.reminders || [])
+                  .filter((x) => Number(x.pnpp_id) === Number(pid)
+                      && x.nilai && x.nilai.tanggal === r.nilai.tanggal && x.nilai.jam)
+                  .sort((a, b) => (a.nilai.jam || '').localeCompare(b.nilai.jam || ''));
+              if (grup.length < 2) return null;
+              const unik = (arr) => [...new Set(arr.filter(Boolean))].join(' & ');
+              return {
+                  hari_tanggal: r.nilai.hari_tanggal || '',
+                  tanggal: r.nilai.tanggal,
+                  waktu_kunjungan: unik(grup.map((x) => x.nilai.jam)),
+                  jam: unik(grup.map((x) => x.nilai.jam)),
+                  poli_layanan: unik(grup.map((x) => x.nilai.poli_layanan)),
+                  poli: unik(grup.map((x) => x.nilai.poli_layanan)),
+                  dokter: unik(grup.map((x) => x.nilai.dokter)),
+              };
+          },
           nilaiToken(pid, token) {
               const manual = this.vars[token] || '';
               if (manual.trim() !== '') return manual;
 
-              const rid = this.reminderIds[pid];
+              const rid = this.reminderIds[pid] || null;
+              const gabungan = this.remindersGabung(pid, rid);
+              if (gabungan && gabungan[token]) return gabungan[token];
+
               const r = rid ? (this.reminders || []).find((x) => Number(x.id) === Number(rid)) : null;
               if (r && r.nilai && r.nilai[token]) return r.nilai[token];
 
               const d = this.pnppData[pid] || {};
               if (d[token]) return d[token];
 
+              console.warn('[nilaiToken] token tidak terisi:', token, {
+                  pid, vars: { ...this.vars }, reminderIds: { ...this.reminderIds },
+                  reminders: this.reminders || [], pnppData: this.pnppData || {},
+              });
               return '';
           },
           previewFor(pid) {
-              const s = this.activeTemplate().konten;
-              return s.replace(/\{+([a-z_]+)\}+/gi, (cocok, token) => {
+              const s = (this.activeTemplate().konten || '').replace(/\{\{\s*([a-z_]+)\s*\}\}/gi, '{$1}');
+              const hasil = s.replace(/\{+([a-z_]+)\}+/gi, (cocok, token) => {
                   const isi = this.nilaiToken(pid, token.toLowerCase());
                   return isi !== '' ? isi : '—';
               });
-}
+              const sisa = hasil.match(/\{+[a-z_]+:?\s*[^}]*\}+/gi) || [];
+              if (sisa.length > 0) {
+                  console.warn('[pratinjau] token tersisa di pembanding:', sisa, { pid, hasil });
+              }
+              return hasil;
+          }
               }"
       x-init="isiOtomatisReferensi(); isiOtomatisVars()">
     @csrf
@@ -180,6 +219,14 @@ tokenPribadi() {
                                 <td class="px-5 py-3">
                                     <p class="font-semibold text-slate-800">{{ $p->nama }}</p>
                                     <p class="text-xs text-slate-400">NIP/NRP {{ $p->nip ?? '—' }}</p>
+                                    @if (in_array((int) $p->id, $sudahDikirimHariIni ?? [], true))
+                                        <span class="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 ring-1 ring-inset ring-amber-200">
+                                            <svg class="h-2.5 w-2.5" fill="currentColor" viewBox="0 0 12 12">
+                                                <circle cx="6" cy="6" r="6"/>
+                                            </svg>
+                                            Sudah {{ $jenis === 'follow_up' ? 'follow up' : 'outreach' }} hari ini
+                                        </span>
+                                    @endif
                                 </td>
                                 <td class="px-5 py-3">
                                     @if ($validWa)
@@ -198,6 +245,45 @@ tokenPribadi() {
             </div>
         @endif
     </div>
+
+    {{-- ===== Saran follow up ===== --}}
+    @if (count($saranPenerima) > 0)
+        <div class="overflow-hidden rounded-2xl border border-amber-200 bg-amber-50/60 shadow-sm">
+            <div class="flex flex-col gap-2 border-b border-amber-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h2 class="text-sm font-bold text-amber-900">Saran Follow Up</h2>
+                    <p class="mt-0.5 text-xs text-amber-700">
+                        Pasien berikut di-outreach hari ini tetapi belum membalas — saran untuk segera di-follow up.
+                        Centang untuk menjadikannya penerima.
+                    </p>
+                </div>
+                <span class="inline-flex shrink-0 items-center rounded-full bg-white px-3 py-1 text-[11px] font-bold text-amber-700 ring-1 ring-inset ring-amber-200">
+                    {{ count($saranPenerima) }} saran
+                </span>
+            </div>
+            <div class="grid gap-2 px-5 py-4 sm:grid-cols-2">
+                @foreach ($saranPenerima as $s)
+                    @php($saranPnpp = $s['pnpp'])
+                    @php($saranWa = \App\Broadcasting\PhoneFormat::toWa($saranPnpp->no_hp))
+                    @if ($saranWa === null)
+                        @continue
+                    @endif
+                    <label class="flex cursor-pointer items-center gap-3 rounded-xl border border-amber-200 bg-white p-3 ring-1 ring-inset ring-amber-100 transition has-[:checked]:border-sky-400 has-[:checked]:bg-sky-50">
+                        <input type="checkbox" name="pnpp_ids[]" value="{{ $saranPnpp->id }}"
+                               x-model="selected" @change="isiOtomatisVars()"
+                               class="h-4 w-4 shrink-0 rounded border-slate-300 text-sky-600 focus:ring-sky-500">
+                        <span class="min-w-0">
+                            <span class="block truncate text-sm font-semibold text-slate-800">{{ $saranPnpp->nama }}</span>
+                            <span class="block truncate text-xs text-slate-400">NIP/NRP {{ $saranPnpp->nip ?? '—' }} · {{ $saranPnpp->satker?->nama ?? '—' }}</span>
+                        </span>
+                        <span class="ml-auto shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold text-amber-800 ring-1 ring-inset ring-amber-200">
+                            {{ $s['alasan'] }}
+                        </span>
+                    </label>
+                @endforeach
+            </div>
+        </div>
+    @endif
 
     {{-- ===== Template & pesan ===== --}}
     <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -333,6 +419,13 @@ tokenPribadi() {
                                 <p class="mt-0.5 text-[11px] text-slate-400">
                                     Token {hari_tanggal}, {waktu_kunjungan}, dan {poli_layanan} ikut terisi dari jadwal yang dipilih.
                                 </p>
+                                <div x-show="remindersGabung(pid, reminderIds[pid]) !== null" x-cloak
+                                     class="mt-1.5 inline-flex items-center gap-1.5 rounded-lg bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800 ring-1 ring-inset ring-amber-200">
+                                    <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 12 9 6v4h12v4H9v4l-6-6Z"/>
+                                    </svg>
+                                    <span>Beberapa jadwal di hari yang sama digabung jadi 1 pesan</span>
+                                </div>
                             </div>
 
                             <div class="mt-2.5 rounded-xl bg-[#dcf8c6] px-3 py-2.5 ring-1 ring-inset ring-emerald-200/60">

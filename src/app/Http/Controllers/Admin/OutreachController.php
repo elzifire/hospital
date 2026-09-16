@@ -13,8 +13,8 @@ use Illuminate\Validation\Rule;
  * Modul Outreach — riwayat pesan undangan jadwal (rule H-7 & H-1) yang
  * digenerate dari penjadwalan Digital Reminder, plus form kirim pesan
  * manual (target PNPP + template + variabel) yang diwarisi dari
- * ManualBroadcastController. Opsi template form manual hanya menampilkan
- * template kategori "Outreach" (sesuai seeder TemplateCategorySeeder).
+ * ManualBroadcastController. Form manual menampilkan semua template aktif
+ * (kategori bebas).
  */
 class OutreachController extends ManualBroadcastController
 {
@@ -89,7 +89,7 @@ class OutreachController extends ManualBroadcastController
 
     protected function kategoriManual(): ?string
     {
-        return 'outreach';
+        return null;
     }
 
     protected function viewManual(): string

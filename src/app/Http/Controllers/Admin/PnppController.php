@@ -31,10 +31,11 @@ class PnppController extends Controller
         ];
 
         if ($search = $request->query('search')) {
-            $query->where(function ($q) use ($search) {
-                $q->where('nama', 'like', "%{$search}%")
+            $searchAtas = strtoupper($search);
+            $query->where(function ($q) use ($searchAtas, $search) {
+                $q->where('nama', 'like', "%{$searchAtas}%")
                     ->orWhere('nip', 'like', "%{$search}%")
-                    ->orWhere('no_bpjs', 'like', "%{$search}%");
+                    ->orWhere('no_hp', 'like', "%{$search}%");
             });
         }
 
@@ -180,6 +181,7 @@ class PnppController extends Controller
         $request->merge([
             'no_bpjs' => MasterRegistry::normalizeDigits($request->input('no_bpjs')),
             'no_hp' => MasterRegistry::normalizePhone($request->input('no_hp')),
+            'nama' => strtoupper((string) $request->input('nama')),
         ]);
 
         return $request->validate([

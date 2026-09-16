@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Broadcasting\BroadcastService;
+use App\Broadcasting\MessageRenderer;
 use App\Broadcasting\PesanFactory;
 use App\Broadcasting\PhoneFormat;
 use App\Broadcasting\WhatsApp\AntreanKirim;
@@ -15,9 +16,9 @@ use App\Models\Reminder;
 use App\Models\Satker;
 use App\Support\TextSanitizer;
 use Carbon\CarbonImmutable;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -79,6 +80,8 @@ abstract class ManualBroadcastController extends Controller
             'pnppData' => $this->dataPnpp($pnpps),
             'poliOptions' => $this->poliOptions(),
             'jadwalMap' => $this->jadwalTerdekat($pnpps),
+            'sudahDikirimHariIni' => $this->sudahDikirimHariIni($pnpps),
+            'saranPenerima' => $this->saranPenerima($request),
         ]);
     }
 
@@ -121,7 +124,30 @@ abstract class ManualBroadcastController extends Controller
         $logs = $pnpps->map(function (Pnpp $pnpp) use ($request, $data, $mode, $template, $varsKustom, $kirimGroup, $reminders) {
             $noHp = PhoneFormat::toWa($pnpp->no_hp);
             $reminder = $this->reminderUntukPnpp($reminders, $data['reminder_ids'] ?? [], $pnpp);
-            $atribut = app(PesanFactory::class)->atribut($template, $pnpp, $reminder, $data['jenis'], 'manual', $request->user(), $varsKustom);
+            $vars = $varsKustom;
+
+            // Beberapa jadwal di hari yang sama digabung jadi satu pesan
+            // (tanggal sekali, waktu & poli disambung " & ") — hemat blast.
+            $gabungan = $this->nilaiGabungan($reminder, $pnpp);
+            if ($gabungan !== []) {
+                $vars += $gabungan;
+            }
+
+            $atribut = app(PesanFactory::class)->atribut($template, $pnpp, $reminder, $data['jenis'], 'manual', $request->user(), $vars);
+
+            Log::channel('whatsapp')->debug('ManualBroadcastController::store', [
+                'jenis' => $data['jenis'],
+                'mode' => $mode,
+                'pnpp_id' => $pnpp->id,
+                'template_id' => $template->id,
+                'konten_template' => (string) $template->konten,
+                'token_template' => $template->tokenParam(),
+                'reminder_id' => $reminder?->id,
+                'gabungan_jadwal' => $gabungan !== [] ? $gabungan : null,
+                'vars_kustom' => $varsKustom,
+                'konten_terrender' => (string) ($atribut['konten'] ?? ''),
+                'template_params' => $atribut['template_params'] ?? [],
+            ]);
 
             return MessageLog::create([
                 ...$atribut,
@@ -231,6 +257,7 @@ abstract class ManualBroadcastController extends Controller
             'pnppData' => $this->dataPnpp($pnpps),
             'poliOptions' => $this->poliOptions(),
             'jadwalMap' => $this->jadwalTerdekat($pnpps),
+            'sudahDikirimHariIni' => $this->sudahDikirimHariIni($pnpps, $group),
         ]);
     }
 
@@ -269,7 +296,28 @@ abstract class ManualBroadcastController extends Controller
 
         foreach ($logs->whereIn('pnpp_id', $ditahan) as $log) {
             $reminder = $this->reminderUntukPnpp($reminders, $data['reminder_ids'] ?? [], $log->pnpp);
-            $atribut = app(PesanFactory::class)->atribut($template, $log->pnpp, $reminder, $logs->first()->jenis, 'manual', $user, $varsKustom);
+            $vars = $varsKustom;
+
+            $gabungan = $this->nilaiGabungan($reminder, $log->pnpp);
+            if ($gabungan !== []) {
+                $vars += $gabungan;
+            }
+
+            $atribut = app(PesanFactory::class)->atribut($template, $log->pnpp, $reminder, $logs->first()->jenis, 'manual', $user, $vars);
+
+            Log::channel('whatsapp')->debug('ManualBroadcastController::update', [
+                'aksi' => 'perbarui',
+                'kirim_group' => $group,
+                'pnpp_id' => $log->pnpp_id,
+                'template_id' => $template->id,
+                'konten_template' => (string) $template->konten,
+                'token_template' => $template->tokenParam(),
+                'reminder_id' => $reminder?->id,
+                'gabungan_jadwal' => $gabungan !== [] ? $gabungan : null,
+                'vars_kustom' => $varsKustom,
+                'konten_terrender' => (string) ($atribut['konten'] ?? ''),
+                'template_params' => $atribut['template_params'] ?? [],
+            ]);
 
             $log->update([
                 'message_template_id' => $template->id,
@@ -291,7 +339,28 @@ abstract class ManualBroadcastController extends Controller
 
         foreach (Pnpp::query()->whereIn('id', $ditambah)->get() as $pnpp) {
             $reminder = $this->reminderUntukPnpp($reminders, $data['reminder_ids'] ?? [], $pnpp);
-            $atribut = app(PesanFactory::class)->atribut($template, $pnpp, $reminder, $logs->first()->jenis, 'manual', $user, $varsKustom);
+            $vars = $varsKustom;
+
+            $gabungan = $this->nilaiGabungan($reminder, $pnpp);
+            if ($gabungan !== []) {
+                $vars += $gabungan;
+            }
+
+            $atribut = app(PesanFactory::class)->atribut($template, $pnpp, $reminder, $logs->first()->jenis, 'manual', $user, $vars);
+
+            Log::channel('whatsapp')->debug('ManualBroadcastController::update', [
+                'aksi' => 'tambah',
+                'kirim_group' => $group,
+                'pnpp_id' => $pnpp->id,
+                'template_id' => $template->id,
+                'konten_template' => (string) $template->konten,
+                'token_template' => $template->tokenParam(),
+                'reminder_id' => $reminder?->id,
+                'gabungan_jadwal' => $gabungan !== [] ? $gabungan : null,
+                'vars_kustom' => $varsKustom,
+                'konten_terrender' => (string) ($atribut['konten'] ?? ''),
+                'template_params' => $atribut['template_params'] ?? [],
+            ]);
 
             MessageLog::create([
                 ...$atribut,
@@ -404,11 +473,24 @@ abstract class ManualBroadcastController extends Controller
     }
 
     /**
+     * Saran khusus modul berupa daftar pasien yang disarankan sebagai
+     * penerima pada halaman kirim manual, beserta alasan mengapa. Bawaan
+     * kosong; modul (mis. Follow Up) bisa menimpanya untuk menampilkan
+     * rekomendasi penerima di samping daftar hasil filter.
+     *
+     * @return Collection<int, array{pnpp: Pnpp, alasan: string}>
+     */
+    protected function saranPenerima(Request $request): Collection
+    {
+        return collect();
+    }
+
+    /**
      * Label jadwal terjadwal terdekat per PNPP untuk kolom "Jadwal" pada
      * daftar penerima; tanggal yang disaring ikut memperjelas jadwalnya.
      *
      * @param  Collection<int, Pnpp>  $pnpps
-     * @return array<int, string>  pnpp_id => label
+     * @return array<int, string> pnpp_id => label
      */
     protected function jadwalTerdekat(Collection $pnpps): array
     {
@@ -429,6 +511,33 @@ abstract class ManualBroadcastController extends Controller
                     .($grup->first()->jam?->format('H:i') ?? '—')
                     .' · '.($grup->first()->poli?->nama ?? '—'),
             ])
+            ->all();
+    }
+
+    /**
+     * Id PNPP yang sudah pernah dikirimi pesan modul ini hari ini — untuk
+     * menandai pasien yang sudah di-outreach (atau di-follow up) di daftar
+     * penerima. Grup yang sedang diedit bisa dikecualikan supaya targetnya
+     * sendiri tidak ikut ditandai.
+     *
+     * @param  Collection<int, Pnpp>  $pnpps
+     * @return array<int, int>
+     */
+    protected function sudahDikirimHariIni(Collection $pnpps, ?string $kecualiGroup = null): array
+    {
+        if ($pnpps->isEmpty()) {
+            return [];
+        }
+
+        return MessageLog::query()
+            ->jenis($this->jenisManual())
+            ->whereIn('pnpp_id', $pnpps->pluck('id')->all())
+            ->where('status', '!=', 'dibatalkan')
+            ->whereDate('created_at', today())
+            ->when($kecualiGroup !== null, fn ($query) => $query->where('kirim_group', '!=', $kecualiGroup))
+            ->pluck('pnpp_id')
+            ->unique()
+            ->values()
             ->all();
     }
 
@@ -548,6 +657,49 @@ abstract class ManualBroadcastController extends Controller
     }
 
     /**
+     * Nilai token gabungan ketika satu pasien punya beberapa jadwal pada
+     * tanggal yang sama: digabung jadi SATU pesan (tanggal sekali, waktu
+     * disambung " & ", poli/dokter disambung " & ") supaya hemat biaya
+     * blast. Berlaku untuk kirim manual; alur generate otomatis tetap
+     * per-jadwal. Mengembalikan array kosong bila jadwal acuan tidak ada
+     * atau tidak ada jadwal lain di hari yang sama.
+     *
+     * @return array<string, string>
+     */
+    protected function nilaiGabungan(?Reminder $acuan, Pnpp $pnpp): array
+    {
+        if ($acuan === null || $acuan->tanggal === null) {
+            return [];
+        }
+
+        $bersamaan = Reminder::query()
+            ->with('poli:id,nama', 'dokter:id,nama')
+            ->where('pnpp_id', $pnpp->id)
+            ->where('status', 'terjadwal')
+            ->whereDate('tanggal', $acuan->tanggal)
+            ->orderBy('jam')
+            ->get();
+
+        if ($bersamaan->count() < 2) {
+            return [];
+        }
+
+        $gabung = function (callable $ambil) use ($bersamaan): string {
+            return $bersamaan->map($ambil)->filter()->unique()->values()->implode(' & ');
+        };
+
+        return [
+            'hari_tanggal' => $acuan->tanggal->locale('id')->translatedFormat('l, d F Y'),
+            'tanggal' => $acuan->tanggal->format('Y-m-d'),
+            'waktu_kunjungan' => $gabung(fn (Reminder $r) => $r->jam?->format('H:i')),
+            'jam' => $gabung(fn (Reminder $r) => $r->jam?->format('H:i')),
+            'poli_layanan' => $gabung(fn (Reminder $r) => $r->poli?->nama),
+            'poli' => $gabung(fn (Reminder $r) => $r->poli?->nama),
+            'dokter' => $gabung(fn (Reminder $r) => $r->dokter?->nama),
+        ];
+    }
+
+    /**
      * Daftar jadwal Digital Reminder untuk pelengkap variabel template
      * pengingat kunjungan, per penerima PNPP. Nilai token turunan
      * (hari_tanggal/waktu_kunjungan/poli_layanan) ikut disertakan agar
@@ -595,10 +747,12 @@ abstract class ManualBroadcastController extends Controller
     /**
      * Data pasien untuk pratinjau pesan di sisi frontend ({nama}, {nip},
      * {satker}, {poli}/{instalasi}, {tanggal}) — poli & tanggal dari
-     * kunjungan terakhir pasien bila tersedia.
+     * kunjungan terakhir pasien bila tersedia. Alias token per-pasien
+     * ({nama_pasien}, {nomor_hp}, …) ikut disertakan supaya pratinjau dan
+     * nilai otomatis frontend konsisten dengan render di server.
      *
      * @param  Collection<int, Pnpp>  $pnpps
-     * @return array<int, array{nama: string, nip: string, satker: string, poli: string, instalasi: string, tanggal: string, hari_tanggal: string}>
+     * @return array<int, array<string, string>>
      */
     protected function dataPnpp(Collection $pnpps): array
     {
@@ -607,17 +761,22 @@ abstract class ManualBroadcastController extends Controller
             $poli = (string) ($kunjungan?->poli?->nama ?? '');
             $tanggal = $kunjungan?->tanggal_kunjungan;
 
-            return [
-                (string) $p->id => [
-                    'nama' => (string) ($p->nama ?? '—'),
-                    'nip' => (string) ($p->nip ?? ''),
-                    'satker' => (string) ($p->satker?->nama ?? ''),
-                    'poli' => $poli,
-                    'instalasi' => $poli,
-                    'tanggal' => (string) ($tanggal?->format('Y-m-d') ?? ''),
-                    'hari_tanggal' => (string) ($tanggal?->locale('id')->translatedFormat('l, d F Y') ?? ''),
-                ],
+            $data = [
+                'nama' => (string) ($p->nama ?? '—'),
+                'nip' => (string) ($p->nip ?? ''),
+                'satker' => (string) ($p->satker?->nama ?? ''),
+                'no_hp' => (string) ($p->no_hp ?? ''),
+                'poli' => $poli,
+                'instalasi' => $poli,
+                'tanggal' => (string) ($tanggal?->format('Y-m-d') ?? ''),
+                'hari_tanggal' => (string) ($tanggal?->locale('id')->translatedFormat('l, d F Y') ?? ''),
             ];
+
+            foreach (MessageRenderer::aliasPnpp() as $alias => $asli) {
+                $data[$alias] ??= $data[$asli] ?? '';
+            }
+
+            return [(string) $p->id => $data];
         })->all();
     }
 
