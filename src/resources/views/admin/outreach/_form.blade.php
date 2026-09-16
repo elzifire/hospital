@@ -160,6 +160,7 @@ tokenPribadi() {
                             <th class="px-5 py-3">Pasien</th>
                             <th class="px-5 py-3">No. WhatsApp</th>
                             <th class="px-5 py-3">Satker</th>
+                            <th class="px-5 py-3">Jadwal</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
@@ -189,6 +190,7 @@ tokenPribadi() {
                                     @endif
                                 </td>
                                 <td class="px-5 py-3 text-xs text-slate-500">{{ $p->satker?->nama ?? '—' }}</td>
+                                <td class="px-5 py-3 text-xs text-slate-600">{{ $jadwalMap[$p->id] ?? '—' }}</td>
                             </tr>
                         @endforeach
                     </tbody>

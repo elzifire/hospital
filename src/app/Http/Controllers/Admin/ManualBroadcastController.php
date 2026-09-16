@@ -15,6 +15,7 @@ use App\Models\Reminder;
 use App\Models\Satker;
 use App\Support\TextSanitizer;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -62,7 +63,12 @@ abstract class ManualBroadcastController extends Controller
         return view($this->viewManual(), [
             'pnpps' => $pnpps,
             'satkers' => Satker::orderBy('nama')->get(['id', 'nama']),
-            'filters' => ['q' => (string) $request->query('q', ''), 'satker' => (string) $request->query('satker', '')],
+            'filters' => [
+                'q' => (string) $request->query('q', ''),
+                'satker' => (string) $request->query('satker', ''),
+                'tanggal' => (string) $request->query('tanggal', ''),
+                'tampilkan' => (string) $request->query('tampilkan', 'berjadwal'),
+            ],
             'canKirimIds' => $canKirimIds,
             'templates' => $this->templateOptions(),
             'selectedIds' => [],
@@ -72,6 +78,7 @@ abstract class ManualBroadcastController extends Controller
             'reminderAwal' => [],
             'pnppData' => $this->dataPnpp($pnpps),
             'poliOptions' => $this->poliOptions(),
+            'jadwalMap' => $this->jadwalTerdekat($pnpps),
         ]);
     }
 
@@ -208,7 +215,12 @@ abstract class ManualBroadcastController extends Controller
             'kirimGroup' => $group,
             'pnpps' => $pnpps,
             'satkers' => Satker::orderBy('nama')->get(['id', 'nama']),
-            'filters' => ['q' => (string) $request->query('q', ''), 'satker' => (string) $request->query('satker', '')],
+            'filters' => [
+                'q' => (string) $request->query('q', ''),
+                'satker' => (string) $request->query('satker', ''),
+                'tanggal' => (string) $request->query('tanggal', ''),
+                'tampilkan' => (string) $request->query('tampilkan', 'berjadwal'),
+            ],
             'canKirimIds' => $canKirimIds,
             'templates' => $this->templateOptions(),
             'selectedIds' => $targetIds,
@@ -218,6 +230,7 @@ abstract class ManualBroadcastController extends Controller
             'reminderAwal' => $reminderAwal,
             'pnppData' => $this->dataPnpp($pnpps),
             'poliOptions' => $this->poliOptions(),
+            'jadwalMap' => $this->jadwalTerdekat($pnpps),
         ]);
     }
 
@@ -295,9 +308,11 @@ abstract class ManualBroadcastController extends Controller
     }
 
     /**
-     * Daftar calon penerima PNPP sesuai filter (q/satker), target yang
-     * sudah dipilih selalu ikut tampil, plus deretan id yang nomor
-     * WhatsApp-nya valid untuk "Pilih semua".
+     * Daftar calon penerima PNPP sesuai filter (q/satker/tanggal jadwal),
+     * hanya pasien yang masih punya jadwal Digital Reminder terjadwal,
+     * diurutkan sesuai jadwalnya. Target yang sudah dipilih selalu ikut
+     * tampil, plus deretan id yang nomor WhatsApp-nya valid untuk
+     * "Pilih semua".
      *
      * @param  array<int, int>  $wajibTampil
      * @return array{0: Collection<int, Pnpp>, 1: array<int, int>}
@@ -306,46 +321,63 @@ abstract class ManualBroadcastController extends Controller
     {
         $q = trim((string) $request->query('q', ''));
         $satkerId = (string) $request->query('satker', '');
-        $butuhSaring = $wajibTampil !== [] || $q !== '' || $satkerId !== '';
+        $tanggal = (string) $request->query('tanggal', '');
+        // tampilkan=berjadwal (bawaan) → hanya PNPP yang punya jadwal
+        // Digital Reminder terjadwal; tampilkan=semua → seluruh PNPP.
+        $tampilkanSemua = (string) $request->query('tampilkan', 'berjadwal') === 'semua';
+        $saring = ! $tampilkanSemua && $tanggal !== '' ? ' AND r.tanggal = ?' : '';
+        $bindings = $saring !== '' ? ['terjadwal', $tanggal] : ['terjadwal'];
 
         $pnpps = Pnpp::query()
             ->with('satker:id,nama', 'latestKunjungan.poli:id,nama')
-            ->when($butuhSaring, function ($query) use ($wajibTampil, $q, $satkerId) {
-                $query->where(function ($sub) use ($wajibTampil, $q, $satkerId) {
+            ->where(function ($query) use ($wajibTampil, $q, $satkerId, $tanggal, $tampilkanSemua) {
+                $query->where(function ($cocok) use ($q, $satkerId) {
                     $dibuka = false;
 
-                    if ($wajibTampil !== []) {
-                        $sub->whereIn('id', $wajibTampil);
-                        $dibuka = true;
-                    }
-
                     if ($q !== '') {
-                        $dibuka
-                            ? $sub->orWhere(fn ($cocok) => $cocok->where('nama', 'like', "%{$q}%")
-                                ->orWhere('nip', 'like', "%{$q}%")
-                                ->orWhere('no_hp', 'like', "%{$q}%"))
-                            : $sub->where(fn ($cocok) => $cocok->where('nama', 'like', "%{$q}%")
-                                ->orWhere('nip', 'like', "%{$q}%")
-                                ->orWhere('no_hp', 'like', "%{$q}%"));
+                        $cocok->where(fn ($cari) => $cari->where('nama', 'like', "%{$q}%")
+                            ->orWhere('nip', 'like', "%{$q}%")
+                            ->orWhere('no_hp', 'like', "%{$q}%"));
                         $dibuka = true;
                     }
 
                     if ($satkerId !== '') {
                         $dibuka
-                            ? $sub->orWhere('satker_id', $satkerId)
-                            : $sub->where('satker_id', $satkerId);
+                            ? $cocok->orWhere('satker_id', $satkerId)
+                            : $cocok->where('satker_id', $satkerId);
                         $dibuka = true;
                     }
 
                     if (! $dibuka) {
-                        $sub->whereRaw('1 = 1');
+                        $cocok->whereRaw('1 = 1');
                     }
                 });
+
+                // Hanya pasien yang masih punya jadwal Digital Reminder
+                // terjadwal; filter tanggal mempersempit ke jadwal tanggal
+                // itu. Mode "semua" melewati pembatasan ini.
+                if (! $tampilkanSemua) {
+                    $query->whereHas('reminders', fn ($jadwal) => $jadwal
+                        ->where('status', 'terjadwal')
+                        ->when($tanggal !== '', fn ($sub) => $sub->whereDate('tanggal', $tanggal)));
+                }
+
+                // Target yang sudah dipilih TETAP tampil walau tidak cocok
+                // filter, supaya tidak tersapu diam-diam saat menyimpan.
+                if ($wajibTampil !== []) {
+                    $query->orWhereIn('id', $wajibTampil);
+                }
             })
+            ->when(! $tampilkanSemua, fn ($query) => $query
+                ->orderByRaw('(SELECT MIN(r.tanggal) FROM reminders r WHERE r.pnpp_id = pnpps.id AND r.status = ?'.$saring.')', $bindings)
+                ->orderByRaw('(SELECT MIN(r.jam) FROM reminders r WHERE r.pnpp_id = pnpps.id AND r.status = ?'.$saring.')', $bindings))
             ->orderBy('nama')
             ->get(['id', 'nama', 'nip', 'no_hp', 'satker_id'])
             ->unique('id')
             ->values();
+
+        // Saringan khusus modul (mis. Follow Up: hanya yang belum membalas).
+        $pnpps = $this->saringBelumBalas($pnpps, $wajibTampil);
 
         $canKirimIds = $pnpps
             ->filter(fn (Pnpp $p) => PhoneFormat::toWa($p->no_hp) !== null)
@@ -355,6 +387,49 @@ abstract class ManualBroadcastController extends Controller
             ->all();
 
         return [$pnpps, $canKirimIds];
+    }
+
+    /**
+     * Saringan khusus modul atas kandidat penerima. Bawaan: tanpa
+     * perubahan. Follow Up memakainya untuk hanya menampilkan PNPP yang
+     * belum membalas pesan respon.
+     *
+     * @param  Collection<int, Pnpp>  $pnpps
+     * @param  array<int, int>  $wajibTampil
+     * @return Collection<int, Pnpp>
+     */
+    protected function saringBelumBalas(Collection $pnpps, array $wajibTampil): Collection
+    {
+        return $pnpps;
+    }
+
+    /**
+     * Label jadwal terjadwal terdekat per PNPP untuk kolom "Jadwal" pada
+     * daftar penerima; tanggal yang disaring ikut memperjelas jadwalnya.
+     *
+     * @param  Collection<int, Pnpp>  $pnpps
+     * @return array<int, string>  pnpp_id => label
+     */
+    protected function jadwalTerdekat(Collection $pnpps): array
+    {
+        if ($pnpps->isEmpty()) {
+            return [];
+        }
+
+        return Reminder::query()
+            ->with('poli:id,nama')
+            ->whereIn('pnpp_id', $pnpps->pluck('id')->all())
+            ->where('status', 'terjadwal')
+            ->orderBy('tanggal')
+            ->orderBy('jam')
+            ->get()
+            ->groupBy('pnpp_id')
+            ->mapWithKeys(fn ($grup, $pnppId) => [
+                (int) $pnppId => ($grup->first()->tanggal?->format('d/m/Y') ?? '—').' '
+                    .($grup->first()->jam?->format('H:i') ?? '—')
+                    .' · '.($grup->first()->poli?->nama ?? '—'),
+            ])
+            ->all();
     }
 
     /**

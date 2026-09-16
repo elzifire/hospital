@@ -2,9 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Models\Dokter;
 use App\Models\MessageLog;
+use App\Models\MessageReply;
 use App\Models\MessageTemplate;
 use App\Models\Pnpp;
+use App\Models\Poli;
+use App\Models\Reminder;
 use App\Models\Satker;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
@@ -45,6 +49,21 @@ class OutreachManualTest extends TestCase
         ], $attrs));
     }
 
+    protected function buatReminder(Pnpp $pnpp): Reminder
+    {
+        $poli = Poli::create(['kode' => 'POL-'.str()->random(4), 'nama' => 'Poli Umum']);
+        $dokter = Dokter::create(['poli_id' => $poli->id, 'nama' => 'dr. Umum']);
+
+        return Reminder::create([
+            'pnpp_id' => $pnpp->id,
+            'poli_id' => $poli->id,
+            'dokter_id' => $dokter->id,
+            'tanggal' => now()->format('Y-m-d'),
+            'jam' => now()->format('H:i'),
+            'status' => 'terjadwal',
+        ]);
+    }
+
     protected function buatTemplate(): MessageTemplate
     {
         return MessageTemplate::create([
@@ -79,7 +98,10 @@ class OutreachManualTest extends TestCase
     public function form_penerima_menyediakan_centang_semua(): void
     {
         $valid = $this->buatPnpp();
+        $this->buatReminder($valid);
+
         $invalid = $this->buatPnpp(['nama' => 'Tanpa Nomor', 'nip' => '789', 'no_hp' => null]);
+        $this->buatReminder($invalid);
 
         $response = $this->actingAs($this->superadmin())
             ->get(route('admin.outreach.create'))
@@ -95,6 +117,116 @@ class OutreachManualTest extends TestCase
         $this->assertDoesNotMatchRegularExpression($checkbox($invalid->id), $html);
         $this->assertStringContainsString('Centang semua', $html);
         $this->assertStringContainsString('nomor tidak valid', $html);
+    }
+
+    #[Test]
+    public function follow_up_hanya_menampilkan_pnpp_yang_belum_membalas(): void
+    {
+        $belumBalas = $this->buatPnpp();
+        $this->buatReminder($belumBalas);
+
+        $sudahBalas = $this->buatPnpp(['nama' => 'Sudah Balas', 'nip' => '555', 'no_hp' => '081299988877']);
+        $this->buatReminder($sudahBalas);
+        MessageReply::create([
+            'pnpp_id' => $sudahBalas->id,
+            'no_hp' => '6281299988877',
+            'nama' => 'Sudah Balas',
+            'isi_pesan' => 'Baik, saya hadir.',
+            'waktu_masuk' => now(),
+            'driver' => 'waha',
+        ]);
+
+        $response = $this->actingAs($this->superadmin())
+            ->get(route('admin.follow-up.create'))
+            ->assertOk();
+
+        $html = $response->getContent();
+        $this->assertStringContainsString('Budi Santoso', $html);
+        $this->assertStringNotContainsString('Sudah Balas', $html);
+    }
+
+    #[Test]
+    public function outreach_masih_menampilkan_pnpp_yang_sudah_membalas(): void
+    {
+        $sudahBalas = $this->buatPnpp(['nama' => 'Sudah Balas', 'nip' => '555']);
+        $this->buatReminder($sudahBalas);
+        MessageReply::create([
+            'pnpp_id' => $sudahBalas->id,
+            'no_hp' => '6281234567890',
+            'nama' => 'Sudah Balas',
+            'isi_pesan' => 'Baik, saya hadir.',
+            'waktu_masuk' => now(),
+            'driver' => 'waha',
+        ]);
+
+        // Filter "belum membalas" khusus milik modul Follow Up — outreach
+        // tetap menampilkan pasien yang sudah membalas.
+        $url = route('admin.outreach.create').'?q='.urlencode('Sudah Balas');
+
+        $this->actingAs($this->superadmin())
+            ->get($url)
+            ->assertOk()
+            ->assertSee('Sudah Balas');
+    }
+
+    #[Test]
+    public function filter_tanggal_menyaring_berdasarkan_jadwal(): void
+    {
+        $besok = $this->buatReminder($this->buatPnpp());
+        $lusa = $this->buatReminder($this->buatPnpp(['nama' => 'Pasien Lusa', 'nip' => '777']));
+
+        // Jadwal lusa diubah ke tanggal lusa agar berbeda dari besok.
+        $besok->update(['tanggal' => now()->addDay()->format('Y-m-d')]);
+        $lusa->update(['tanggal' => now()->addDays(2)->format('Y-m-d')]);
+
+        $this->actingAs($this->superadmin())
+            ->get(route('admin.outreach.create', [
+                'tanggal' => now()->addDay()->format('Y-m-d'),
+            ]))
+            ->assertOk()
+            ->assertSee('Budi Santoso')
+            ->assertDontSee('Pasien Lusa');
+    }
+
+    #[Test]
+    public function pnpp_tanpa_jadwal_tidak_tampil_di_form(): void
+    {
+        $this->buatPnpp(['nama' => 'Tanpa Jadwal', 'nip' => '888']);
+
+        $this->actingAs($this->superadmin())
+            ->get(route('admin.outreach.create'))
+            ->assertOk()
+            ->assertDontSee('Tanpa Jadwal');
+    }
+
+    #[Test]
+    public function filter_tampilkan_semua_memunculkan_pnpp_tanpa_jadwal(): void
+    {
+        $berjadwal = $this->buatPnpp();
+        $this->buatReminder($berjadwal);
+        $tanpaJadwal = $this->buatPnpp(['nama' => 'Tanpa Jadwal', 'nip' => '888']);
+
+        $this->actingAs($this->superadmin())
+            ->get(route('admin.outreach.create', ['tampilkan' => 'semua']))
+            ->assertOk()
+            ->assertSee('Budi Santoso')
+            ->assertSee('Tanpa Jadwal');
+    }
+
+    #[Test]
+    public function filter_tampilkan_berjadwal_mengabaikan_filter_tanggal(): void
+    {
+        // Mode "semua" tidak ikut dibatasi by filter tanggal jadwal:
+        // pasien tanpa jadwal tetap muncul walau tanggal disaring.
+        $tanpaJadwal = $this->buatPnpp(['nama' => 'Tanpa Jadwal', 'nip' => '888']);
+
+        $this->actingAs($this->superadmin())
+            ->get(route('admin.outreach.create', [
+                'tampilkan' => 'semua',
+                'tanggal' => now()->addDay()->format('Y-m-d'),
+            ]))
+            ->assertOk()
+            ->assertSee('Tanpa Jadwal');
     }
 
     #[Test]

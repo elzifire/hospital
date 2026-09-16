@@ -23,7 +23,6 @@ use App\Http\Controllers\Admin\RegisterPnppController as AdminRegisterPnppContro
 use App\Http\Controllers\Admin\ResponController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\SatkerController;
-use App\Http\Controllers\Admin\Setting\BroadcastRuleController;
 use App\Http\Controllers\Admin\Setting\MessageTemplateController;
 use App\Http\Controllers\Admin\Setting\TemplateCategoryController;
 use App\Http\Controllers\Admin\Setting\TemplateExportController;
@@ -181,7 +180,6 @@ Route::middleware('auth')->group(function () {
         Route::prefix('setting')->name('setting.')->middleware('can:manage template')->group(function () {
             Route::get('/', [SettingController::class, 'index'])->name('index');
             Route::get('/template', [SettingController::class, 'template'])->name('template');
-            Route::put('/aturan/{aturan}', [BroadcastRuleController::class, 'update'])->name('aturan.update');
 
             // CRUD Kategori — halaman terpisah agar tambah & edit lebih lega.
             Route::get('kategori', [TemplateCategoryController::class, 'index'])->name('kategori.index');

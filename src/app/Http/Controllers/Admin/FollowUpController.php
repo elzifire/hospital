@@ -3,8 +3,12 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Broadcasting\BroadcastService;
+use App\Broadcasting\PhoneFormat;
 use App\Models\MessageLog;
+use App\Models\MessageReply;
+use App\Models\Pnpp;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 
 /**
  * Modul Follow Up — riwayat pesan tindak lanjut pasien plus form kirim
@@ -13,9 +17,52 @@ use Illuminate\Http\Request;
  *
  * Berbeda dengan Outreach, opsi template pada form manual hanya menampilkan
  * template kategori "Follow Up" (sesuai seeder TemplateCategorySeeder).
+ * Daftar penerima hanya menampilkan PNPP yang belum membalas pesan respon.
  */
 class FollowUpController extends ManualBroadcastController
 {
+    /**
+     * Saring kandidat penerima: buang PNPP yang sudah pernah membalas
+     * (berdasarkan pnpp_id atau nomor WhatsApp-nya), namun target yang
+     * sudah dipilih tetap dipertahankan supaya tidak tersapu saat edit.
+     *
+     * @param  Collection<int, Pnpp>  $pnpps
+     * @param  array<int, int>  $wajibTampil
+     * @return Collection<int, Pnpp>
+     */
+    protected function saringBelumBalas(Collection $pnpps, array $wajibTampil): Collection
+    {
+        if ($pnpps->isEmpty()) {
+            return $pnpps;
+        }
+
+        $wajibSet = array_flip(array_map('intval', $wajibTampil));
+
+        $repliedPnppIds = MessageReply::query()
+            ->whereNotNull('pnpp_id')
+            ->pluck('pnpp_id')
+            ->mapWithKeys(fn ($id) => [(int) $id => true])
+            ->all();
+
+        $repliedNoHp = MessageReply::query()
+            ->whereNotNull('no_hp')
+            ->pluck('no_hp')
+            ->map(fn ($n) => (string) $n)
+            ->flip()
+            ->all();
+
+        return $pnpps->filter(function (Pnpp $p) use ($wajibSet, $repliedPnppIds, $repliedNoHp) {
+            if (isset($wajibSet[(int) $p->id])) {
+                return true;
+            }
+            if (isset($repliedPnppIds[(int) $p->id])) {
+                return false;
+            }
+            $wa = PhoneFormat::toWa($p->no_hp);
+
+            return $wa === null || ! isset($repliedNoHp[$wa]);
+        })->values();
+    }
     /**
      * Riwayat pesan follow up — data nyata, dengan ringkasan status,
      * pencarian, filter status/aturan (termasuk manual), dan pembatalan.

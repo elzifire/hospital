@@ -64,6 +64,11 @@ class Pnpp extends Model
         return $this->hasMany(Kunjungan::class);
     }
 
+    public function reminders()
+    {
+        return $this->hasMany(Reminder::class);
+    }
+
     public function latestKunjungan()
     {
         return $this->hasOne(Kunjungan::class)->latestOfMany('tanggal_kunjungan');

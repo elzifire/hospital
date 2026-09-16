@@ -4,8 +4,15 @@
 
     $poliTerkunci=true → user akun poli: satu baris poli tunggal
     (polinya sendiri) non-editabel, tanpa tombol tambah/hapus. --}}
+@php
+    $poliTerkunciData = $polis->first();
+    $rowsAwal = collect(old('polis', []))
+        ->map(fn ($r) => ['poli_id' => $r['poli_id'] ?? '', 'keluhan' => $r['keluhan'] ?? '', 'diagnosa' => $r['diagnosa'] ?? ''])
+        ->values()
+        ->all();
+    $rowsAwal = $rowsAwal ?: [['poli_id' => '', 'keluhan' => '', 'diagnosa' => '']];
+@endphp
 @if ($poliTerkunci ?? false)
-    @php($poliTerkunciData = $polis->first())
     <div class="rounded-xl border border-violet-200 bg-violet-50/40 p-4">
         <div class="grid grid-cols-1 items-start gap-3 lg:grid-cols-[180px_1fr_1fr]">
             <div>
@@ -33,13 +40,6 @@
     </div>
     @error('polis')<p class="text-xs font-medium text-rose-600">{{ $message }}</p>@enderror
 @else
-@php
-    $rowsAwal = collect(old('polis', []))
-        ->map(fn ($r) => ['poli_id' => $r['poli_id'] ?? '', 'keluhan' => $r['keluhan'] ?? '', 'diagnosa' => $r['diagnosa'] ?? ''])
-        ->values()
-        ->all();
-    $rowsAwal = $rowsAwal ?: [['poli_id' => '', 'keluhan' => '', 'diagnosa' => '']];
-@endphp
 <div x-data="{
         rows: @js($rowsAwal),
         tambahRow() { this.rows.push({ poli_id: '', keluhan: '', diagnosa: '' }) },
