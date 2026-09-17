@@ -59,7 +59,21 @@ abstract class ManualBroadcastController extends Controller
      */
     public function create(Request $request)
     {
-        [$pnpps, $canKirimIds] = $this->kumpulanTarget($request, []);
+        $saranPenerima = $this->saranPenerima($request);
+
+        // Hook "sasar" dari halaman index (mis. Follow Up): tangkap saran
+        // dengan kategori tertentu dan preselected-kan sebagai penerima.
+        $sasar = (string) $request->query('sasar', '');
+        $sasarIds = [];
+        if (in_array($sasar, ['belum_hadir', 'outreach_belum_balas'], true)) {
+            $sasarIds = $saranPenerima
+                ->filter(fn ($s) => in_array($sasar, (array) ($s['kategori'] ?? []), true))
+                ->map(fn ($s) => (int) $s['pnpp']->id)
+                ->values()
+                ->all();
+        }
+
+        [$pnpps, $canKirimIds] = $this->kumpulanTarget($request, $sasarIds);
 
         return view($this->viewManual(), [
             'pnpps' => $pnpps,
@@ -72,7 +86,7 @@ abstract class ManualBroadcastController extends Controller
             ],
             'canKirimIds' => $canKirimIds,
             'templates' => $this->templateOptions(),
-            'selectedIds' => [],
+            'selectedIds' => $sasarIds,
             'templateId' => null,
             'varsAwal' => [],
             'reminders' => $this->pilihanReminder($pnpps),
@@ -81,7 +95,7 @@ abstract class ManualBroadcastController extends Controller
             'poliOptions' => $this->poliOptions(),
             'jadwalMap' => $this->jadwalTerdekat($pnpps),
             'sudahDikirimHariIni' => $this->sudahDikirimHariIni($pnpps),
-            'saranPenerima' => $this->saranPenerima($request),
+            'saranPenerima' => $saranPenerima,
         ]);
     }
 

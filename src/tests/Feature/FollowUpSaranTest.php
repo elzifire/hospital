@@ -292,4 +292,64 @@ class FollowUpSaranTest extends TestCase
         $this->assertStringContainsString('Template Khusus Outreach', $followUpHtml);
         $this->assertStringContainsString('Template Khusus Follow Up', $followUpHtml);
     }
+
+    #[Test]
+    public function index_follow_up_menampilkan_saran_dengan_dua_tab(): void
+    {
+        $belumHadir = $this->buatPnpp();
+        $this->buatReminder($belumHadir, now()->subDays(2)->format('Y-m-d'), 'tidak_datang');
+
+        $outreach = $this->buatPnpp(['nama' => 'Rina Antika', 'no_hp' => '081277788899']);
+        $this->kirimOutreachHariIni($outreach);
+
+        $html = $this->actingAs($this->superadmin())
+            ->get(route('admin.follow-up.index'))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertStringContainsString('Saran Follow Up', $html);
+        $this->assertStringContainsString('Belum Hadir (1)', $html);
+        $this->assertStringContainsString('Outreach Belum Dibalas (1)', $html);
+        $this->assertStringContainsString('Budi Santoso', $html);
+        $this->assertStringContainsString('Rina Antika', $html);
+        $this->assertStringContainsString('lewat tanpa kunjungan.', $html);
+        $this->assertStringContainsString('belum dibalas.', $html);
+        $this->assertStringContainsString('sasar=belum_hadir', $html);
+        $this->assertStringContainsString('sasar=outreach_belum_balas', $html);
+    }
+
+    #[Test]
+    public function create_follow_up_menangkap_hook_sasar_dan_preselect_penerima(): void
+    {
+        $belumHadir = $this->buatPnpp();
+        $this->buatReminder($belumHadir, now()->subDays(2)->format('Y-m-d'), 'tidak_datang');
+
+        $html = $this->actingAs($this->superadmin())
+            ->get(route('admin.follow-up.create', ['sasar' => 'belum_hadir']))
+            ->assertOk()
+            ->getContent();
+
+        $data = $this->ambilDataAlpine($html);
+        $this->assertSame([(int) $belumHadir->id], $data['selected']);
+        $this->assertContains((int) $belumHadir->id, $data['allIds']);
+
+        $outreach = $this->buatPnpp(['nama' => 'Rina Antika', 'no_hp' => '081277788899']);
+        $this->kirimOutreachHariIni($outreach);
+
+        $htmlOutreach = $this->actingAs($this->superadmin())
+            ->get(route('admin.follow-up.create', ['sasar' => 'outreach_belum_balas']))
+            ->assertOk()
+            ->getContent();
+
+        $dataOutreach = $this->ambilDataAlpine($htmlOutreach);
+        $this->assertSame([(int) $outreach->id], $dataOutreach['selected']);
+        $this->assertContains((int) $outreach->id, $dataOutreach['allIds']);
+
+        $polos = $this->actingAs($this->superadmin())
+            ->get(route('admin.follow-up.create'))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertSame([], $this->ambilDataAlpine($polos)['selected']);
+    }
 }

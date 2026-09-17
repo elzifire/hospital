@@ -42,6 +42,7 @@ class ResponController extends Controller
             'takTerdaftar' => $stats['takTerdaftar'],
             'poliId' => $stats['poliId'],
             'filters' => $filters,
+            'queryString' => http_build_query(array_filter($filters, fn ($v) => $v !== '')),
             'signature' => $this->signaturePercakapan($stats, $konversasi),
         ]);
     }
@@ -72,6 +73,10 @@ class ResponController extends Controller
     protected function daftarKonversasi(Request $request, int $perPage = 15): array
     {
         $q = (string) $request->query('q', '');
+        // Filter urut: belum dibaca dulu (badge merah), lalu pesan terbaru.
+        $statusBaca = (string) $request->query('status_baca', '');
+        // Filter asal kontak: terdaftar / tak terdaftar di tabel PNPP.
+        $asal = (string) $request->query('asal', '');
         $poliId = $request->user()?->poliId();
 
         $scopePoli = fn ($query) => $query->when(
@@ -94,6 +99,19 @@ class ResponController extends Controller
             ->selectRaw('COUNT(*) as total_pesan')
             ->selectRaw('COALESCE(SUM(CASE WHEN "read_at" IS NULL THEN 1 ELSE 0 END), 0) as belum_dibaca')
             ->groupBy('no_hp')
+            ->when($statusBaca === 'belum', fn ($query) => $query->havingRaw(
+                'COALESCE(SUM(CASE WHEN "read_at" IS NULL THEN 1 ELSE 0 END), 0) > 0'
+            ))
+            ->when($statusBaca === 'dibaca', fn ($query) => $query->havingRaw(
+                'COALESCE(SUM(CASE WHEN "read_at" IS NULL THEN 1 ELSE 0 END), 0) = 0'
+            ))
+            ->when($asal === 'terdaftar', fn ($query) => $query->havingRaw(
+                'COALESCE(MAX("pnpp_id"), 0) > 0'
+            ))
+            ->when($asal === 'tak_terdaftar', fn ($query) => $query->havingRaw(
+                'COALESCE(MAX("pnpp_id"), 0) = 0'
+            ))
+            ->orderByDesc('belum_dibaca')
             ->orderByDesc('waktu_terakhir')
             ->paginate($perPage)
             ->withQueryString();
@@ -137,7 +155,7 @@ class ResponController extends Controller
             'poliId' => $poliId,
         ];
 
-        return [$konversasi, $stats, ['q' => $q]];
+        return [$konversasi, $stats, ['q' => $q, 'status_baca' => $statusBaca, 'asal' => $asal]];
     }
 
     /**

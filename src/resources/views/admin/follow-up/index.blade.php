@@ -71,6 +71,84 @@
         @endforeach
     </div>
 
+    {{-- ===== Saran Follow Up (2 tab: belum_hadir & outreach_belum_balas) ===== --}}
+    @if (count($saranBelumHadir) > 0 || count($saranOutreach) > 0)
+        <div x-data="{ tabSaran: 'belum_hadir' }"
+             class="overflow-hidden rounded-2xl border border-amber-200 bg-amber-50/60 shadow-sm">
+            <div class="flex flex-col gap-1 border-b border-amber-100 px-5 py-4">
+                <h3 class="text-sm font-bold text-amber-900">Saran Follow Up</h3>
+                <p class="text-xs text-amber-700">
+                    Pasien yang perlu ditindaklanjuti. Pilih tab lalu “Follow Up Semua” untuk membuka form dengan penerima terpilih.
+                </p>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2 border-b border-amber-100 bg-white/60 px-5 py-3">
+                <button type="button" @click="tabSaran = 'belum_hadir'"
+                        class="rounded-full px-3 py-1 text-[11px] font-bold ring-1 ring-inset transition"
+                        :class="tabSaran === 'belum_hadir' ? 'bg-rose-600 text-white ring-rose-600' : 'bg-white text-rose-700 ring-rose-200 hover:bg-rose-50'">
+                    Belum Hadir ({{ count($saranBelumHadir) }})
+                </button>
+                <button type="button" @click="tabSaran = 'outreach_belum_balas'"
+                        class="rounded-full px-3 py-1 text-[11px] font-bold ring-1 ring-inset transition"
+                        :class="tabSaran === 'outreach_belum_balas' ? 'bg-sky-600 text-white ring-sky-600' : 'bg-white text-sky-700 ring-sky-200 hover:bg-sky-50'">
+                    Outreach Belum Dibalas ({{ count($saranOutreach) }})
+                </button>
+            </div>
+
+            {{-- Tab: belum_hadir --}}
+            <div x-show="tabSaran === 'belum_hadir'" class="px-5 py-4">
+                @if (count($saranBelumHadir) > 0)
+                    <ul class="divide-y divide-amber-100 rounded-xl border border-amber-200 bg-white">
+                        @foreach ($saranBelumHadir as $s)
+                            @php($p = $s['pnpp'])
+                            <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
+                                <div class="min-w-0 flex-1">
+                                    <p class="truncate text-sm font-semibold text-slate-800">{{ $p->nama }}</p>
+                                    <p class="text-xs text-slate-400">NIP/NRP {{ $p->nip ?? '—' }} · {{ $p->satker?->nama ?? '—' }}</p>
+                                </div>
+                                <span class="rounded-full bg-rose-50 px-2.5 py-0.5 text-[10px] font-bold text-rose-700 ring-1 ring-inset ring-rose-200">
+                                    {{ $s['alasan'][0] ?? 'Jadwal lewat tanpa kunjungan.' }}
+                                </span>
+                            </li>
+                        @endforeach
+                    </ul>
+                    <a href="{{ route('admin.follow-up.create', ['sasar' => 'belum_hadir']) }}"
+                       class="mt-3 inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-rose-700">
+                        Follow Up Semua ({{ count($saranBelumHadir) }})
+                    </a>
+                @else
+                    <p class="text-xs text-amber-700">Tidak ada pasien dalam kategori ini.</p>
+                @endif
+            </div>
+
+            {{-- Tab: outreach_belum_balas --}}
+            <div x-show="tabSaran === 'outreach_belum_balas'" class="px-5 py-4">
+                @if (count($saranOutreach) > 0)
+                    <ul class="divide-y divide-amber-100 rounded-xl border border-amber-200 bg-white">
+                        @foreach ($saranOutreach as $s)
+                            @php($p = $s['pnpp'])
+                            <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
+                                <div class="min-w-0 flex-1">
+                                    <p class="truncate text-sm font-semibold text-slate-800">{{ $p->nama }}</p>
+                                    <p class="text-xs text-slate-400">NIP/NRP {{ $p->nip ?? '—' }} · {{ $p->satker?->nama ?? '—' }}</p>
+                                </div>
+                                <span class="rounded-full bg-sky-50 px-2.5 py-0.5 text-[10px] font-bold text-sky-700 ring-1 ring-inset ring-sky-200">
+                                    {{ $s['alasan'][0] ?? 'Outreach terkirim, belum dibalas.' }}
+                                </span>
+                            </li>
+                        @endforeach
+                    </ul>
+                    <a href="{{ route('admin.follow-up.create', ['sasar' => 'outreach_belum_balas']) }}"
+                       class="mt-3 inline-flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-sky-700">
+                        Follow Up Semua ({{ count($saranOutreach) }})
+                    </a>
+                @else
+                    <p class="text-xs text-amber-700">Tidak ada pasien dalam kategori ini.</p>
+                @endif
+            </div>
+        </div>
+    @endif
+
     {{-- ===== Riwayat + filter ===== --}}
     <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div class="border-b border-slate-100 px-5 py-4">

@@ -45,7 +45,7 @@
          x-data="balasanLive({
              endpoint: @js(route('admin.respon.poll')),
              signature: @js($signature ?? ''),
-             query: @js($filters['q']),
+             query: @js($queryString ?? ''),
          })"
          x-init="init()">
 
@@ -85,17 +85,33 @@
                 </div>
             </div>
 
-            {{-- Pencarian --}}
+            {{-- Pencarian & filter --}}
             <form method="GET" action="{{ route('admin.respon.index') }}"
                   class="flex flex-wrap items-end gap-3 border-b border-slate-100 bg-slate-50/50 px-5 py-4">
                 <div>
                     <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Cari kontak / pesan</label>
                     <input type="text" name="q" value="{{ $filters['q'] }}" placeholder="Nama / nomor / isi pesan…"
-                           class="w-64 rounded-lg border-slate-300 text-sm shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                           class="w-56 rounded-lg border-slate-300 text-sm shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                </div>
+                <div>
+                    <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Status baca</label>
+                    <select name="status_baca" class="rounded-lg border-slate-300 text-sm shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                        <option value="">Semua</option>
+                        <option value="belum" {{ $filters['status_baca'] === 'belum' ? 'selected' : '' }}>Belum dibaca</option>
+                        <option value="dibaca" {{ $filters['status_baca'] === 'dibaca' ? 'selected' : '' }}>Sudah dibaca</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Kontak</label>
+                    <select name="asal" class="rounded-lg border-slate-300 text-sm shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                        <option value="">Semua</option>
+                        <option value="terdaftar" {{ $filters['asal'] === 'terdaftar' ? 'selected' : '' }}>Terdaftar</option>
+                        <option value="tak_terdaftar" {{ $filters['asal'] === 'tak_terdaftar' ? 'selected' : '' }}>Tak terdaftar</option>
+                    </select>
                 </div>
                 <div class="flex gap-2">
-                    <button type="submit" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700">Cari</button>
-                    @if (filled($filters['q']))
+                    <button type="submit" class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700">Terapkan</button>
+                    @if (filled($filters['q']) || filled($filters['status_baca']) || filled($filters['asal']))
                         <a href="{{ route('admin.respon.index') }}" class="rounded-lg bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-300">Reset</a>
                     @endif
                 </div>
@@ -156,7 +172,8 @@
 
             async cek() {
                 try {
-                    const resp = await fetch(this.endpoint + '?q=' + encodeURIComponent(this.query), {
+                    const url = this.endpoint + (this.query ? '?' + this.query : '');
+                    const resp = await fetch(url, {
                         headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
                     });
                     if (!resp.ok) return;

@@ -299,12 +299,23 @@ class FollowUpController extends ManualBroadcastController
             ->groupBy('status')
             ->pluck('total', 'status');
 
+        $saranPenerima = $this->saranPenerima($request);
+
         return view('admin.follow-up.index', [
             'logs' => $logs,
             'perStatus' => $perStatus,
             'penerimaUnik' => MessageLog::jenis('follow_up')->tap($scopePoli)->distinct()->count('pnpp_id'),
             'total' => (int) $perStatus->sum(),
             'filters' => ['q' => $q, 'status' => $status, 'rule' => $rule],
+            'saranPenerima' => $saranPenerima,
+            'saranBelumHadir' => $saranPenerima
+                ->filter(fn ($s) => in_array(self::SARAN_BELUM_HADIR, $s['kategori'], true))
+                ->values()
+                ->all(),
+            'saranOutreach' => $saranPenerima
+                ->filter(fn ($s) => in_array(self::SARAN_OUTREACH_BELUM_BALAS, $s['kategori'], true))
+                ->values()
+                ->all(),
         ]);
     }
 
