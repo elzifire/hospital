@@ -145,6 +145,7 @@
                 <table class="min-w-full divide-y divide-slate-100 text-sm">
                     <thead class="bg-slate-50/70 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">
                         <tr>
+                            <th class="px-5 py-3">No</th>
                             <th class="px-5 py-3">Pasien</th>
                             <th class="px-5 py-3">Tanggal</th>
                             <th class="px-5 py-3">Poli</th>
@@ -155,6 +156,7 @@
                     <tbody class="divide-y divide-slate-100">
                         @foreach ($items as $baris)
                             <tr class="hover:bg-slate-50/60">
+                                <td class="px-5 py-3 text-center text-xs font-semibold text-slate-400">{{ $loop->iteration }}</td>
                                 <td class="px-5 py-3">
                                     <p class="font-semibold text-slate-800">{{ $baris['pasien']?->nama ?? '—' }}</p>
                                     <p class="text-xs text-slate-400">NIP {{ $baris['pasien']?->nip ?? '—' }} · {{ $baris['pasien']?->satker?->nama ?? '—' }}</p>

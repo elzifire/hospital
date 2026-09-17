@@ -223,7 +223,7 @@ class KunjunganDaftar
             'tanggal' => $r->tanggal,
             'jam' => $r->jam,
             'pasien' => $r->pnpp,
-            'poliNama' => $r->poli?->nama ?? '—',
+            'poliNama' => $r->poli?->nama ?? ($r->home_visit ? 'Home Visit' : '—'),
             'dokter' => $r->dokter?->nama,
             'homeVisit' => (bool) $r->home_visit,
             'sudahKunjungan' => (bool) $r->sudah_kunjungan,

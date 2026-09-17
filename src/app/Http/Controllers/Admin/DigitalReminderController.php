@@ -59,7 +59,7 @@ class DigitalReminderController extends Controller
             $jumlah = 0;
 
             foreach ($data['pnpp_ids'] as $pnppId) {
-                foreach ($data['poli_ids'] as $poliId) {
+                foreach ($this->poliIdsUntukSimpan($data['poli_ids'] ?? []) as $poliId) {
                     Reminder::create([
                         'pnpp_id' => $pnppId,
                         'poli_id' => $poliId,
@@ -128,7 +128,7 @@ class DigitalReminderController extends Controller
         ]);
 
         $reminder->update([
-            'poli_id' => $data['poli_id'],
+            'poli_id' => $this->poliIdUntukUpdate($data['poli_id'] ?? null),
             'dokter_id' => $data['dokter_id'] ?? null,
             'message_template_id' => $data['message_template_id'] ?? null,
             'tanggal' => $data['tanggal'],
@@ -191,15 +191,20 @@ class DigitalReminderController extends Controller
     /**
      * Aturan validasi form. Create: pasien + chips poli (pengaturan
      * shared, tanpa dokter). Update: satu blok poli + dokter.
+     * Home visit: poli tidak wajib (boleh kosong).
      */
     protected function aturanValidasi(Request $request, ?Reminder $reminder = null): array
     {
         if ($reminder) {
             return [
-                'poli_id' => array_merge(['required', Rule::exists('polis', 'id')], $this->pembatasanPoli()),
+                'poli_id' => array_merge([
+                    Rule::requiredIf(! $request->boolean('home_visit')),
+                    'nullable',
+                    Rule::exists('polis', 'id'),
+                ], $this->pembatasanPoli()),
                 'dokter_id' => [
                     'nullable',
-                    Rule::exists('dokters', 'id')->where('poli_id', $request->integer('poli_id')),
+                    Rule::exists('dokters', 'id')->where('poli_id', $request->input('poli_id')),
                 ],
                 'message_template_id' => $this->aturanTemplate(),
                 'tanggal' => ['required', 'date'],
@@ -214,7 +219,7 @@ class DigitalReminderController extends Controller
         return [
             'pnpp_ids' => ['required', 'array', 'min:1'],
             'pnpp_ids.*' => ['integer', Rule::exists('pnpps', 'id')],
-            'poli_ids' => ['required', 'array', 'min:1'],
+            'poli_ids' => ['nullable', 'array', Rule::requiredIf(! $request->boolean('home_visit'))],
             'poli_ids.*' => array_merge(['integer', Rule::exists('polis', 'id')], $this->pembatasanPoli()),
             'message_template_id' => $this->aturanTemplate(),
             'tanggal' => ['required', 'date', 'after_or_equal:today'],
@@ -271,6 +276,32 @@ class DigitalReminderController extends Controller
     protected function batasiPoli(): bool
     {
         return $this->poliAktif() !== null;
+    }
+
+    /**
+     * Daftar poli yang akan disimpan. Home visit boleh tanpa poli (null);
+     * untuk akun poli yang mengosongkannya, poli sendiri digunakan agar
+     * jadwal tetap terlihat & ter-scope di daftarnya.
+     *
+     * @param  array<int>  $poliIds
+     * @return array<int|null>
+     */
+    protected function poliIdsUntukSimpan(array $poliIds): array
+    {
+        if ($poliIds !== []) {
+            return array_values(array_unique(array_map('intval', $poliIds)));
+        }
+
+        return $this->batasiPoli() ? [$this->poliAktif()] : [null];
+    }
+
+    /**
+     * Poli final untuk update — sama seperti poliIdsUntukSimpan tetapi
+     * untuk satu jadwal (home visit tanpa poli → null, akun poli → miliknya).
+     */
+    protected function poliIdUntukUpdate(?int $poliId): ?int
+    {
+        return $poliId ?? ($this->batasiPoli() ? $this->poliAktif() : null);
     }
 
     /**

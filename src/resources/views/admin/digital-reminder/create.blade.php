@@ -73,11 +73,15 @@
               tokenJadwal: ['poli', 'instalasi', 'poli_layanan', 'dokter', 'tanggal', 'jam', 'hari_tanggal', 'waktu_kunjungan'],
               tanggal: @js((string) old('tanggal')),
               jam: @js((string) old('jam')),
+              homeVisit: @js((string) old('home_visit', '0')),
               poliData: @js($polis->mapWithKeys(fn ($po) => [(string) $po->id => $po->nama])),
               pnppData: @js($pnpps->mapWithKeys(fn ($p) => [(string) $p->id => ['nama' => $p->nama ?? '—', 'nip' => $p->nip ?? '', 'satker' => $p->satker?->nama ?? '']])),
               get jumlah() { return Object.values(this.terpilih).filter(Boolean).length },
               get jumlahPoli() { return Object.values(this.poliTerpilih).filter(Boolean).length },
-              get totalJadwal() { return this.jumlah * this.jumlahPoli },
+              get totalJadwal() {
+                  const kali = this.homeVisit === '1' && this.jumlahPoli === 0 ? 1 : this.jumlahPoli;
+                  return this.jumlah * kali;
+              },
               activeTemplate() {
                   return this.templates.find((t) => String(t.id) === String(this.templateId)) ?? null;
               },
@@ -225,13 +229,14 @@ nilaiToken(pid, token) {
                 </div>
             </div>
             <div class="space-y-5 p-5">
-                <div>
-                    <div class="mb-2 flex items-center justify-between">
-                        <label class="block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Poli yang Dituju <span class="text-rose-500">*</span></label>
-                        <button type="button" @click="togglePoliSemua()"
-                                class="text-[11px] font-semibold text-sky-600 transition hover:text-sky-800"
-                                x-text="semuaPoli ? 'Hapus semua' : 'Pilih semua'"></button>
-                    </div>
+<div>
+                        <div class="mb-2 flex items-center justify-between">
+                            <label class="block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Poli yang Dituju <span x-show="homeVisit === '0'" class="text-rose-500">*</span></label>
+                            <button type="button" @click="togglePoliSemua()"
+                                    class="text-[11px] font-semibold text-sky-600 transition hover:text-sky-800"
+                                    x-text="semuaPoli ? 'Hapus semua' : 'Pilih semua'"></button>
+                        </div>
+                        <p x-show="homeVisit === '1'" x-cloak class="mb-2 text-xs text-slate-400">Home visit — poli tidak wajib. Kosongkan semua untuk jadwal tanpa poli.</p>
                     <div class="flex flex-wrap gap-2">
                         @foreach ($polis as $po)
                             <label class="cursor-pointer">
@@ -265,12 +270,12 @@ nilaiToken(pid, token) {
                         <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Jenis Kunjungan</label>
                         <div class="flex flex-wrap gap-3">
                             <label class="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-600 transition has-[:checked]:border-sky-400 has-[:checked]:bg-sky-50 has-[:checked]:text-sky-700">
-                                <input type="radio" name="home_visit" value="0" {{ old('home_visit', '0') === '0' ? 'checked' : '' }}
+                                <input type="radio" name="home_visit" value="0" x-model="homeVisit" {{ old('home_visit', '0') === '0' ? 'checked' : '' }}
                                        class="h-4 w-4 border-slate-300 text-sky-600 focus:ring-sky-500">
                                 Kunjungan di RS
                             </label>
                             <label class="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-600 transition has-[:checked]:border-teal-400 has-[:checked]:bg-teal-50 has-[:checked]:text-teal-700">
-                                <input type="radio" name="home_visit" value="1" {{ old('home_visit') === '1' ? 'checked' : '' }}
+                                <input type="radio" name="home_visit" value="1" x-model="homeVisit" {{ old('home_visit') === '1' ? 'checked' : '' }}
                                        class="h-4 w-4 border-slate-300 text-teal-600 focus:ring-teal-500">
                                 Home Visit
                             </label>
@@ -364,7 +369,7 @@ nilaiToken(pid, token) {
         <div class="sticky bottom-0 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-lg backdrop-blur">
             <p class="text-sm text-slate-500">
                 <span class="font-bold text-slate-800" x-text="jumlah"></span> pasien ×
-                <span class="font-bold text-slate-800" x-text="jumlahPoli"></span> poli =
+                <span class="font-bold text-slate-800" x-text="homeVisit === '1' && jumlahPoli === 0 ? 'Home Visit' : jumlahPoli + ' poli'"></span> =
                 <span class="font-bold text-sky-700" x-text="totalJadwal"></span> jadwal
             </p>
             <button type="submit" :disabled="totalJadwal === 0"

@@ -9,7 +9,7 @@
         reminders: @js($reminders->map(fn ($r) => [
             'id' => $r->id,
             'tanggal' => $r->tanggal->format('Y-m-d'),
-            'poli_id' => (int) $r->poli_id,
+            'poli_id' => $r->poli_id,
             'poli' => $r->poli?->nama,
         ])->values()),
         reminderId: '{{ old('reminder_id') }}',
@@ -168,7 +168,7 @@
                 <h2 class="text-sm font-bold text-slate-900">Catat Poli yang Dikunjungi</h2>
                 <p class="mt-0.5 text-xs text-slate-500"
                    x-text="reminder
-                        ? 'Realisasi jadwal ' + reminder.poli + ' — poli lain yang dikunjungi juga bisa dicentang.'
+                        ? 'Realisasi jadwal ' + (reminder.poli || 'home visit') + ' — poli lain yang dikunjungi juga bisa dicentang.'
                         : 'Pilih penjadwalan terlebih dahulu.'"></p>
             </div>
             <template x-if="reminder">

@@ -598,7 +598,7 @@ class KirimPesanTest extends TestCase
         $hasil = app(MetaSender::class)->kirim($log);
 
         $this->assertFalse($hasil->ok);
-        $this->assertStringContainsString('Meta Cloud API menolak', $hasil->error);
+        $this->assertStringContainsString('Terjadi Kesalahan sistem saat mengirim pesan WhatsApp', $hasil->error);
     }
 
     #[Test]
@@ -709,6 +709,6 @@ class KirimPesanTest extends TestCase
         $this->assertSame(0, $hasil['terkirim']);
         $this->assertSame(1, $hasil['gagal']);
         $this->assertSame('gagal', $log->refresh()->status);
-        $this->assertStringContainsString('Meta Cloud API', $log->error);
+        $this->assertStringContainsString('Terjadi Kesalahan sistem saat mengirim pesan WhatsApp', $log->error);
     }
 }

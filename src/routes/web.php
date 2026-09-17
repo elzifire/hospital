@@ -143,6 +143,8 @@ Route::middleware('auth')->group(function () {
             Route::get('respon/import', [ResponController::class, 'indexImport'])->name('respon.import');
             Route::get('respon', [ResponController::class, 'index'])->name('respon.index');
             Route::get('respon/poll', [ResponController::class, 'poll'])->name('respon.poll');
+            Route::get('respon/pesan-manual', [ResponController::class, 'pesanManual'])->name('respon.pesan-manual');
+            Route::post('respon/pesan-manual', [ResponController::class, 'kirimPesanManual'])->name('respon.pesan-manual-kirim');
             Route::get('respon/{nomor}', [ResponController::class, 'show'])->name('respon.show');
             Route::post('respon/manual', [ResponController::class, 'storeManual'])->name('respon.manual-store');
             Route::delete('respon/manual/{responManual}', [ResponController::class, 'destroy'])->name('respon.manual-destroy');

@@ -7,6 +7,7 @@ use App\Broadcasting\PhoneFormat;
 use App\Models\MessageLog;
 use App\Models\MessageReply;
 use App\Models\Pnpp;
+use App\Models\Reminder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 
@@ -16,12 +17,25 @@ use Illuminate\Support\Collection;
  * generate otomatis (H-1, hari-H, tidak-datang) dinonaktifkan sementara.
  *
  * Form manual menampilkan semua template aktif (kategori bebas). Halaman
- * create menampilkan saran follow up: pasien yang di-outreach hari ini
- * dan belum membalas. Daftar penerima hanya menampilkan PNPP yang belum
- * membalas pesan respon.
+ * create & edit menampilkan saran follow up dengan dua kategori saringan:
+ *  - belum_hadir: pasien yang punya jadwal Digital Reminder yang lewat
+ *    tanpa kunjungan (tidak hadir) — wajib di-follow up;
+ *  - outreach_belum_balas: pasien yang menerima pesan outreach (informasi
+ *    & edukasi / pelayanan) belum membalas balasan.
+ * Daftar penerima hanya menampilkan PNPP yang belum membalas pesan respon.
  */
 class FollowUpController extends ManualBroadcastController
 {
+    /**
+     * Pasien punya jadwal terlewat tanpa kunjungan (tidak hadir).
+     */
+    public const SARAN_BELUM_HADIR = 'belum_hadir';
+
+    /**
+     * Pasien menerima pesan outreach namun belum membalas.
+     */
+    public const SARAN_OUTREACH_BELUM_BALAS = 'outreach_belum_balas';
+
     /**
      * Saring kandidat penerima: buang PNPP yang sudah pernah membalas
      * (berdasarkan pnpp_id atau nomor WhatsApp-nya), namun target yang
@@ -66,25 +80,114 @@ class FollowUpController extends ManualBroadcastController
     }
 
     /**
-     * Algoritma saran follow up: pasien yang sudah menerima pesan outreach
-     * hari ini (status terkirim) namun belum membalas di hari yang sama
-     * disarankan untuk di-follow up — contoh kasus "di-outreach hari ini,
-     * belum balas" dari petugas. Balasan dikenali lewat pnpp_id atau nomor
-     * WhatsApp pada MessageReply; pasien yang sudah di-follow up hari ini
-     * dikecualikan supaya tidak dobel.
+     * Algoritma saran follow up: gabungan dua kategori saringan —
+     * 1) pasien yang jadwalnya lewat tanpa kunjungan (tidak hadir),
+     * 2) pasien yang outreach-nya terkirim namun belum membalas.
+     * Satu pasien boleh memenuhi dua-duanya (kategori & alasan digabung).
+     * Pasien yang sudah di-follow up pada jendela saran dikecualikan
+     * supaya tidak dobel, dan yang nomor WhatsApp-nya tidak valid
+     * tidak disarankan.
      *
-     * @return Collection<int, array{pnpp: Pnpp, alasan: string}>
+     * @return Collection<int, array{pnpp: Pnpp, kategori: array<int, string>, alasan: array<int, string>}>
      */
     protected function saranPenerima(Request $request): Collection
     {
-        $hariIni = today();
+        $kandidat = $this->reminderBelumHadir()
+            ->concat($this->outreachBelumDibalas());
+
+        if ($kandidat->isEmpty()) {
+            return collect();
+        }
+
+        $gabung = collect();
+        $perId = [];
+        foreach ($kandidat as $item) {
+            $id = (int) $item['pnpp']->id;
+            if (! isset($perId[$id])) {
+                $perId[$id] = $gabung->count();
+                $gabung->push([
+                    'pnpp' => $item['pnpp'],
+                    'kategori' => [],
+                    'alasan' => [],
+                ]);
+            }
+            $idx = $perId[$id];
+            $rek = $gabung->get($idx);
+            $rek['kategori'][] = $item['kategori'];
+            $rek['alasan'][] = $item['alasan'];
+            $gabung->put($idx, $rek);
+        }
+
+        // Belum hadir lebih prioritas, lalu urut abjad nama.
+        return $gabung->sortBy([
+            fn ($a) => in_array(self::SARAN_BELUM_HADIR, $a['kategori'], true) ? 0 : 1,
+            fn ($a) => strtolower((string) $a['pnpp']->nama),
+        ])->values();
+    }
+
+    /**
+     * Kandidat saran "belum hadir": jadwal Digital Reminder berstatus
+     * tidak_datang, atau masih terjadwal namun tanggalnya sudah lewat
+     * tanpa kunjungan. Ambil jadwal terlewat terakhir per pasien.
+     *
+     * @return Collection<int, array{pnpp: Pnpp, kategori: string, alasan: string}>
+     */
+    protected function reminderBelumHadir(): Collection
+    {
+        $jadwal = Reminder::query()
+            ->with('pnpp.satker:id,nama', 'poli:id,nama')
+            ->where(function ($query) {
+                $query->where('status', 'tidak_datang')
+                    ->orWhere(function ($terlambat) {
+                        $terlambat->where('status', 'terjadwal')
+                            ->whereDate('tanggal', '<', today()->toDateString())
+                            ->whereDoesntHave('kunjungan');
+                    });
+            })
+            ->orderByDesc('tanggal')
+            ->orderBy('jam')
+            ->get()
+            ->unique('pnpp_id');
+
+        return $jadwal
+            ->map(function (Reminder $r) {
+                $pnpp = $r->pnpp;
+                if ($pnpp === null || PhoneFormat::toWa($pnpp->no_hp) === null) {
+                    return null;
+                }
+
+                return [
+                    'pnpp' => $pnpp,
+                    'kategori' => self::SARAN_BELUM_HADIR,
+                    'alasan' => 'Jadwal '.($r->poli?->nama ?? 'poli').' '
+                        .($r->tanggal?->locale('id')->translatedFormat('l, d F Y') ?? '—')
+                        .' lewat tanpa kunjungan.',
+                ];
+            })
+            ->filter()
+            ->values();
+    }
+
+    /**
+     * Kandidat saran "outreach belum dibalas": pesan outreach (informasi
+     * & edukasi / pelayanan) terkirim pada jendela saran (7 hari terakhir)
+     * namun belum ada balasan setelah pesan terkirim. Balasan dikenali
+     * lewat pnpp_id atau nomor WhatsApp pada MessageReply; pasien yang
+     * sudah di-follow up pada jendela yang sama dikecualikan.
+     *
+     * @return Collection<int, array{pnpp: Pnpp, kategori: string, alasan: string}>
+     */
+    protected function outreachBelumDibalas(): Collection
+    {
+        $sejak = now()->subDays(7)->startOfDay();
 
         $logs = MessageLog::query()
             ->jenis('outreach')
             ->where('status', 'terkirim')
-            ->whereDate('created_at', $hariIni)
+            ->where('created_at', '>=', $sejak)
             ->whereNotNull('pnpp_id')
-            ->with('pnpp.satker:id,nama')
+            ->with('pnpp.satker:id,nama', 'template:id,judul')
+            ->orderByDesc('created_at')
             ->get()
             ->unique('pnpp_id');
 
@@ -92,26 +195,38 @@ class FollowUpController extends ManualBroadcastController
             return collect();
         }
 
-        $balasById = MessageReply::query()
-            ->whereDate('waktu_masuk', $hariIni)
-            ->whereNotNull('pnpp_id')
-            ->pluck('pnpp_id')
-            ->map(fn ($id) => (int) $id)
-            ->flip()
+        $pids = $logs->pluck('pnpp_id')->map(fn ($id) => (int) $id)->unique()->values()->all();
+        $was = $logs->pluck('pnpp')
+            ->filter()
+            ->map(fn (Pnpp $p) => PhoneFormat::toWa($p->no_hp))
+            ->filter()
+            ->unique()
+            ->values()
             ->all();
 
-        $balasByWa = MessageReply::query()
-            ->whereDate('waktu_masuk', $hariIni)
-            ->whereNotNull('no_hp')
-            ->pluck('no_hp')
-            ->map(fn ($n) => (string) $n)
-            ->flip()
-            ->all();
+        $balas = collect();
+        MessageReply::query()
+            ->where('waktu_masuk', '>=', $sejak)
+            ->where(function ($query) use ($pids, $was) {
+                $query->whereIn('pnpp_id', $pids)->orWhereIn('no_hp', $was);
+            })
+            ->get(['pnpp_id', 'no_hp', 'waktu_masuk'])
+            ->each(function (MessageReply $r) use ($balas) {
+                if ($r->pnpp_id !== null) {
+                    $balas['p'.(int) $r->pnpp_id] = $r->waktu_masuk;
+                }
+                if (filled($r->no_hp)) {
+                    $wa = PhoneFormat::toWa((string) $r->no_hp);
+                    if ($wa !== null) {
+                        $balas['w'.$wa] = $r->waktu_masuk;
+                    }
+                }
+            });
 
-        $diFollowUpHariIni = MessageLog::query()
+        $diFollowUp = MessageLog::query()
             ->jenis('follow_up')
             ->where('status', '!=', 'dibatalkan')
-            ->whereDate('created_at', $hariIni)
+            ->where('created_at', '>=', $sejak)
             ->whereNotNull('pnpp_id')
             ->pluck('pnpp_id')
             ->map(fn ($id) => (int) $id)
@@ -119,24 +234,28 @@ class FollowUpController extends ManualBroadcastController
             ->all();
 
         return $logs
-            ->filter(function (MessageLog $log) use ($balasById, $balasByWa, $diFollowUpHariIni) {
+            ->filter(function (MessageLog $log) use ($balas, $diFollowUp) {
                 $pnpp = $log->pnpp;
-
-                if ($pnpp === null || isset($diFollowUpHariIni[(int) $pnpp->id])) {
-                    return false;
-                }
-
-                if (isset($balasById[(int) $pnpp->id])) {
+                if ($pnpp === null || isset($diFollowUp[(int) $pnpp->id])) {
                     return false;
                 }
 
                 $wa = PhoneFormat::toWa($pnpp->no_hp);
+                if ($wa === null) {
+                    return false;
+                }
 
-                return $wa !== null && ! isset($balasByWa[$wa]);
+                $terkirim = $log->sent_at ?? $log->created_at;
+                $balasan = $balas['p'.(int) $pnpp->id] ?? $balas['w'.$wa] ?? null;
+
+                return ! ($balasan !== null && $balasan->gte($terkirim));
             })
             ->map(fn (MessageLog $log) => [
                 'pnpp' => $log->pnpp,
-                'alasan' => 'Di-outreach hari ini, belum membalas.',
+                'kategori' => self::SARAN_OUTREACH_BELUM_BALAS,
+                'alasan' => 'Outreach "'.($log->template->judul ?? 'pesan').'" terkirim '
+                    .(($log->sent_at ?? $log->created_at)?->format('d/m') ?? '')
+                    .', belum dibalas.',
             ])
             ->values();
     }

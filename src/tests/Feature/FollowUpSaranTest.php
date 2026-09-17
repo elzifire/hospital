@@ -45,7 +45,7 @@ class FollowUpSaranTest extends TestCase
         ], $attrs));
     }
 
-    protected function buatReminder(Pnpp $pnpp): Reminder
+    protected function buatReminder(Pnpp $pnpp, ?string $tanggal = null, string $status = 'terjadwal'): Reminder
     {
         $poli = Poli::create(['kode' => 'POL-'.str()->random(4), 'nama' => 'Poli Umum']);
         $dokter = Dokter::create(['poli_id' => $poli->id, 'nama' => 'dr. Umum']);
@@ -54,9 +54,9 @@ class FollowUpSaranTest extends TestCase
             'pnpp_id' => $pnpp->id,
             'poli_id' => $poli->id,
             'dokter_id' => $dokter->id,
-            'tanggal' => now()->format('Y-m-d'),
+            'tanggal' => $tanggal ?? now()->format('Y-m-d'),
             'jam' => now()->format('H:i'),
-            'status' => 'terjadwal',
+            'status' => $status,
         ]);
     }
 
@@ -86,6 +86,20 @@ class FollowUpSaranTest extends TestCase
             ->assertRedirect(route('admin.outreach.index'));
     }
 
+    /**
+     * Ambil dan decode data Alpine yang dirender sebagai window.alpineOutreachData.
+     *
+     * @return array<string, mixed>
+     */
+    protected function ambilDataAlpine(string $html): array
+    {
+        if (preg_match('/window\.alpineOutreachData\s*=\s*(\{.*?\});\s*<\/script>/s', $html, $m) !== 1) {
+            return [];
+        }
+
+        return json_decode($m[1], true) ?? [];
+    }
+
     #[Test]
     public function follow_up_menyarankan_pasien_dioutreach_hari_ini_belum_balas(): void
     {
@@ -113,10 +127,84 @@ class FollowUpSaranTest extends TestCase
 
         $this->assertStringContainsString('Budi Santoso', $html);
         $this->assertStringContainsString('Saran Follow Up', $html);
-        $this->assertSame(1, substr_count($html, 'Di-outreach hari ini, belum membalas.'));
+        $this->assertStringContainsString('Outreach Belum Dibalas', $html);
+
+        $data = $this->ambilDataAlpine($html);
+        $this->assertCount(1, $data['saran']);
+        $this->assertSame(['outreach_belum_balas'], $data['saran'][0]['kategori']);
+        $this->assertStringContainsString('belum dibalas.', $data['saran'][0]['alasan'][0]);
         // Yang sudah membalas tidak masuk saran dan sudah dibuang dari
         // daftar penerima oleh saringan "belum membalas".
         $this->assertStringNotContainsString('Sudah Balas', $html);
+    }
+
+    #[Test]
+    public function pasien_jadwal_lewat_tanpa_kunjungan_disaran_untuk_follow_up(): void
+    {
+        $pnpp = $this->buatPnpp();
+        $this->buatReminder($pnpp, now()->subDays(2)->format('Y-m-d'), 'tidak_datang');
+
+        $html = $this->actingAs($this->superadmin())
+            ->get(route('admin.follow-up.create'))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertStringContainsString('Saran Follow Up', $html);
+        $this->assertStringContainsString('Belum Hadir', $html);
+        $this->assertStringContainsString('lewat tanpa kunjungan.', $html);
+        $this->assertStringContainsString('belum_hadir', $html);
+        $this->assertStringContainsString('Budi Santoso', $html);
+    }
+
+    #[Test]
+    public function pasien_dengan_dua_kriteria_tampil_sekali_dengan_dua_alasan(): void
+    {
+        $pnpp = $this->buatPnpp();
+        $this->buatReminder($pnpp, now()->subDays(2)->format('Y-m-d'), 'tidak_datang');
+        $this->kirimOutreachHariIni($pnpp);
+
+        $html = $this->actingAs($this->superadmin())
+            ->get(route('admin.follow-up.create'))
+            ->assertOk()
+            ->getContent();
+
+        // Satu kartu: kedua kategori & alasan tergabung dalam satu entri.
+        $data = $this->ambilDataAlpine($html);
+        $this->assertCount(1, $data['saran']);
+        $this->assertSame(['belum_hadir', 'outreach_belum_balas'], $data['saran'][0]['kategori']);
+        $this->assertCount(2, $data['saran'][0]['alasan']);
+        $this->assertStringContainsString('lewat tanpa kunjungan.', $data['saran'][0]['alasan'][0]);
+        $this->assertStringContainsString('belum dibalas.', $data['saran'][0]['alasan'][1]);
+        $this->assertStringContainsString('Belum Hadir', $html);
+    }
+
+    #[Test]
+    public function halaman_ubah_follow_up_juga_menampilkan_saran_follow_up(): void
+    {
+        $pnpp = $this->buatPnpp();
+        $this->buatReminder($pnpp, now()->subDays(2)->format('Y-m-d'), 'tidak_datang');
+
+        // Buat grup follow-up dengan mode jadwalkan sehingga tetap "menunggu".
+        $this->actingAs($this->superadmin())
+            ->post(route('admin.follow-up.store'), [
+                'pnpp_ids' => [$pnpp->id],
+                'jenis' => 'follow_up',
+                'mode' => 'jadwalkan',
+                'kirim_pada' => now()->addHour()->format('Y-m-d\TH:i'),
+                'message_template_id' => $this->buatTemplate()->id,
+            ])
+            ->assertRedirect(route('admin.follow-up.index'));
+
+        $group = MessageLog::where('pnpp_id', $pnpp->id)->firstOrFail()->kirim_group;
+
+        $html = $this->actingAs($this->superadmin())
+            ->get(route('admin.follow-up.edit', $group))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertStringContainsString('Saran Follow Up', $html);
+        $this->assertStringContainsString('Budi Santoso', $html);
+        $this->assertStringContainsString('lewat tanpa kunjungan.', $html);
     }
 
     #[Test]
@@ -154,7 +242,7 @@ class FollowUpSaranTest extends TestCase
         // tidak lagi disarankan karena sudah di-follow up hari ini.
         $this->assertStringContainsString('Budi Santoso', $html);
         $this->assertStringNotContainsString('Saran Follow Up', $html);
-        $this->assertSame(0, substr_count($html, 'Di-outreach hari ini, belum membalas.'));
+        $this->assertSame([], $this->ambilDataAlpine($html)['saran']);
     }
 
     #[Test]

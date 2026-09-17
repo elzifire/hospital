@@ -9,9 +9,12 @@ use App\Jobs\ImportMasterJob;
 use App\Jobs\PreviewImportJob;
 use App\Models\MessageLog;
 use App\Models\MessageReply;
+use App\Models\MessageTemplate;
 use App\Models\Pnpp;
 use App\Models\ResponManual;
+use App\Models\Satker;
 use App\Support\MasterRegistry;
+use App\Support\TextSanitizer;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
@@ -19,6 +22,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class ResponController extends Controller
 {
@@ -191,6 +195,128 @@ class ResponController extends Controller
     public function indexManual()
     {
         return view('admin.respon.manual');
+    }
+
+    /**
+     * Form kirim pesan manual ke target kontak PNPP (bukan template Meta —
+     * teks bebas, hemat biaya). Saring pasien via kata kunci / satker lalu
+     * centang satu atau beberapa kontak sebagai penerima.
+     */
+    public function pesanManual(Request $request)
+    {
+        $q = trim((string) $request->query('q', ''));
+        $satkerId = (string) $request->query('satker', '');
+
+        $pnpps = Pnpp::query()
+            ->with('satker:id,nama')
+            ->when($q !== '', function ($query) use ($q) {
+                $query->where(
+                    fn ($sub) => $sub->where('nama', 'like', "%{$q}%")
+                        ->orWhere('nip', 'like', "%{$q}%")
+                        ->orWhere('no_hp', 'like', "%{$q}%")
+                );
+            })
+            ->when($satkerId !== '', fn ($query) => $query->where('satker_id', $satkerId))
+            ->orderBy('nama')
+            ->get(['id', 'nama', 'nip', 'no_hp', 'satker_id']);
+
+        $canKirimIds = $pnpps
+            ->filter(fn (Pnpp $p) => PhoneFormat::toWa($p->no_hp) !== null)
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+
+        return view('admin.respon.pesan-manual', [
+            'pnpps' => $pnpps,
+            'satkers' => Satker::orderBy('nama')->get(['id', 'nama']),
+            'filters' => ['q' => $q, 'satker' => $satkerId],
+            'canKirimIds' => $canKirimIds,
+            'templates' => $this->templateReferensi(),
+        ]);
+    }
+
+    /**
+     * Kirim pesan manual (POST) ke kontak PNPP terpilih — teks bebas
+     * (bukan template Meta), dikirim sinkron lewat WhatsApp Business.
+     */
+    public function kirimPesanManual(Request $request)
+    {
+        $data = $request->validate([
+            'pnpp_ids' => ['required', 'array', 'min:1'],
+            'pnpp_ids.*' => ['integer', Rule::exists('pnpps', 'id')],
+            'isi' => ['required', 'string', 'max:5000'],
+        ]);
+
+        $isi = TextSanitizer::win1252((string) $data['isi']);
+        $kirimGroup = (string) Str::uuid();
+
+        $pnpps = Pnpp::query()->whereIn('id', $data['pnpp_ids'])->get();
+
+        $logs = $pnpps->map(function (Pnpp $pnpp) use ($request, $isi, $kirimGroup) {
+            $noHp = PhoneFormat::toWa($pnpp->no_hp);
+
+            // Nomor WhatsApp tidak valid → pesan langsung ditandai gagal,
+            // tidak masuk antrean pengiriman.
+            $valid = $noHp !== null;
+
+            return MessageLog::create([
+                'jenis' => 'respon',
+                'rule' => 'pesan_manual',
+                'pnpp_id' => $pnpp->id,
+                'created_by' => $request->user()?->id,
+                'kirim_group' => $kirimGroup,
+                'penerima_nama' => (string) $pnpp->nama,
+                'penerima_no_hp' => $noHp ?? (string) ($pnpp->no_hp ?? ''),
+                'konten' => $isi,
+                'status' => $valid ? 'menunggu' : 'gagal',
+                'error' => $valid ? null : 'Nomor WhatsApp tidak valid.',
+                'provider' => (string) config('whatsapp.driver'),
+                // Tanpa meta template → teks bebas, hemat biaya & aman dari
+                // galat parameter template.
+                'meta_template_name' => null,
+                'template_params' => [],
+            ]);
+        });
+
+        $menunggu = $logs->where('status', 'menunggu');
+        $tanpaNomor = $logs->where('status', 'gagal');
+
+        $hasil = $menunggu->isEmpty()
+            ? ['terkirim' => 0, 'gagal' => 0, 'dilewati' => 0]
+            : app(AntreanKirim::class)->kirimSinkron($menunggu->all());
+
+        $pesan = implode(' ', array_filter([
+            ($hasil['terkirim'] ?? 0) > 0 ? 'Pesan terkirim ke '.$hasil['terkirim'].' kontak.' : null,
+            ($hasil['gagal'] ?? 0) > 0 ? 'Pesan gagal terkirim untuk '.$hasil['gagal'].' kontak.' : null,
+            $tanpaNomor->isNotEmpty() ? $tanpaNomor->count().' kontak dilewati karena nomor WhatsApp tidak valid.' : null,
+        ]));
+
+        return redirect()
+            ->route('admin.respon.pesan-manual')
+            ->with(filled($pesan) && ($hasil['terkirim'] ?? 0) > 0 ? 'success' : 'error', $pesan ?: 'Tidak ada pesan yang terkirim.');
+    }
+
+    /**
+     * Daftar template aktif sebagai referensi isi pesan — ditampilkan di
+     * halaman kirim manual agar user tinggal menyalin (pengiriman tetap
+     * teks bebas, bukan tipe template Meta sehingga lebih hemat).
+     */
+    protected function templateReferensi(): array
+    {
+        return MessageTemplate::query()
+            ->with('category:id,nama')
+            ->where('is_active', true)
+            ->orderBy('judul')
+            ->get(['id', 'judul', 'konten', 'template_category_id'])
+            ->map(fn (MessageTemplate $t) => [
+                'id' => $t->id,
+                'judul' => (string) $t->judul,
+                'konten' => (string) $t->konten,
+                'kategori' => (string) ($t->category?->nama ?? ''),
+            ])
+            ->values()
+            ->all();
     }
 
     /**

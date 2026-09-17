@@ -26,6 +26,7 @@
           x-data="{
               poliId: '{{ old('poli_id', $reminder->poli_id) }}',
               dokterId: '{{ old('dokter_id', $reminder->dokter_id) }}',
+              homeVisit: '{{ old('home_visit', $reminder->home_visit ? '1' : '0') }}',
               tanggal: '{{ old('tanggal', $reminder->tanggal?->format('Y-m-d')) }}',
               jam: '{{ old('jam', $reminder->jam?->format('H:i')) }}',
               dokters: @js($dokters->map(fn ($d) => ['id' => $d->id, 'nama' => $d->nama, 'poli_id' => $d->poli_id])),
@@ -94,8 +95,8 @@ nilaiToken(token) {
             </div>
             <div class="grid grid-cols-1 gap-5 p-5 md:grid-cols-2">
                 <div>
-                    <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Poli <span class="text-rose-500">*</span></label>
-                    <select name="poli_id" x-model="poliId" required
+                    <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Poli <span x-show="homeVisit === '0'" class="text-rose-500">*</span></label>
+                    <select name="poli_id" x-model="poliId" :required="homeVisit === '0'"
                             class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
                         <option value="" disabled>— Pilih poli —</option>
                         @foreach ($polis as $po)
@@ -106,15 +107,15 @@ nilaiToken(token) {
                 </div>
                 <div>
                     <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Dokter</label>
-                    <select name="dokter_id" x-model="dokterId"
-                            class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                    <select name="dokter_id" x-model="dokterId" :disabled="!poliId"
+                            class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400">
                         <option value="">— Opsional —</option>
                         @foreach ($dokters as $d)
                             <option value="{{ $d->id }}" data-poli="{{ $d->poli_id }}"
                                     {{ (string) old('dokter_id', $reminder->dokter_id) === (string) $d->id ? 'selected' : '' }}>{{ $d->nama }}</option>
                         @endforeach
                     </select>
-                    <p class="mt-1 text-xs text-slate-400">Sebaiknya sesuai poli — validasi menolak dokter dari poli lain.</p>
+                    <p class="mt-1 text-xs text-slate-400">Sebaiknya sesuai poli — validasi menolak dokter dari poli lain. Untuk home visit tanpa poli, dokter dikosongkan.</p>
                     @error('dokter_id')<p class="mt-1 text-xs text-rose-500">{{ $message }}</p>@enderror
                 </div>
                 <div>
@@ -133,16 +134,17 @@ nilaiToken(token) {
                     <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Jenis Kunjungan</label>
                     <div class="flex flex-wrap gap-3">
                         <label class="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-600 transition has-[:checked]:border-sky-400 has-[:checked]:bg-sky-50 has-[:checked]:text-sky-700">
-                            <input type="radio" name="home_visit" value="0" {{ old('home_visit', $reminder->home_visit ? '1' : '0') === '0' ? 'checked' : '' }}
+                            <input type="radio" name="home_visit" value="0" x-model="homeVisit" {{ old('home_visit', $reminder->home_visit ? '1' : '0') === '0' ? 'checked' : '' }}
                                    class="h-4 w-4 border-slate-300 text-sky-600 focus:ring-sky-500">
                             Kunjungan di RS
                         </label>
                         <label class="flex cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-4 py-2.5 text-sm text-slate-600 transition has-[:checked]:border-teal-400 has-[:checked]:bg-teal-50 has-[:checked]:text-teal-700">
-                            <input type="radio" name="home_visit" value="1" {{ old('home_visit', $reminder->home_visit ? '1' : '0') === '1' ? 'checked' : '' }}
+                            <input type="radio" name="home_visit" value="1" x-model="homeVisit" {{ old('home_visit', $reminder->home_visit ? '1' : '0') === '1' ? 'checked' : '' }}
                                    class="h-4 w-4 border-slate-300 text-teal-600 focus:ring-teal-500">
                             Home Visit
                         </label>
                     </div>
+                    <p class="mt-1 text-xs text-slate-400">Home visit tidak wajib memilih poli — biarkan kosong untuk jadwal kunjungan ke rumah pasien.</p>
                 </div>
                 <div class="md:col-span-2">
                     <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Status</label>
@@ -279,25 +281,31 @@ nilaiToken(token) {
                 <div>
                     <p class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Poli yang Dikunjungi</p>
                     <div class="space-y-2">
-                        {{-- Poli terjadwal: terkunci, selalu tercatat --}}
-                        <div class="rounded-xl border border-sky-200 bg-sky-50/60 px-4 py-3">
-                            <div class="flex items-center gap-2">
-                                <svg class="h-4 w-4 text-sky-600" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/>
-                                </svg>
-                                <span class="text-sm font-bold text-sky-800">{{ $reminder->poli?->nama }}</span>
-                                <span class="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-sky-700">terjadwal — wajib</span>
+                        @if ($reminder->poli_id)
+                            {{-- Poli terjadwal: terkunci, selalu tercatat --}}
+                            <div class="rounded-xl border border-sky-200 bg-sky-50/60 px-4 py-3">
+                                <div class="flex items-center gap-2">
+                                    <svg class="h-4 w-4 text-sky-600" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/>
+                                    </svg>
+                                    <span class="text-sm font-bold text-sky-800">{{ $reminder->poli?->nama }}</span>
+                                    <span class="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-sky-700">terjadwal — wajib</span>
+                                </div>
+                                <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                    <input type="text" name="polis[{{ $reminder->poli_id }}][keluhan]" maxlength="1000" value="{{ old('polis.'.$reminder->poli_id.'.keluhan') }}" placeholder="Keluhan di poli ini (opsional)…"
+                                           class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                                    <input type="text" name="polis[{{ $reminder->poli_id }}][diagnosa]" maxlength="1000" value="{{ old('polis.'.$reminder->poli_id.'.diagnosa') }}" placeholder="Diagnosa di poli ini (opsional)…"
+                                           class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                                </div>
                             </div>
-                            <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                <input type="text" name="polis[{{ $reminder->poli_id }}][keluhan]" maxlength="1000" value="{{ old('polis.'.$reminder->poli_id.'.keluhan') }}" placeholder="Keluhan di poli ini (opsional)…"
-                                       class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
-                                <input type="text" name="polis[{{ $reminder->poli_id }}][diagnosa]" maxlength="1000" value="{{ old('polis.'.$reminder->poli_id.'.diagnosa') }}" placeholder="Diagnosa di poli ini (opsional)…"
-                                       class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
-                            </div>
-                        </div>
+                        @else
+                            <p class="rounded-xl border border-dashed border-teal-300 bg-teal-50/40 px-4 py-3 text-xs text-teal-800">
+                                Jadwal ini home visit tanpa poli terjadwal — centang poli yang benar-benar dikunjungi, atau biarkan kosong untuk mencatat tanpa poli.
+                            </p>
+                        @endif
 
-                        {{-- Poli lain: opsional via checklist --}}
-                        @foreach ($polis->where('id', '!==', $reminder->poli_id) as $po)
+                        {{-- Poli lain (atau semua poli untuk home visit): opsional via checklist --}}
+                        @foreach (($reminder->poli_id ? $polis->where('id', '!==', $reminder->poli_id) : $polis) as $po)
                             <div>
                                 <label class="flex cursor-pointer items-center gap-2.5 rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 transition has-[:checked]:border-emerald-300 has-[:checked]:bg-emerald-50/60 has-[:checked]:text-emerald-800">
                                     <input type="checkbox" name="poli_pilih[]" value="{{ $po->id }}" x-model="pilih[{{ $po->id }}]"

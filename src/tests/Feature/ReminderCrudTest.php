@@ -307,4 +307,152 @@ class ReminderCrudTest extends TestCase
         $this->actingAs($user)->get(route('admin.digital-reminder.create'))->assertForbidden();
         $this->actingAs($user)->post(route('admin.digital-reminder.store'), [])->assertForbidden();
     }
+
+    #[Test]
+    public function home_visit_bisa_dibuat_tanpa_poli(): void
+    {
+        extract($this->pasangan());
+        $this->actingAs($this->superadmin());
+
+        // Home visit → poli tidak wajib: 2 pasien, tanpa poli = 2 jadwal.
+        $this->post(route('admin.digital-reminder.store'), [
+            'pnpp_ids' => [$budi->id, $siti->id],
+            'tanggal' => today()->addDays(3)->format('Y-m-d'),
+            'jam' => '10:00',
+            'home_visit' => '1',
+        ])->assertRedirect(route('admin.digital-reminder.index'));
+
+        $this->assertSame(2, Reminder::count());
+        $this->assertDatabaseHas('reminders', [
+            'pnpp_id' => $budi->id,
+            'poli_id' => null,
+            'home_visit' => true,
+            'status' => 'terjadwal',
+        ]);
+        $this->assertDatabaseHas('reminders', ['pnpp_id' => $siti->id, 'poli_id' => null, 'home_visit' => true]);
+
+        // Kunjungan di RS (bukan home visit) tetap wajib poli.
+        $this->post(route('admin.digital-reminder.store'), [
+            'pnpp_ids' => [$budi->id],
+            'tanggal' => today()->addDay()->format('Y-m-d'),
+            'jam' => '09:00',
+            'home_visit' => '0',
+        ])->assertSessionHasErrors('poli_ids');
+    }
+
+    #[Test]
+    public function edit_bisa_menghapus_poli_saat_menjadi_home_visit(): void
+    {
+        extract($this->pasangan());
+
+        $reminder = Reminder::create([
+            'pnpp_id' => $budi->id,
+            'poli_id' => $poliUmum->id,
+            'tanggal' => today()->addDay()->format('Y-m-d'),
+            'jam' => '09:00',
+            'status' => 'terjadwal',
+        ]);
+
+        $this->actingAs($this->superadmin())
+            ->put(route('admin.digital-reminder.update', $reminder), [
+                'tanggal' => $reminder->tanggal->format('Y-m-d'),
+                'jam' => '09:00',
+                'home_visit' => '1',
+                'status' => 'terjadwal',
+            ])->assertRedirect(route('admin.digital-reminder.index'));
+
+        $this->assertDatabaseHas('reminders', ['id' => $reminder->id, 'poli_id' => null, 'home_visit' => true]);
+
+        // Kembali ke RS tanpa poli → ditolak (poli harus diisi lagi).
+        $this->put(route('admin.digital-reminder.update', $reminder), [
+            'tanggal' => $reminder->tanggal->format('Y-m-d'),
+            'jam' => '09:00',
+            'home_visit' => '0',
+            'status' => 'terjadwal',
+        ])->assertSessionHasErrors('poli_id');
+    }
+
+    #[Test]
+    public function catat_home_visit_tanpa_poli_membuat_kunjungan_tanpa_poli(): void
+    {
+        extract($this->pasangan());
+
+        $reminder = Reminder::create([
+            'pnpp_id' => $budi->id,
+            'poli_id' => null,
+            'home_visit' => true,
+            'tanggal' => today()->format('Y-m-d'),
+            'jam' => '08:30',
+            'status' => 'terjadwal',
+        ]);
+
+        // Dicatat tanpa centang poli apa pun → tetap tercatat, tanpa poli.
+        $this->actingAs($this->superadmin())
+            ->post(route('admin.digital-reminder.kunjungan', $reminder), [
+                'tanggal_kunjungan' => today()->format('Y-m-d'),
+                'keluhan' => 'Kontrol di rumah',
+                'diagnosa' => 'Stabil',
+            ])->assertRedirect(route('admin.pnpp.kunjungan', $budi));
+
+        $this->assertDatabaseHas('kunjungans', [
+            'reminder_id' => $reminder->id,
+            'pnpp_id' => $budi->id,
+            'poli_id' => null,
+            'keluhan' => 'Kontrol di rumah',
+            'diagnosa' => 'Stabil',
+        ]);
+        $this->assertSame('selesai', $reminder->refresh()->status);
+
+        // Boleh juga mencatat poli tertentu yang benar-benar dikunjungi.
+        $reminderKedua = Reminder::create([
+            'pnpp_id' => $siti->id,
+            'poli_id' => null,
+            'home_visit' => true,
+            'tanggal' => today()->format('Y-m-d'),
+            'jam' => '08:30',
+            'status' => 'terjadwal',
+        ]);
+
+        $this->actingAs($this->superadmin())
+            ->post(route('admin.digital-reminder.kunjungan', $reminderKedua), [
+                'tanggal_kunjungan' => today()->format('Y-m-d'),
+                'poli_pilih' => [$poliGigi->id],
+                'polis' => [$poliGigi->id => ['keluhan' => 'Gigi']],
+            ])->assertRedirect(route('admin.pnpp.kunjungan', $siti));
+
+        $this->assertDatabaseHas('kunjungans', [
+            'reminder_id' => $reminderKedua->id,
+            'poli_id' => $poliGigi->id,
+            'keluhan' => 'Gigi',
+        ]);
+    }
+
+    #[Test]
+    public function akun_poli_home_visit_tanpa_poli_tetap_terikat_polinya_sendiri(): void
+    {
+        extract($this->pasangan());
+
+        $user = User::create([
+            'name' => 'Petugas Umum',
+            'email' => 'petugas-umum@test.dev',
+            'password' => 'rahasia',
+        ]);
+        $user->assignRole('poli');
+        $user->userDetail()->updateOrCreate([], ['poli_id' => $poliUmum->id]);
+
+        $this->actingAs($user)
+            ->post(route('admin.digital-reminder.store'), [
+                'pnpp_ids' => [$budi->id],
+                'tanggal' => today()->addDay()->format('Y-m-d'),
+                'jam' => '10:00',
+                'home_visit' => '1',
+            ])->assertRedirect(route('admin.digital-reminder.index'));
+
+        // Poli sendiri dipasang agar jadwal tetap terlihat di scope akun poli.
+        $this->assertDatabaseHas('reminders', [
+            'pnpp_id' => $budi->id,
+            'poli_id' => $poliUmum->id,
+            'home_visit' => true,
+        ]);
+    }
 }

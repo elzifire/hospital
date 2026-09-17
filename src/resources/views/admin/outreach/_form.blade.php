@@ -6,6 +6,20 @@
     $jenisDesc = $jenisDesc ?? 'Undangan jadwal (riwayat modul Outreach).';
     $saranPenerima = $saranPenerima ?? [];
     $tokenJadwal = ['hari_tanggal', 'waktu_kunjungan', 'poli_layanan', 'poli', 'dokter', 'tanggal', 'jam'];
+    $saranFe = collect($saranPenerima)
+        ->map(function ($s) {
+            $p = $s['pnpp'];
+            return [
+                'id' => (int) $p->id,
+                'nama' => (string) ($p->nama ?? ''),
+                'nip' => (string) ($p->nip ?? ''),
+                'satker' => (string) ($p->satker?->nama ?? ''),
+                'kategori' => array_values($s['kategori'] ?? []),
+                'alasan' => array_values($s['alasan'] ?? []),
+            ];
+        })
+        ->values()
+        ->all();
     $alpineOutreachData = [
         'selected' => $selectedIds,
         'allIds' => $canKirimIds,
@@ -16,6 +30,7 @@
         'reminders' => $reminders ?? [],
         'pnppData' => (object) ($pnppData ?? []),
         'poliOptions' => $poliOptions ?? [],
+        'saran' => $saranFe,
     ];
 @endphp
 <script>
@@ -25,6 +40,9 @@
       x-data="{
           ...(window.alpineOutreachData || {}),
           tokenJadwal: ['hari_tanggal', 'waktu_kunjungan', 'poli_layanan', 'poli', 'dokter', 'tanggal', 'jam'],
+          saranTab: 'semua',
+          saranCari: '',
+          saranBatas: 12,
           waktuBawaan() {
               const d = new Date(Date.now() + 15 * 60000);
               const p = (n) => String(n).padStart(2, '0');
@@ -162,6 +180,35 @@ tokenPribadi() {
                   console.warn('[pratinjau] token tersisa di pembanding:', sisa, { pid, hasil });
               }
               return hasil;
+          },
+          saranKategoriCocok(s) {
+              return this.saranTab === 'semua' || (s.kategori || []).includes(this.saranTab);
+          },
+          saranCocokCari(s) {
+              const q = (this.saranCari || '').trim().toLowerCase();
+              if (q === '') return true;
+              return (s.nama || '').toLowerCase().includes(q)
+                  || (s.nip || '').toLowerCase().includes(q);
+          },
+          saranTersaring() {
+              return (this.saran || []).filter((s) => this.saranKategoriCocok(s) && this.saranCocokCari(s));
+          },
+          saranTampil() {
+              return this.saranTersaring().slice(0, this.saranBatas);
+          },
+          tambahSaran() {
+              this.saranBatas += 12;
+          },
+          get saranTotal() {
+              return (this.saran || []).length;
+          },
+          get saranTerpilih() {
+              const terpilih = new Set(this.selected.map(Number));
+              return (this.saran || []).filter((s) => terpilih.has(Number(s.id))).length;
+          },
+          saranJumlah(tab) {
+              if (tab === 'semua') return this.saranTotal;
+              return (this.saran || []).filter((s) => (s.kategori || []).includes(tab)).length;
           }
               }"
       x-init="isiOtomatisReferensi(); isiOtomatisVars()">
@@ -253,34 +300,66 @@ tokenPribadi() {
                 <div>
                     <h2 class="text-sm font-bold text-amber-900">Saran Follow Up</h2>
                     <p class="mt-0.5 text-xs text-amber-700">
-                        Pasien berikut di-outreach hari ini tetapi belum membalas — saran untuk segera di-follow up.
-                        Centang untuk menjadikannya penerima.
+                        Pasien yang wajib di-follow up — belum hadir sesuai jadwal, atau menerima pesan outreach
+                        (informasi &amp; edukasi / pelayanan) namun belum membalas. Centang untuk menjadikannya penerima.
                     </p>
                 </div>
-                <span class="inline-flex shrink-0 items-center rounded-full bg-white px-3 py-1 text-[11px] font-bold text-amber-700 ring-1 ring-inset ring-amber-200">
-                    {{ count($saranPenerima) }} saran
+                <span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-white px-3 py-1 text-[11px] font-bold text-amber-700 ring-1 ring-inset ring-amber-200">
+                    <span x-text="saranTotal"></span> saran · <span class="text-sky-700" x-text="saranTerpilih"></span> dipilih
                 </span>
             </div>
+
+            <div class="flex flex-wrap items-center gap-2 border-b border-amber-100 px-5 py-3">
+                <button type="button" @click="saranTab = 'semua'; saranBatas = 12"
+                        class="rounded-full px-3 py-1 text-[11px] font-bold ring-1 ring-inset transition"
+                        :class="saranTab === 'semua' ? 'bg-amber-700 text-white ring-amber-700' : 'bg-white text-amber-800 ring-amber-200 hover:bg-amber-100'">
+                    Semua <span x-text="saranJumlah('semua')"></span>
+                </button>
+                <button type="button" @click="saranTab = 'belum_hadir'; saranBatas = 12"
+                        class="rounded-full px-3 py-1 text-[11px] font-bold ring-1 ring-inset transition"
+                        :class="saranTab === 'belum_hadir' ? 'bg-rose-600 text-white ring-rose-600' : 'bg-white text-rose-700 ring-rose-200 hover:bg-rose-50'">
+                    Belum Hadir <span x-text="saranJumlah('belum_hadir')"></span>
+                </button>
+                <button type="button" @click="saranTab = 'outreach_belum_balas'; saranBatas = 12"
+                        class="rounded-full px-3 py-1 text-[11px] font-bold ring-1 ring-inset transition"
+                        :class="saranTab === 'outreach_belum_balas' ? 'bg-sky-600 text-white ring-sky-600' : 'bg-white text-sky-700 ring-sky-200 hover:bg-sky-50'">
+                    Outreach Belum Dibalas <span x-text="saranJumlah('outreach_belum_balas')"></span>
+                </button>
+                <input type="search" x-model="saranCari" placeholder="Cari nama / NIP…"
+                       class="ml-auto w-full rounded-lg border-amber-200 bg-white text-sm shadow-sm focus:border-amber-400 focus:ring-amber-400 sm:w-56">
+            </div>
+
             <div class="grid gap-2 px-5 py-4 sm:grid-cols-2">
-                @foreach ($saranPenerima as $s)
-                    @php($saranPnpp = $s['pnpp'])
-                    @php($saranWa = \App\Broadcasting\PhoneFormat::toWa($saranPnpp->no_hp))
-                    @if ($saranWa === null)
-                        @continue
-                    @endif
-                    <label class="flex cursor-pointer items-center gap-3 rounded-xl border border-amber-200 bg-white p-3 ring-1 ring-inset ring-amber-100 transition has-[:checked]:border-sky-400 has-[:checked]:bg-sky-50">
-                        <input type="checkbox" name="pnpp_ids[]" value="{{ $saranPnpp->id }}"
+                <template x-for="s in saranTampil()" :key="s.id">
+                    <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-amber-200 bg-white p-3 ring-1 ring-inset ring-amber-100 transition has-[:checked]:border-sky-400 has-[:checked]:bg-sky-50">
+                        <input type="checkbox" name="pnpp_ids[]" :value="s.id"
                                x-model="selected" @change="isiOtomatisVars()"
-                               class="h-4 w-4 shrink-0 rounded border-slate-300 text-sky-600 focus:ring-sky-500">
-                        <span class="min-w-0">
-                            <span class="block truncate text-sm font-semibold text-slate-800">{{ $saranPnpp->nama }}</span>
-                            <span class="block truncate text-xs text-slate-400">NIP/NRP {{ $saranPnpp->nip ?? '—' }} · {{ $saranPnpp->satker?->nama ?? '—' }}</span>
-                        </span>
-                        <span class="ml-auto shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold text-amber-800 ring-1 ring-inset ring-amber-200">
-                            {{ $s['alasan'] }}
+                               class="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-sky-600 focus:ring-sky-500">
+                        <span class="min-w-0 flex-1">
+                            <span class="flex flex-wrap items-baseline gap-x-2">
+                                <span class="truncate text-sm font-semibold text-slate-800" x-text="s.nama"></span>
+                                <span class="text-xs text-slate-400" x-text="s.nip ? 'NIP/NRP ' + s.nip : ''"></span>
+                                <span class="ml-auto text-xs text-slate-400" x-text="s.satker || ''"></span>
+                            </span>
+                            <template x-for="(a, i) in (s.alasan || [])" :key="a">
+                                <span class="mt-1.5 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 ring-inset"
+                                      :class="(s.kategori[i] || '') === 'belum_hadir' ? 'bg-rose-50 text-rose-700 ring-rose-200' : 'bg-sky-50 text-sky-700 ring-sky-200'">
+                                    <span x-text="a"></span>
+                                </span>
+                            </template>
                         </span>
                     </label>
-                @endforeach
+                </template>
+                <div x-show="saranTampil().length === 0"
+                     class="col-span-full rounded-xl border border-dashed border-amber-300 bg-amber-100/40 px-4 py-6 text-center text-xs text-amber-700">
+                    Tidak ada pasien sesuai filter ini.
+                </div>
+                <div x-show="saranTersaring().length > saranTampil().length" class="col-span-full text-center">
+                    <button type="button" @click="tambahSaran()"
+                            class="rounded-full bg-white px-4 py-1.5 text-[11px] font-bold text-amber-700 ring-1 ring-inset ring-amber-200 transition hover:bg-amber-100">
+                        Tampilkan <span x-text="saranTersaring().length - saranTampil().length"></span> saran lagi
+                    </button>
+                </div>
             </div>
         </div>
     @endif

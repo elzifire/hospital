@@ -1,8 +1,9 @@
 @php($responPages = [
-    'balasan' => ['label' => 'Balasan WhatsApp', 'route' => 'admin.respon.index'],
-    'data'    => ['label' => 'Data Respon', 'route' => 'admin.respon.data'],
-    'manual'  => ['label' => 'Input Manual', 'route' => 'admin.respon.manual'],
-    'import'  => ['label' => 'Import Excel', 'route' => 'admin.respon.import'],
+    'balasan'    => ['label' => 'Balasan WhatsApp', 'route' => 'admin.respon.index'],
+    'data'       => ['label' => 'Data Respon', 'route' => 'admin.respon.data'],
+    'manual'     => ['label' => 'Input Manual', 'route' => 'admin.respon.manual'],
+    'pesanmanual' => ['label' => 'Pesan Manual', 'route' => 'admin.respon.pesan-manual'],
+    'import'     => ['label' => 'Import Excel', 'route' => 'admin.respon.import'],
 ])
 <div class="flex flex-wrap items-center gap-1 border-b border-slate-200">
     @foreach ($responPages as $key => $page)

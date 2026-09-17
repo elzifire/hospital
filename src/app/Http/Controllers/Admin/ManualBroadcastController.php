@@ -258,6 +258,7 @@ abstract class ManualBroadcastController extends Controller
             'poliOptions' => $this->poliOptions(),
             'jadwalMap' => $this->jadwalTerdekat($pnpps),
             'sudahDikirimHariIni' => $this->sudahDikirimHariIni($pnpps, $group),
+            'saranPenerima' => $this->saranPenerima($request),
         ]);
     }
 

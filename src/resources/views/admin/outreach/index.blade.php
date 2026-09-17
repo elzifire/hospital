@@ -124,6 +124,7 @@
                 <table class="min-w-full divide-y divide-slate-100 text-sm">
                     <thead class="bg-slate-50/70 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">
                         <tr>
+                            <th class="px-5 py-3">No</th>
                             <th class="px-5 py-3">Penerima</th>
                             <th class="px-5 py-3">Pesan</th>
                             <th class="px-5 py-3">Template</th>
@@ -135,6 +136,7 @@
                     <tbody class="divide-y divide-slate-100">
                         @foreach ($logs as $log)
                             <tr class="hover:bg-slate-50/60">
+                                <td class="px-5 py-3 text-center text-xs font-semibold text-slate-400">{{ $loop->iteration }}</td>
                                 <td class="px-5 py-3">
                                     <p class="font-semibold text-slate-800">{{ $log->penerima_nama }}</p>
                                     <p class="font-mono text-xs text-slate-400">{{ $log->penerima_no_hp }}</p>
