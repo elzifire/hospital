@@ -9,6 +9,7 @@ use App\Models\MessageReply;
 use App\Models\Pnpp;
 use App\Models\Reminder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
 /**
@@ -35,6 +36,16 @@ class FollowUpController extends ManualBroadcastController
      * Pasien menerima pesan outreach namun belum membalas.
      */
     public const SARAN_OUTREACH_BELUM_BALAS = 'outreach_belum_balas';
+
+    /**
+     * Pasien punya jadwal terjadwal hari ini/mendatang tanpa kunjungan.
+     */
+    public const SARAN_BELUM_BERKUNJUNG = 'belum_berkunjung';
+
+    /**
+     * Label template saat sumber saran tidak punya template terpasang.
+     */
+    public const TEMPLATE_TANPA = 'Tanpa template';
 
     /**
      * Saring kandidat penerima: buang PNPP yang sudah pernah membalas
@@ -80,19 +91,21 @@ class FollowUpController extends ManualBroadcastController
     }
 
     /**
-     * Algoritma saran follow up: gabungan dua kategori saringan —
+     * Konfigurasi saran follow up — gabungan tiga kategori saringan:
      * 1) pasien yang jadwalnya lewat tanpa kunjungan (tidak hadir),
-     * 2) pasien yang outreach-nya terkirim namun belum membalas.
-     * Satu pasien boleh memenuhi dua-duanya (kategori & alasan digabung).
-     * Pasien yang sudah di-follow up pada jendela saran dikecualikan
-     * supaya tidak dobel, dan yang nomor WhatsApp-nya tidak valid
-     * tidak disarankan.
+     * 2) pasien yang jadwalnya hari ini/mendatang namun belum berkunjung,
+     * 3) pasien yang outreach-nya terkirim namun belum membalas.
+     * Satu pasien boleh memenuhi beberapa sekaligus (kategori, alasan &
+     * template sumber digabung). Pasien yang sudah di-follow up pada jendela
+     * saran dikecualikan supaya tidak dobel, dan yang nomor WhatsApp-nya
+     * tidak valid tidak disarankan.
      *
-     * @return Collection<int, array{pnpp: Pnpp, kategori: array<int, string>, alasan: array<int, string>}>
+     * @return Collection<int, array{pnpp: Pnpp, kategori: array<int, string>, alasan: array<int, string>, template: array<int, string>}>
      */
     protected function saranPenerima(Request $request): Collection
     {
         $kandidat = $this->reminderBelumHadir()
+            ->concat($this->reminderBelumBerkunjung())
             ->concat($this->outreachBelumDibalas());
 
         if ($kandidat->isEmpty()) {
@@ -109,18 +122,21 @@ class FollowUpController extends ManualBroadcastController
                     'pnpp' => $item['pnpp'],
                     'kategori' => [],
                     'alasan' => [],
+                    'template' => [],
                 ]);
             }
             $idx = $perId[$id];
             $rek = $gabung->get($idx);
             $rek['kategori'][] = $item['kategori'];
             $rek['alasan'][] = $item['alasan'];
+            $rek['template'][] = $item['template'] ?? self::TEMPLATE_TANPA;
             $gabung->put($idx, $rek);
         }
 
-        // Belum hadir lebih prioritas, lalu urut abjad nama.
+        // Prioritas: belum hadir > belum berkunjung > outreach, lalu abjad nama.
         return $gabung->sortBy([
-            fn ($a) => in_array(self::SARAN_BELUM_HADIR, $a['kategori'], true) ? 0 : 1,
+            fn ($a) => in_array(self::SARAN_BELUM_HADIR, $a['kategori'], true) ? 0
+                : (in_array(self::SARAN_BELUM_BERKUNJUNG, $a['kategori'], true) ? 1 : 2),
             fn ($a) => strtolower((string) $a['pnpp']->nama),
         ])->values();
     }
@@ -135,7 +151,7 @@ class FollowUpController extends ManualBroadcastController
     protected function reminderBelumHadir(): Collection
     {
         $jadwal = Reminder::query()
-            ->with('pnpp.satker:id,nama', 'poli:id,nama')
+            ->with('pnpp.satker:id,nama', 'poli:id,nama', 'messageTemplate:id,judul')
             ->where(function ($query) {
                 $query->where('status', 'tidak_datang')
                     ->orWhere(function ($terlambat) {
@@ -162,6 +178,7 @@ class FollowUpController extends ManualBroadcastController
                     'alasan' => 'Jadwal '.($r->poli?->nama ?? 'poli').' '
                         .($r->tanggal?->locale('id')->translatedFormat('l, d F Y') ?? '—')
                         .' lewat tanpa kunjungan.',
+                    'template' => $r->messageTemplate?->judul ?? self::TEMPLATE_TANPA,
                 ];
             })
             ->filter()
@@ -169,14 +186,89 @@ class FollowUpController extends ManualBroadcastController
     }
 
     /**
-     * Kandidat saran "outreach belum dibalas": pesan outreach (informasi
-     * & edukasi / pelayanan) terkirim pada jendela saran (7 hari terakhir)
-     * namun belum ada balasan setelah pesan terkirim. Balasan dikenali
-     * lewat pnpp_id atau nomor WhatsApp pada MessageReply; pasien yang
-     * sudah di-follow up pada jendela yang sama dikecualikan.
+     * Kandidat saran "belum berkunjung": jadwal Digital Reminder berstatus
+     * terjadwal untuk hari ini atau mendatang yang belum tercatat
+     * kunjungannya. Ambil jadwal terdekat per pasien; yang sudah di-follow
+     * up pada jendela saran dikecualikan.
      *
      * @return Collection<int, array{pnpp: Pnpp, kategori: string, alasan: string}>
      */
+    protected function reminderBelumBerkunjung(): Collection
+    {
+        $sejak = now()->subDays(7)->startOfDay();
+        $diFollowUp = $this->diFollowUpDalamJendela($sejak);
+        $sudahBalas = $this->balasanDalamJendela($sejak);
+
+        $jadwal = Reminder::query()
+            ->with('pnpp.satker:id,nama', 'poli:id,nama', 'messageTemplate:id,judul')
+            ->where('status', 'terjadwal')
+            ->whereDate('tanggal', '>=', today()->toDateString())
+            ->whereDoesntHave('kunjungan')
+            ->orderBy('tanggal')
+            ->orderBy('jam')
+            ->get()
+            ->unique('pnpp_id');
+
+        return $jadwal
+            ->map(function (Reminder $r) use ($diFollowUp, $sudahBalas) {
+                $pnpp = $r->pnpp;
+                if ($pnpp === null
+                    || isset($diFollowUp[(int) $pnpp->id])
+                    || isset($sudahBalas[(int) $pnpp->id])
+                    || PhoneFormat::toWa($pnpp->no_hp) === null) {
+                    return null;
+                }
+
+                return [
+                    'pnpp' => $pnpp,
+                    'kategori' => self::SARAN_BELUM_BERKUNJUNG,
+                    'alasan' => 'Jadwal '.($r->poli?->nama ?? 'poli').' '
+                        .($r->tanggal?->locale('id')->translatedFormat('l, d F Y') ?? '—')
+                        .' hari ini/mendatang, belum berkunjung.',
+                    'template' => $r->messageTemplate?->judul ?? self::TEMPLATE_TANPA,
+                ];
+            })
+            ->filter()
+            ->values();
+    }
+
+    /**
+     * Pnpp yang sudah membalas pesan apapun pada jendela saran — dianggap
+     * sudah merespons (engaged) sehingga tidak perlu disarankan kembali.
+     *
+     * @return array<int, true>
+     */
+    protected function balasanDalamJendela(Carbon $sejak): array
+    {
+        return MessageReply::query()
+            ->whereNotNull('pnpp_id')
+            ->where('waktu_masuk', '>=', $sejak)
+            ->pluck('pnpp_id')
+            ->map(fn ($id) => (int) $id)
+            ->flip()
+            ->all();
+    }
+
+    /**
+     * Pnpp yang sudah mendapat pesan follow up pada jendela saran
+     * (mengikuti outreachBelumDibalas: 7 hari terakhir, status bukan
+     * dibatalkan) — dipakai untuk mencegah saran dobel.
+     *
+     * @return array<int, true>
+     */
+    protected function diFollowUpDalamJendela(Carbon $sejak): array
+    {
+        return MessageLog::query()
+            ->jenis('follow_up')
+            ->where('status', '!=', 'dibatalkan')
+            ->where('created_at', '>=', $sejak)
+            ->whereNotNull('pnpp_id')
+            ->pluck('pnpp_id')
+            ->map(fn ($id) => (int) $id)
+            ->flip()
+            ->all();
+    }
+
     protected function outreachBelumDibalas(): Collection
     {
         $sejak = now()->subDays(7)->startOfDay();
@@ -223,15 +315,7 @@ class FollowUpController extends ManualBroadcastController
                 }
             });
 
-        $diFollowUp = MessageLog::query()
-            ->jenis('follow_up')
-            ->where('status', '!=', 'dibatalkan')
-            ->where('created_at', '>=', $sejak)
-            ->whereNotNull('pnpp_id')
-            ->pluck('pnpp_id')
-            ->map(fn ($id) => (int) $id)
-            ->flip()
-            ->all();
+        $diFollowUp = $this->diFollowUpDalamJendela($sejak);
 
         return $logs
             ->filter(function (MessageLog $log) use ($balas, $diFollowUp) {
@@ -256,6 +340,7 @@ class FollowUpController extends ManualBroadcastController
                 'alasan' => 'Outreach "'.($log->template->judul ?? 'pesan').'" terkirim '
                     .(($log->sent_at ?? $log->created_at)?->format('d/m') ?? '')
                     .', belum dibalas.',
+                'template' => $log->template?->judul ?? self::TEMPLATE_TANPA,
             ])
             ->values();
     }
@@ -269,6 +354,9 @@ class FollowUpController extends ManualBroadcastController
         $q = (string) $request->query('q', '');
         $status = (string) $request->query('status', '');
         $rule = (string) $request->query('rule', '');
+        // Rentang tanggal dibuat: filter riwayat pesan follow up.
+        $tanggalAwal = $this->tanggalQuery($request, 'tanggal_awal');
+        $tanggalAkhir = $this->tanggalQuery($request, 'tanggal_akhir');
         $poliId = $request->user()?->poliId();
 
         // Akun poli hanya melihat pesan hasil generate dari reminder
@@ -289,6 +377,8 @@ class FollowUpController extends ManualBroadcastController
             ))
             ->when($status, fn ($query) => $query->where('status', $status))
             ->when($rule, fn ($query) => $query->where('rule', $rule))
+            ->when($tanggalAwal, fn ($query) => $query->whereDate('created_at', '>=', $tanggalAwal))
+            ->when($tanggalAkhir, fn ($query) => $query->whereDate('created_at', '<=', $tanggalAkhir))
             ->orderByDesc('id')
             ->paginate(10)
             ->withQueryString();
@@ -301,22 +391,51 @@ class FollowUpController extends ManualBroadcastController
 
         $saranPenerima = $this->saranPenerima($request);
 
+        // Tampil per template: saring saran sesuai template yang dipilih
+        // (penuh/persis — label 'Tanpa template' untuk sumber tanpa template).
+        $saranTemplate = (string) $request->query('template', '');
+        $cocokTemplate = fn (array $s) => $saranTemplate === ''
+            || in_array($saranTemplate, $s['template'] ?? [], true);
+
+        $saranTemplates = $saranPenerima
+            ->flatMap(fn ($s) => array_values(array_unique($s['template'] ?? [])))
+            ->countBy()
+            ->sortKeys()
+            ->all();
+
         return view('admin.follow-up.index', [
             'logs' => $logs,
             'perStatus' => $perStatus,
             'penerimaUnik' => MessageLog::jenis('follow_up')->tap($scopePoli)->distinct()->count('pnpp_id'),
             'total' => (int) $perStatus->sum(),
-            'filters' => ['q' => $q, 'status' => $status, 'rule' => $rule],
+            'filters' => ['q' => $q, 'status' => $status, 'rule' => $rule, 'tanggal_awal' => $tanggalAwal, 'tanggal_akhir' => $tanggalAkhir],
             'saranPenerima' => $saranPenerima,
+            'currentSaranTemplate' => $saranTemplate,
+            'saranTemplates' => $saranTemplates,
             'saranBelumHadir' => $saranPenerima
-                ->filter(fn ($s) => in_array(self::SARAN_BELUM_HADIR, $s['kategori'], true))
+                ->filter(fn ($s) => $cocokTemplate($s) && in_array(self::SARAN_BELUM_HADIR, $s['kategori'], true))
                 ->values()
                 ->all(),
             'saranOutreach' => $saranPenerima
-                ->filter(fn ($s) => in_array(self::SARAN_OUTREACH_BELUM_BALAS, $s['kategori'], true))
+                ->filter(fn ($s) => $cocokTemplate($s) && in_array(self::SARAN_OUTREACH_BELUM_BALAS, $s['kategori'], true))
+                ->values()
+                ->all(),
+            'saranBelumBerkunjung' => $saranPenerima
+                ->filter(fn ($s) => $cocokTemplate($s) && in_array(self::SARAN_BELUM_BERKUNJUNG, $s['kategori'], true))
                 ->values()
                 ->all(),
         ]);
+    }
+
+    /**
+     * Baca parameter tanggal query (format Y-m-d); null bila kosong atau
+     * formatnya tidak valid, supaya tidak menjatuhkan query.
+     */
+    protected function tanggalQuery(Request $request, string $param): ?string
+    {
+        $nilai = (string) $request->query($param, '');
+
+        return preg_match('/^\d{4}-\d{2}-\d{2}$/', $nilai) === 1 ? $nilai : null;
     }
 
     /**

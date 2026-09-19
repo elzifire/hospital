@@ -122,9 +122,44 @@
                 <div class="flex items-center justify-between border-b border-slate-100 px-6 py-4">
                     <h3 class="text-base font-bold text-slate-900">Daftar Kunjungan</h3>
                     <span class="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-1 text-xs font-bold tabular-nums text-sky-700 ring-1 ring-sky-200/70">
-                        {{ $pnpp->kunjungans->count() }} catatan poli
+                        {{ $pnpp->kunjungans->count() }} catatan
                     </span>
                 </div>
+
+                {{-- Filter rentang tanggal & poli --}}
+                <form method="GET" action="{{ request()->url() }}"
+                      class="flex flex-wrap items-end gap-3 border-b border-slate-100 bg-slate-50/70 px-6 py-4">
+                    <div>
+                        <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Dari</label>
+                        <input type="date" name="dari" value="{{ $filters['dari'] }}"
+                               class="h-10 rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Sampai</label>
+                        <input type="date" name="sampai" value="{{ $filters['sampai'] }}"
+                               class="h-10 rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                    </div>
+                    <div>
+                        <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Poli</label>
+                        @if ($batasiPoli)
+                            <span class="inline-flex h-10 items-center gap-1.5 rounded-lg bg-violet-50 px-3 text-sm font-semibold text-violet-700 ring-1 ring-violet-200/70">
+                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                                <span class="truncate">{{ $polis->first()?->nama }}</span>
+                            </span>
+                        @else
+                            <select name="poli" class="h-10 rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                                <option value="">Semua poli</option>
+                                @foreach ($polis as $po)
+                                    <option value="{{ $po->id }}" {{ (int) $filters['poli'] === (int) $po->id ? 'selected' : '' }}>{{ $po->nama }}</option>
+                                @endforeach
+                            </select>
+                        @endif
+                    </div>
+                    <div class="flex gap-2">
+                        <button type="submit" class="h-10 rounded-lg bg-sky-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700">Terapkan</button>
+                        <a href="{{ request()->url() }}" class="h-10 rounded-lg bg-slate-200 px-4 text-sm font-semibold text-slate-600 transition hover:bg-slate-300">Reset</a>
+                    </div>
+                </form>
 
                 @if ($pnpp->kunjungans->isEmpty())
                     <div class="px-6 py-16 text-center">
@@ -132,8 +167,14 @@
                             <div class="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 ring-8 ring-slate-50">
                                 <svg class="h-7 w-7 text-slate-400" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" /></svg>
                             </div>
-                            <h3 class="text-base font-bold text-slate-900">Belum ada riwayat kunjungan</h3>
-                            <p class="mt-1 text-sm text-slate-500">Tambahkan kunjungan pertama lewat formulir di atas.</p>
+                            <h3 class="text-base font-bold text-slate-900">{{ $filters['dari'] || $filters['sampai'] || $filters['poli'] ? 'Tidak ada kunjungan sesuai filter' : 'Belum ada riwayat kunjungan' }}</h3>
+                            <p class="mt-1 text-sm text-slate-500">
+                                @if ($filters['dari'] || $filters['sampai'] || $filters['poli'])
+                                    Ubah rentang tanggal atau pilihan poli, atau tekan Reset.
+                                @else
+                                    Tambahkan kunjungan pertama lewat formulir di atas.
+                                @endif
+                            </p>
                         </div>
                     </div>
                 @else
@@ -142,7 +183,11 @@
                             <div class="px-6 py-4">
                                 <div class="flex flex-wrap items-center gap-2">
                                     <span class="text-sm font-bold text-slate-900">{{ $baris->first()->tanggal_kunjungan->translatedFormat('d F Y') }}</span>
-                                    <span class="inline-flex items-center rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-sky-700 ring-1 ring-sky-200/70">{{ $baris->count() }} poli</span>
+                                    @if ($baris->first()->home_visit && $baris->every(fn ($k) => $k->home_visit))
+                                        <span class="inline-flex items-center rounded-full bg-teal-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-teal-700 ring-1 ring-teal-200/70">Home Visit</span>
+                                    @else
+                                        <span class="inline-flex items-center rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-sky-700 ring-1 ring-sky-200/70">{{ $baris->count() }} poli</span>
+                                    @endif
                                     @if ($loop->first)
                                         <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-700 ring-1 ring-emerald-200/70">Terbaru</span>
                                     @endif
@@ -151,9 +196,16 @@
                                     @foreach ($baris as $kunjungan)
                                         <li class="group flex flex-wrap items-center justify-between gap-3 rounded-xl bg-slate-50/70 px-4 py-3 transition hover:bg-sky-50/50">
                                             <div class="min-w-0">
-                                                <span class="inline-flex items-center rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-semibold text-sky-700 ring-1 ring-inset ring-sky-200/70">
-                                                    {{ $kunjungan->poli?->nama ?? 'Tanpa poli' }}
-                                                </span>
+                                                @if ($kunjungan->home_visit)
+                                                    <span class="inline-flex items-center gap-1 rounded-full bg-teal-50 px-2.5 py-1 text-[11px] font-semibold text-teal-700 ring-1 ring-inset ring-teal-200/70">
+                                                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75" /></svg>
+                                                        Home Visit
+                                                    </span>
+                                                @else
+                                                    <span class="inline-flex items-center rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-semibold text-sky-700 ring-1 ring-inset ring-sky-200/70">
+                                                        {{ $kunjungan->poli?->nama ?? 'Tanpa poli' }}
+                                                    </span>
+                                                @endif
                                                 <dl class="mt-1.5 flex flex-wrap gap-x-5 gap-y-0.5 text-xs">
                                                     <div class="flex gap-1.5">
                                                         <dt class="font-semibold text-slate-400">Keluhan:</dt>

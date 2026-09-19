@@ -28,27 +28,24 @@
         'selesai'      => 'bg-emerald-50 text-emerald-700 ring-emerald-200/70',
         'tidak_datang' => 'bg-rose-50 text-rose-700 ring-rose-200/70',
         'dibatalkan'   => 'bg-slate-100 text-slate-500 ring-slate-200/70',
+        'jadwal_ulang' => 'bg-indigo-50 text-indigo-700 ring-indigo-200/70',
         'tercatat'     => 'bg-teal-50 text-teal-700 ring-teal-200/70',
     ];
 
-    $statusLabel = ['terjadwal' => 'Terjadwal', 'selesai' => 'Selesai', 'tidak_datang' => 'Tidak Datang', 'dibatalkan' => 'Dibatalkan', 'tercatat' => 'Tercatat'];
+    $statusLabel = ['terjadwal' => 'Terjadwal', 'selesai' => 'Selesai', 'tidak_datang' => 'Tidak Datang', 'dibatalkan' => 'Dibatalkan', 'jadwal_ulang' => 'Jadwal Ulang', 'tercatat' => 'Tercatat'];
+    $ctl = 'h-10 w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500';
+    $lbl = 'mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-500';
 @endphp
 
 <div class="space-y-6">
     {{-- ===== Header ===== --}}
     <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-            <h2 class="text-xl font-bold tracking-tight text-slate-900">Digital Reminder &amp; Kunjungan</h2>
+            <h2 class="text-xl font-bold tracking-tight text-slate-900"><span>DIGITAL REMINDER</span></h2>
             <p class="mt-0.5 text-sm text-slate-500">Penjadwalan kunjungan pasien beserta realisasinya — jadwal dibuat di sini, kunjungan dicatat lewat modul Kunjungan.</p>
         </div>
         <div class="flex flex-wrap items-center gap-2">
-            @can('manage kunjungan')
-                <a href="{{ route('admin.kunjungan.create') }}"
-                   class="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2">
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-                    Tambah Kunjungan
-                </a>
-            @endcan
+           
             @can('manage digital-reminder')
                 <a href="{{ route('admin.digital-reminder.create') }}"
                    class="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2">
@@ -85,15 +82,15 @@
         </div>
 
         <form method="GET" action="{{ request()->url() }}"
-              class="flex flex-wrap items-end gap-3 border-b border-slate-100 bg-slate-50/50 px-5 py-4">
-            <div>
-                <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Cari</label>
+              class="flex flex-wrap items-end gap-x-3 gap-y-3 border-b border-slate-100 bg-slate-50/50 px-5 py-4">
+            <div class="w-56">
+                <label class="{{ $lbl }}">Cari</label>
                 <input type="text" name="q" value="{{ $filters['q'] }}" placeholder="Nama / NIP / catatan…"
-                       class="w-56 rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                       class="{{ $ctl }}">
             </div>
-            <div>
-                <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Status</label>
-                <select name="status" class="rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+            <div class="w-40">
+                <label class="{{ $lbl }}">Status</label>
+                <select name="status" class="{{ $ctl }}">
                     <option value="">Semua</option>
                     @foreach ($statusLabel as $key => $label)
                         <option value="{{ $key }}" {{ $filters['status'] === $key ? 'selected' : '' }}>{{ $label }}</option>
@@ -101,17 +98,17 @@
                 </select>
             </div>
             @if ($batasiPoli ?? false)
-                <div>
-                    <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Poli</label>
-                    <span class="inline-flex items-center gap-1.5 rounded-lg bg-violet-50 px-3 py-2 text-sm font-semibold text-violet-700 ring-1 ring-violet-200/70">
+                <div class="w-48">
+                    <label class="{{ $lbl }}">Poli</label>
+                    <span class="inline-flex h-10 w-full items-center gap-1.5 rounded-lg bg-violet-50 px-3 text-sm font-semibold text-violet-700 ring-1 ring-violet-200/70">
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
-                        {{ $polis->first()?->nama }}
+                        <span class="truncate">{{ $polis->first()?->nama }}</span>
                     </span>
                 </div>
             @else
-                <div>
-                    <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Poli</label>
-                    <select name="poli" class="rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                <div class="w-44">
+                    <label class="{{ $lbl }}">Poli</label>
+                    <select name="poli" class="{{ $ctl }}">
                         <option value="">Semua</option>
                         @foreach ($polis as $po)
                             <option value="{{ $po->id }}" {{ $filters['poli'] == $po->id ? 'selected' : '' }}>{{ $po->nama }}</option>
@@ -119,28 +116,28 @@
                     </select>
                 </div>
             @endif
-            <div>
-                <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Periode</label>
-                <select name="periode" class="rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+            <div class="w-40">
+                <label class="{{ $lbl }}">Periode</label>
+                <select name="periode" class="{{ $ctl }}">
                     <option value="">Semua</option>
                     <option value="hari-ini" {{ $filters['periode'] === 'hari-ini' ? 'selected' : '' }}>Hari Ini</option>
-                    <option value="7-hari" {{ $filters['periode'] === '7-hari' ? 'selected' : '' }}>7 Hari</option>
-                    <option value="30-hari" {{ $filters['periode'] === '30-hari' ? 'selected' : '' }}>30 Hari</option>
+                    <option value="7-hari" {{ $filters['periode'] === '7-hari' ? 'selected' : '' }}>7 Hari Terakhir</option>
+                    <option value="30-hari" {{ $filters['periode'] === '30-hari' ? 'selected' : '' }}>30 Hari Terakhir</option>
                 </select>
             </div>
-            <div>
-                <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Dari</label>
+            <div class="w-40">
+                <label class="{{ $lbl }}">Dari</label>
                 <input type="date" name="dari" value="{{ $filters['dari'] }}"
-                       class="rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                       class="{{ $ctl }}">
             </div>
-            <div>
-                <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Sampai</label>
+            <div class="w-40">
+                <label class="{{ $lbl }}">Sampai</label>
                 <input type="date" name="sampai" value="{{ $filters['sampai'] }}"
-                       class="rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                       class="{{ $ctl }}">
             </div>
             <div class="flex gap-2">
-                <button type="submit" class="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700">Filter</button>
-                <a href="{{ request()->url() }}" class="rounded-lg bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-300">Reset</a>
+                <button type="submit" class="h-10 rounded-lg bg-sky-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700">Filter</button>
+                <a href="{{ request()->url() }}" class="h-10 rounded-lg bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-300">Reset</a>
             </div>
         </form>
 
@@ -260,6 +257,12 @@
                                             <a href="{{ $r['catatUrl'] }}"
                                                class="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200 transition hover:bg-emerald-100">
                                                 Catat Kunjungan
+                                            </a>
+                                        @endif
+                                        @if (! $r['sudahKunjungan'] && in_array($r['status'], ['terjadwal', 'tidak_datang'], true))
+                                            <a href="{{ $r['jadwalUlangUrl'] }}"
+                                               class="rounded-lg bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 ring-1 ring-inset ring-indigo-200 transition hover:bg-indigo-100">
+                                                Jadwal Ulang
                                             </a>
                                         @endif
                                         <a href="{{ $r['editUrl'] }}"

@@ -63,11 +63,14 @@ abstract class ManualBroadcastController extends Controller
 
         // Hook "sasar" dari halaman index (mis. Follow Up): tangkap saran
         // dengan kategori tertentu dan preselected-kan sebagai penerima.
+        // Bila ada "template", saring hanya saran ber-template itu.
         $sasar = (string) $request->query('sasar', '');
+        $sasarTemplate = (string) $request->query('template', '');
         $sasarIds = [];
-        if (in_array($sasar, ['belum_hadir', 'outreach_belum_balas'], true)) {
+        if (in_array($sasar, ['belum_hadir', 'outreach_belum_balas', 'belum_berkunjung'], true)) {
             $sasarIds = $saranPenerima
-                ->filter(fn ($s) => in_array($sasar, (array) ($s['kategori'] ?? []), true))
+                ->filter(fn ($s) => in_array($sasar, (array) ($s['kategori'] ?? []), true)
+                    && ($sasarTemplate === '' || in_array($sasarTemplate, (array) ($s['template'] ?? []), true)))
                 ->map(fn ($s) => (int) $s['pnpp']->id)
                 ->values()
                 ->all();

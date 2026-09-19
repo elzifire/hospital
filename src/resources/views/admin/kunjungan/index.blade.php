@@ -38,13 +38,6 @@
                     Tambah Kunjungan
                 </a>
             @endcan
-            @can('manage digital-reminder')
-                <a href="{{ route('admin.digital-reminder.create') }}"
-                   class="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2">
-                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-                    Buat Jadwal
-                </a>
-            @endcan
         </div>
     </div>
 
@@ -78,12 +71,12 @@
             <div>
                 <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Cari</label>
                 <input type="text" name="q" value="{{ $filters['q'] }}" placeholder="Nama / NIP…"
-                       class="w-56 rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                       class="h-10 w-56 rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
             </div>
             @if ($batasiPoli)
                 <div>
                     <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Poli</label>
-                    <span class="inline-flex items-center gap-1.5 rounded-lg bg-violet-50 px-3 py-2 text-sm font-semibold text-violet-700 ring-1 ring-violet-200/70">
+                    <span class="inline-flex h-10 items-center gap-1.5 rounded-lg bg-violet-50 px-3 text-sm font-semibold text-violet-700 ring-1 ring-violet-200/70">
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
                         {{ $polis->first()?->nama }}
                     </span>
@@ -91,7 +84,7 @@
             @else
                 <div>
                     <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Poli</label>
-                    <select name="poli" class="rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                    <select name="poli" class="h-10 rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
                         <option value="">Semua</option>
                         @foreach ($polis as $po)
                             <option value="{{ $po->id }}" {{ $filters['poli'] == $po->id ? 'selected' : '' }}>{{ $po->nama }}</option>
@@ -100,8 +93,16 @@
                 </div>
             @endif
             <div>
+                <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Jenis Kunjungan</label>
+                <select name="home" class="h-10 rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                    <option value="">Semua</option>
+                    <option value="1" {{ $filters['home'] === '1' ? 'selected' : '' }}>Home Visit</option>
+                    <option value="0" {{ $filters['home'] === '0' ? 'selected' : '' }}>Kunjungan RS</option>
+                </select>
+            </div>
+            <div>
                 <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Periode</label>
-                <select name="periode" class="rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                <select name="periode" class="h-10 rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
                     <option value="">Semua</option>
                     <option value="hari-ini" {{ $filters['periode'] === 'hari-ini' ? 'selected' : '' }}>Hari Ini</option>
                     <option value="7-hari" {{ $filters['periode'] === '7-hari' ? 'selected' : '' }}>7 Hari</option>
@@ -111,16 +112,16 @@
             <div>
                 <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Dari</label>
                 <input type="date" name="dari" value="{{ $filters['dari'] }}"
-                       class="rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                       class="h-10 rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
             </div>
             <div>
                 <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Sampai</label>
                 <input type="date" name="sampai" value="{{ $filters['sampai'] }}"
-                       class="rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                       class="h-10 rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
             </div>
             <div class="flex gap-2">
-                <button type="submit" class="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700">Filter</button>
-                <a href="{{ request()->url() }}" class="rounded-lg bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-300">Reset</a>
+                <button type="submit" class="h-10 rounded-lg bg-sky-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700">Filter</button>
+                <a href="{{ request()->url() }}" class="h-10 rounded-lg bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-300">Reset</a>
             </div>
         </form>
 
@@ -163,14 +164,22 @@
                                 </td>
                                 <td class="whitespace-nowrap px-5 py-3">
                                     <p class="font-semibold text-slate-800">{{ $baris['tanggal']?->translatedFormat('d M Y') }}</p>
-                                    <p class="text-xs text-slate-400">{{ $baris['jumlahPoli'] }} poli dikunjungi</p>
+                                    @if ($baris['homeVisit'] ?? false)
+                                        <p class="text-xs font-medium text-teal-600">Home Visit</p>
+                                    @else
+                                        <p class="text-xs text-slate-400">{{ $baris['jumlahPoli'] }} poli dikunjungi</p>
+                                    @endif
                                 </td>
                                 <td class="px-5 py-3">
                                     <div class="flex flex-wrap gap-1.5">
                                         @forelse ($baris['poliBadges'] as $nama)
                                             <span class="rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ring-inset bg-sky-50 text-sky-700 ring-sky-200/70">{{ $nama }}</span>
                                         @empty
-                                            <span class="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-500 ring-1 ring-inset ring-slate-200/70">Tanpa poli</span>
+                                            @if ($baris['homeVisit'] ?? false)
+                                                <span class="rounded-full bg-teal-50 px-2.5 py-0.5 text-[11px] font-semibold text-teal-700 ring-1 ring-inset ring-teal-200/70">Home Visit</span>
+                                            @else
+                                                <span class="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-500 ring-1 ring-inset ring-slate-200/70">Tanpa poli</span>
+                                            @endif
                                         @endforelse
                                     </div>
                                     @if ($baris['diagnosa'])

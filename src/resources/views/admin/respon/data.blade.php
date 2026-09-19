@@ -56,12 +56,12 @@
                 <div>
                     <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Cari</label>
                     <input type="text" name="q" value="{{ $filters['q'] }}" placeholder="Nama / NRP-NIP / nomor / satker / isi…"
-                           class="w-64 rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                           class="h-10 w-64 rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
                 </div>
                 <div class="flex gap-2">
-                    <button type="submit" class="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700">Cari</button>
+                    <button type="submit" class="h-10 rounded-lg bg-sky-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700">Cari</button>
                     @if (filled($filters['q']))
-                        <a href="{{ route('admin.respon.data') }}" class="rounded-lg bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-300">Reset</a>
+                        <a href="{{ route('admin.respon.data') }}" class="h-10 rounded-lg bg-slate-200 px-4 text-sm font-semibold text-slate-600 transition hover:bg-slate-300">Reset</a>
                     @endif
                 </div>
             </form>

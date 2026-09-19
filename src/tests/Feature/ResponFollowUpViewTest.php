@@ -91,6 +91,42 @@ class ResponFollowUpViewTest extends TestCase
     }
 
     #[Test]
+    public function halaman_riwayat_follow_up_menyaring_rentang_tanggal(): void
+    {
+        $budi = Pnpp::create(['nama' => 'Budi Santoso', 'no_hp' => '081234567890']);
+
+        $lama = MessageLog::create([
+            'jenis' => 'follow_up', 'rule' => 'h-1', 'pnpp_id' => $budi->id, 'penerima_nama' => 'Budi Santoso',
+            'penerima_no_hp' => '6281234567890', 'konten' => 'Pesan lama dua bulan lalu.', 'status' => 'terkirim',
+        ]);
+        $lama->created_at = now()->subMonths(2)->setTime(9, 0);
+        $lama->save();
+
+        $baru = MessageLog::create([
+            'jenis' => 'follow_up', 'rule' => 'h-1', 'pnpp_id' => $budi->id, 'penerima_nama' => 'Budi Santoso',
+            'penerima_no_hp' => '6281234567890', 'konten' => 'Pesan baru bulan ini.', 'status' => 'terkirim',
+        ]);
+        $baru->created_at = now()->setTime(9, 0);
+        $baru->save();
+
+        $this->actingAs($this->superadmin())
+            ->get(route('admin.follow-up.index', [
+                'tanggal_awal' => now()->startOfMonth()->format('Y-m-d'),
+                'tanggal_akhir' => now()->endOfMonth()->format('Y-m-d'),
+            ]))
+            ->assertOk()
+            ->assertSee('Pesan baru bulan ini.')
+            ->assertDontSee('Pesan lama dua bulan lalu.');
+
+        // Format tanggal tidak valid diabaikan (tidak error, semua tampil).
+        $this->actingAs($this->superadmin())
+            ->get(route('admin.follow-up.index', ['tanggal_awal' => 'bukan-tanggal']))
+            ->assertOk()
+            ->assertSee('Pesan lama dua bulan lalu.')
+            ->assertSee('Pesan baru bulan ini.');
+    }
+
+    #[Test]
     public function user_biasa_ditolak_dari_modul_follow_up_dan_outreach(): void
     {
         $user = User::where('email', 'user@gmail.com')->firstOrFail();

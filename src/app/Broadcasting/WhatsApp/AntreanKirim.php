@@ -123,8 +123,8 @@ class AntreanKirim
             ->where('updated_at', '>=', $sejak)
             ->count();
 
-        $sisaJam = max(0, (int) config('whatsapp.rate_limit.max_per_jam', 20) - $diproses(now()->subHour()));
-        $sisaHari = max(0, (int) config('whatsapp.rate_limit.max_per_hari', 200) - $diproses(now()->subDay()));
+        $sisaJam = max(0, (int) config('whatsapp.rate_limit.max_per_jam', 2000) - $diproses(now()->subHour()));
+        $sisaHari = max(0, (int) config('whatsapp.rate_limit.max_per_hari', 2000) - $diproses(now()->subDay()));
 
         return max(0, min($maks, $sisaJam, $sisaHari));
     }

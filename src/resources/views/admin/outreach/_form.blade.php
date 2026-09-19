@@ -16,6 +16,7 @@
                 'satker' => (string) ($p->satker?->nama ?? ''),
                 'kategori' => array_values($s['kategori'] ?? []),
                 'alasan' => array_values($s['alasan'] ?? []),
+                'template' => array_values($s['template'] ?? []),
             ];
         })
         ->values()
@@ -41,6 +42,7 @@
           ...(window.alpineOutreachData || {}),
           tokenJadwal: ['hari_tanggal', 'waktu_kunjungan', 'poli_layanan', 'poli', 'dokter', 'tanggal', 'jam'],
           saranTab: 'semua',
+          saranTemplate: 'semua',
           saranCari: '',
           saranBatas: 12,
           waktuBawaan() {
@@ -182,7 +184,15 @@ tokenPribadi() {
               return hasil;
           },
           saranKategoriCocok(s) {
-              return this.saranTab === 'semua' || (s.kategori || []).includes(this.saranTab);
+              const kategoriCocok = this.saranTab === 'semua' || (s.kategori || []).includes(this.saranTab);
+              const templateCocok = this.saranTemplate === 'semua' || (s.template || []).includes(this.saranTemplate);
+              return kategoriCocok && templateCocok;
+          },
+          saranDaftarTemplate() {
+              return [...new Set((this.saran || []).flatMap((s) => s.template || []))].sort((a, b) => a.localeCompare(b));
+          },
+          saranJumlahTemplate(t) {
+              return (this.saran || []).filter((s) => (s.template || []).includes(t)).length;
           },
           saranCocokCari(s) {
               const q = (this.saranCari || '').trim().toLowerCase();
@@ -300,8 +310,9 @@ tokenPribadi() {
                 <div>
                     <h2 class="text-sm font-bold text-amber-900">Saran Follow Up</h2>
                     <p class="mt-0.5 text-xs text-amber-700">
-                        Pasien yang wajib di-follow up — belum hadir sesuai jadwal, atau menerima pesan outreach
-                        (informasi &amp; edukasi / pelayanan) namun belum membalas. Centang untuk menjadikannya penerima.
+                        Pasien yang perlu ditindaklanjuti — belum hadir sesuai jadwal, jadwal hari ini/mendatang yang belum
+                        berkunjung, atau menerima pesan outreach (informasi &amp; edukasi / pelayanan) namun belum membalas.
+                        Centang untuk menjadikannya penerima.
                     </p>
                 </div>
                 <span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-white px-3 py-1 text-[11px] font-bold text-amber-700 ring-1 ring-inset ring-amber-200">
@@ -320,13 +331,37 @@ tokenPribadi() {
                         :class="saranTab === 'belum_hadir' ? 'bg-rose-600 text-white ring-rose-600' : 'bg-white text-rose-700 ring-rose-200 hover:bg-rose-50'">
                     Belum Hadir <span x-text="saranJumlah('belum_hadir')"></span>
                 </button>
+                <button type="button" @click="saranTab = 'belum_berkunjung'; saranBatas = 12"
+                        class="rounded-full px-3 py-1 text-[11px] font-bold ring-1 ring-inset transition"
+                        :class="saranTab === 'belum_berkunjung' ? 'bg-violet-600 text-white ring-violet-600' : 'bg-white text-violet-700 ring-violet-200 hover:bg-violet-50'">
+                    Belum Berkunjung <span x-text="saranJumlah('belum_berkunjung')"></span>
+                </button>
                 <button type="button" @click="saranTab = 'outreach_belum_balas'; saranBatas = 12"
                         class="rounded-full px-3 py-1 text-[11px] font-bold ring-1 ring-inset transition"
                         :class="saranTab === 'outreach_belum_balas' ? 'bg-sky-600 text-white ring-sky-600' : 'bg-white text-sky-700 ring-sky-200 hover:bg-sky-50'">
                     Outreach Belum Dibalas <span x-text="saranJumlah('outreach_belum_balas')"></span>
                 </button>
                 <input type="search" x-model="saranCari" placeholder="Cari nama / NIP…"
-                       class="ml-auto w-full rounded-lg border-amber-200 bg-white text-sm shadow-sm focus:border-amber-400 focus:ring-amber-400 sm:w-56">
+                       class="ml-auto h-10 w-full rounded-lg border-amber-200 bg-white text-sm shadow-sm focus:border-amber-400 focus:ring-amber-400 sm:w-56">
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2 border-b border-amber-100 bg-amber-50/40 px-5 py-2.5">
+                <label class="text-[11px] font-semibold uppercase tracking-wide text-amber-600">Tampil per template</label>
+                <select x-model="saranTemplate"
+                        class="h-10 rounded-lg border-amber-200 bg-white text-sm shadow-sm focus:border-amber-400 focus:ring-amber-400">
+                    <option value="semua">Semua template</option>
+                    <template x-for="t in saranDaftarTemplate()" :key="t">
+                        <option :value="t" x-text="t + ' (' + saranJumlahTemplate(t) + ')'"></option>
+                    </template>
+                </select>
+                <button type="button" x-show="saranTemplate !== 'semua'" x-cloak
+                        @click="saranTemplate = 'semua'; saranBatas = 12"
+                        class="rounded-full bg-white px-3 py-1 text-[11px] font-bold text-amber-700 ring-1 ring-inset ring-amber-200 transition hover:bg-amber-100">
+                    Reset template
+                </button>
+                <span class="ml-auto text-[11px] font-semibold text-amber-700">
+                    <span x-text="saranTersaring().length"></span> dari <span x-text="saranTotal"></span> saran
+                </span>
             </div>
 
             <div class="grid gap-2 px-5 py-4 sm:grid-cols-2">
@@ -341,12 +376,22 @@ tokenPribadi() {
                                 <span class="text-xs text-slate-400" x-text="s.nip ? 'NIP/NRP ' + s.nip : ''"></span>
                                 <span class="ml-auto text-xs text-slate-400" x-text="s.satker || ''"></span>
                             </span>
-                            <template x-for="(a, i) in (s.alasan || [])" :key="a">
-                                <span class="mt-1.5 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 ring-inset"
-                                      :class="(s.kategori[i] || '') === 'belum_hadir' ? 'bg-rose-50 text-rose-700 ring-rose-200' : 'bg-sky-50 text-sky-700 ring-sky-200'">
-                                    <span x-text="a"></span>
-                                </span>
-                            </template>
+                            <span class="mt-1.5 flex flex-wrap items-center gap-1.5">
+                                <template x-for="(a, i) in (s.alasan || [])" :key="'a' + i">
+                                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold ring-1 ring-inset"
+                                          :class="({ belum_hadir: 'bg-rose-50 text-rose-700 ring-rose-200', belum_berkunjung: 'bg-violet-50 text-violet-700 ring-violet-200', outreach_belum_balas: 'bg-sky-50 text-sky-700 ring-sky-200' })[s.kategori[i] || ''] || 'bg-slate-50 text-slate-700 ring-slate-200'">
+                                        <span x-text="a"></span>
+                                    </span>
+                                </template>
+                                <template x-for="(t, i) in (s.template || [])" :key="'t' + i">
+                                    <span class="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-500 ring-1 ring-inset ring-slate-200">
+                                        <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2Z"/>
+                                        </svg>
+                                        <span x-text="t"></span>
+                                    </span>
+                                </template>
+                            </span>
                         </span>
                     </label>
                 </template>
@@ -378,7 +423,7 @@ tokenPribadi() {
                 <label for="message_template_id" class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Template</label>
                 <select x-model="templateId" name="message_template_id" id="message_template_id" required
                         @change="pilihTemplate($el.value)"
-                        class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:w-96">
+                        class="h-10 w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:w-96">
                     <option value="" disabled selected>Pilih template…</option>
                     @foreach ($templates as $t)
                         <option value="{{ $t['id'] }}">{{ $t['judul'] }} — {{ $t['token'] ? '{'.implode(', ', $t['token']).'}' : 'tanpa variabel' }}</option>
@@ -407,7 +452,7 @@ tokenPribadi() {
                                 <template x-if="['poli', 'instalasi'].includes(token)">
                                     <select :name="'vars[' + token + ']'"
                                             x-model="vars[token]"
-                                            class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                                            class="h-10 w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
                                         <option value="">Otomatis dari data pasien…</option>
                                         <template x-for="o in poliOptions" :key="o">
                                             <option :value="o" x-text="o"></option>
@@ -416,12 +461,12 @@ tokenPribadi() {
                                 </template>
                                 <template x-if="token === 'tanggal'">
                                     <input type="date" :name="'vars[' + token + ']'" x-model="vars[token]"
-                                           class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                                           class="h-10 w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
                                 </template>
                                 <template x-if="token !== 'tanggal' && !['poli', 'instalasi'].includes(token)">
                                     <input type="text" :name="'vars[' + token + ']'" x-model="vars[token]"
                                            maxlength="255"
-                                           class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                           class="h-10 w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
                                            x-bind:placeholder="tokenPribadi().includes(token) ? 'otomatis per penerima ({' + token + '})' : 'kosong = otomatis ({' + token + '})'">
                                 </template>
                                 <p class="mt-0.5 text-[11px] text-slate-400">Terisi otomatis dari pasien/jadwal acuan dan bisa diubah; {nama}/{nip}/{satker} diisi per penerima pada pratinjau.</p>
@@ -489,7 +534,7 @@ tokenPribadi() {
                                 <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Referensi jadwal Digital Reminder</label>
                                 <select x-model="reminderIds[pid]"
                                         :name="'reminder_ids[' + pid + ']'"
-                                        class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                                        class="h-10 w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
                                     <option value="">Isi manual / tanpa jadwal</option>
                                     <template x-for="r in remindersUntuk(pid)" :key="r.id">
                                         <option :value="r.id" x-text="r.label"></option>
@@ -577,7 +622,7 @@ tokenPribadi() {
                         <label for="kirim_pada" class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Waktu pengiriman</label>
                         <input type="datetime-local" name="kirim_pada" id="kirim_pada"
                                :value="mode === 'jadwalkan' ? waktuBawaan() : ''"
-                               class="rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                               class="h-10 rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
                     </div>
                     <p class="text-xs text-slate-400">Gunakan format 24 jam (contoh: 14:30). Waktu minimal 1 menit ke depan.</p>
                 </div>

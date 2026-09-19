@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Dokter;
+use App\Models\Kunjungan;
 use App\Models\MessageLog;
 use App\Models\MessageReply;
 use App\Models\MessageTemplate;
@@ -45,7 +46,7 @@ class FollowUpSaranTest extends TestCase
         ], $attrs));
     }
 
-    protected function buatReminder(Pnpp $pnpp, ?string $tanggal = null, string $status = 'terjadwal'): Reminder
+    protected function buatReminder(Pnpp $pnpp, ?string $tanggal = null, string $status = 'terjadwal', ?int $templateId = null): Reminder
     {
         $poli = Poli::create(['kode' => 'POL-'.str()->random(4), 'nama' => 'Poli Umum']);
         $dokter = Dokter::create(['poli_id' => $poli->id, 'nama' => 'dr. Umum']);
@@ -57,6 +58,7 @@ class FollowUpSaranTest extends TestCase
             'tanggal' => $tanggal ?? now()->format('Y-m-d'),
             'jam' => now()->format('H:i'),
             'status' => $status,
+            'message_template_id' => $templateId,
         ]);
     }
 
@@ -75,13 +77,13 @@ class FollowUpSaranTest extends TestCase
         ]);
     }
 
-    protected function kirimOutreachHariIni(Pnpp $pnpp): void
+    protected function kirimOutreachHariIni(Pnpp $pnpp, ?MessageTemplate $template = null): void
     {
         $this->actingAs($this->superadmin())
             ->post(route('admin.outreach.store'), [
                 'pnpp_ids' => [$pnpp->id],
                 'jenis' => 'outreach',
-                'message_template_id' => $this->buatTemplate()->id,
+                'message_template_id' => ($template ?? $this->buatTemplate())->id,
             ])
             ->assertRedirect(route('admin.outreach.index'));
     }
@@ -131,8 +133,10 @@ class FollowUpSaranTest extends TestCase
 
         $data = $this->ambilDataAlpine($html);
         $this->assertCount(1, $data['saran']);
-        $this->assertSame(['outreach_belum_balas'], $data['saran'][0]['kategori']);
-        $this->assertStringContainsString('belum dibalas.', $data['saran'][0]['alasan'][0]);
+        // Reminder terjadwal hari ini tanpa kunjungan → juga "belum berkunjung".
+        $this->assertSame(['belum_berkunjung', 'outreach_belum_balas'], $data['saran'][0]['kategori']);
+        $this->assertStringContainsString('belum berkunjung.', $data['saran'][0]['alasan'][0]);
+        $this->assertStringContainsString('belum dibalas.', $data['saran'][0]['alasan'][1]);
         // Yang sudah membalas tidak masuk saran dan sudah dibuang dari
         // daftar penerima oleh saringan "belum membalas".
         $this->assertStringNotContainsString('Sudah Balas', $html);
@@ -249,7 +253,8 @@ class FollowUpSaranTest extends TestCase
     public function hanya_outreach_terkirim_yang_memicu_saran(): void
     {
         $menunggu = $this->buatPnpp(['nama' => 'Masih Menunggu', 'nip' => '101']);
-        $this->buatReminder($menunggu);
+        // Jadwal sudah lewat & selesai → bukan belum_hadir, bukan belum_berkunjung.
+        $this->buatReminder($menunggu, now()->subDays(2)->format('Y-m-d'), 'selesai');
 
         // Pesan belum terkirim (menunggu) — belum sampai ke pasien.
         MessageLog::create([
@@ -299,6 +304,9 @@ class FollowUpSaranTest extends TestCase
         $belumHadir = $this->buatPnpp();
         $this->buatReminder($belumHadir, now()->subDays(2)->format('Y-m-d'), 'tidak_datang');
 
+        $belumBerkunjung = $this->buatPnpp(['nama' => 'Citra Dewi', 'no_hp' => '081255566677']);
+        $this->buatReminder($belumBerkunjung, now()->addDays(1)->format('Y-m-d'));
+
         $outreach = $this->buatPnpp(['nama' => 'Rina Antika', 'no_hp' => '081277788899']);
         $this->kirimOutreachHariIni($outreach);
 
@@ -309,12 +317,16 @@ class FollowUpSaranTest extends TestCase
 
         $this->assertStringContainsString('Saran Follow Up', $html);
         $this->assertStringContainsString('Belum Hadir (1)', $html);
+        $this->assertStringContainsString('Belum Berkunjung (1)', $html);
         $this->assertStringContainsString('Outreach Belum Dibalas (1)', $html);
         $this->assertStringContainsString('Budi Santoso', $html);
+        $this->assertStringContainsString('Citra Dewi', $html);
         $this->assertStringContainsString('Rina Antika', $html);
         $this->assertStringContainsString('lewat tanpa kunjungan.', $html);
+        $this->assertStringContainsString('belum berkunjung.', $html);
         $this->assertStringContainsString('belum dibalas.', $html);
         $this->assertStringContainsString('sasar=belum_hadir', $html);
+        $this->assertStringContainsString('sasar=belum_berkunjung', $html);
         $this->assertStringContainsString('sasar=outreach_belum_balas', $html);
     }
 
@@ -345,11 +357,140 @@ class FollowUpSaranTest extends TestCase
         $this->assertSame([(int) $outreach->id], $dataOutreach['selected']);
         $this->assertContains((int) $outreach->id, $dataOutreach['allIds']);
 
+        $belumBerkunjung = $this->buatPnpp(['nama' => 'Citra Dewi', 'no_hp' => '081255566677']);
+        $this->buatReminder($belumBerkunjung, now()->addDays(1)->format('Y-m-d'));
+
+        $htmlBerkunjung = $this->actingAs($this->superadmin())
+            ->get(route('admin.follow-up.create', ['sasar' => 'belum_berkunjung']))
+            ->assertOk()
+            ->getContent();
+
+        $dataBerkunjung = $this->ambilDataAlpine($htmlBerkunjung);
+        $this->assertSame([(int) $belumBerkunjung->id], $dataBerkunjung['selected']);
+        $this->assertContains((int) $belumBerkunjung->id, $dataBerkunjung['allIds']);
+
         $polos = $this->actingAs($this->superadmin())
             ->get(route('admin.follow-up.create'))
             ->assertOk()
             ->getContent();
 
         $this->assertSame([], $this->ambilDataAlpine($polos)['selected']);
+    }
+
+    #[Test]
+    public function pasien_jadwal_hari_ini_belum_kunjungan_disaran_berkunjung(): void
+    {
+        $pnpp = $this->buatPnpp(['nama' => 'Citra Dewi', 'no_hp' => '081255566677']);
+        $this->buatReminder($pnpp, now()->format('Y-m-d'));
+
+        $html = $this->actingAs($this->superadmin())
+            ->get(route('admin.follow-up.create'))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertStringContainsString('Saran Follow Up', $html);
+        $this->assertStringContainsString('Belum Berkunjung', $html);
+        $this->assertStringContainsString('belum berkunjung.', $html);
+        $this->assertStringContainsString('Citra Dewi', $html);
+
+        $data = $this->ambilDataAlpine($html);
+        $this->assertCount(1, $data['saran']);
+        $this->assertSame(['belum_berkunjung'], $data['saran'][0]['kategori']);
+    }
+
+    #[Test]
+    public function pasien_yang_sudah_mencatat_kunjungan_tidak_disaran_belum_berkunjung(): void
+    {
+        $pnpp = $this->buatPnpp(['nama' => 'Citra Dewi', 'no_hp' => '081255566677']);
+        $reminder = $this->buatReminder($pnpp, now()->format('Y-m-d'));
+
+        Kunjungan::create([
+            'pnpp_id' => $pnpp->id,
+            'reminder_id' => $reminder->id,
+            'tanggal_kunjungan' => now()->format('Y-m-d'),
+        ]);
+
+        $html = $this->actingAs($this->superadmin())
+            ->get(route('admin.follow-up.create'))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertStringNotContainsString('Saran Follow Up', $html);
+        $this->assertSame([], $this->ambilDataAlpine($html)['saran']);
+    }
+
+    #[Test]
+    public function saran_menyertakan_label_template_sumber(): void
+    {
+        $tplJadwal = $this->buatTemplate();
+        $tplJadwal->update(['judul' => 'Template Jadwal A']);
+        $pasienJadwal = $this->buatPnpp(['nama' => 'Jadwal A', 'no_hp' => '081200000001']);
+        $this->buatReminder($pasienJadwal, now()->format('Y-m-d'), 'terjadwal', $tplJadwal->id);
+
+        $pasienOutreach = $this->buatPnpp(['nama' => 'Outreach X', 'no_hp' => '081200000002']);
+        $tplOutreach = $this->buatTemplate();
+        $tplOutreach->update(['judul' => 'Template Outreach X']);
+        $this->kirimOutreachHariIni($pasienOutreach, $tplOutreach);
+
+        $pasienTanpa = $this->buatPnpp(['nama' => 'Tanpa Tpl', 'no_hp' => '081200000003']);
+        $this->buatReminder($pasienTanpa, now()->format('Y-m-d'));
+
+        $html = $this->actingAs($this->superadmin())
+            ->get(route('admin.follow-up.create'))
+            ->assertOk()
+            ->getContent();
+
+        $perNama = collect($this->ambilDataAlpine($html)['saran'])->keyBy('nama');
+        $this->assertSame(['Template Jadwal A'], $perNama['Jadwal A']['template']);
+        $this->assertSame(['Template Outreach X'], $perNama['Outreach X']['template']);
+        $this->assertSame(['Tanpa template'], $perNama['Tanpa Tpl']['template']);
+    }
+
+    #[Test]
+    public function index_menyaring_saran_berdasarkan_template(): void
+    {
+        $tplA = $this->buatTemplate();
+        $tplA->update(['judul' => 'Template A']);
+        $pasienA = $this->buatPnpp(['nama' => 'Pasien A', 'no_hp' => '081211111111']);
+        $this->buatReminder($pasienA, now()->format('Y-m-d'), 'terjadwal', $tplA->id);
+
+        $tplB = $this->buatTemplate();
+        $tplB->update(['judul' => 'Template B']);
+        $pasienB = $this->buatPnpp(['nama' => 'Pasien B', 'no_hp' => '081222222222']);
+        $this->buatReminder($pasienB, now()->format('Y-m-d'), 'terjadwal', $tplB->id);
+
+        $html = $this->actingAs($this->superadmin())
+            ->get(route('admin.follow-up.index', ['template' => 'Template A']))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertStringContainsString('Pasien A', $html);
+        $this->assertStringNotContainsString('Pasien B', $html);
+        // Daftar pilihan template tetap menampilkan keduanya.
+        $this->assertStringContainsString('Template A (1)', $html);
+        $this->assertStringContainsString('Template B (1)', $html);
+    }
+
+    #[Test]
+    public function create_hook_sasar_dengan_template_memilih_subset_saja(): void
+    {
+        $tplA = $this->buatTemplate();
+        $tplA->update(['judul' => 'Template A']);
+        $pasienA = $this->buatPnpp(['nama' => 'Pasien A', 'no_hp' => '081211111111']);
+        $this->buatReminder($pasienA, now()->format('Y-m-d'), 'terjadwal', $tplA->id);
+
+        $tplB = $this->buatTemplate();
+        $tplB->update(['judul' => 'Template B']);
+        $pasienB = $this->buatPnpp(['nama' => 'Pasien B', 'no_hp' => '081222222222']);
+        $this->buatReminder($pasienB, now()->format('Y-m-d'), 'terjadwal', $tplB->id);
+
+        $html = $this->actingAs($this->superadmin())
+            ->get(route('admin.follow-up.create', ['sasar' => 'belum_berkunjung', 'template' => 'Template A']))
+            ->assertOk()
+            ->getContent();
+
+        $data = $this->ambilDataAlpine($html);
+        $this->assertSame([(int) $pasienA->id], $data['selected']);
+        $this->assertNotContains((int) $pasienB->id, $data['selected']);
     }
 }

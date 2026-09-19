@@ -827,7 +827,7 @@ class MonitoringRegistry
                     ['label' => 'Dokter',     'type' => 'text',                      'value' => fn ($m) => $m->dokter?->nama ?? '—'],
                     ['label' => 'Home Visit', 'type' => 'badge',                     'value' => fn ($m) => [$m->home_visit ? 'Ya' : 'Tidak', $m->home_visit ? 'teal' : 'slate']],
                     ['label' => 'Pesan',      'type' => 'stat',  'tone' => 'violet',  'value' => fn ($m) => [(string) $m->message_logs_count, 'pesan']],
-                    ['label' => 'Status',     'type' => 'badge',                     'value' => fn ($m) => [$m->status, ['terjadwal' => 'sky', 'selesai' => 'emerald', 'tidak_datang' => 'rose', 'dibatalkan' => 'amber'][$m->status] ?? 'slate']],
+                    ['label' => 'Status',     'type' => 'badge',                     'value' => fn ($m) => [$m->status, ['terjadwal' => 'sky', 'selesai' => 'emerald', 'tidak_datang' => 'rose', 'dibatalkan' => 'amber', 'jadwal_ulang' => 'indigo'][$m->status] ?? 'slate']],
                 ],
                 'export' => [
                     'headers' => ['Tanggal', 'Jam', 'Pasien', 'NIP/NRP', 'Satker', 'Poli', 'Dokter', 'Home Visit', 'Status', 'Catatan'],

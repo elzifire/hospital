@@ -32,25 +32,25 @@
                 <div>
                     <label class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Nama</label>
                     <input type="text" name="nama" value="{{ old('nama') }}" placeholder="Nama pasien"
-                           class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                           class="h-10 w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
                 </div>
 
                 <div>
                     <label class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">NRP/NIP</label>
                     <input type="text" name="nrp_nip" value="{{ old('nrp_nip') }}" placeholder="NRP / NIP pasien"
-                           class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                           class="h-10 w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
                 </div>
 
                 <div>
                     <label class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">No. HP <span class="text-rose-500">*</span></label>
                     <input type="text" name="no_hp" value="{{ old('no_hp') }}" placeholder="081234567890" required
-                           class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                           class="h-10 w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
                 </div>
 
                 <div>
                     <label class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Satker</label>
                     <input type="text" name="satker" value="{{ old('satker') }}" placeholder="Satuan Kerja"
-                           class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                           class="h-10 w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
                 </div>
 
                 <div>
@@ -62,7 +62,7 @@
                 <div>
                     <label class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Waktu Masuk</label>
                     <input type="datetime-local" name="waktu" value="{{ old('waktu') }}"
-                           class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                           class="h-10 w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
                     <p class="mt-1 text-xs text-slate-400">Kosongkan untuk memakai waktu sekarang.</p>
                 </div>
             </div>

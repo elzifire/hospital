@@ -24,6 +24,7 @@ use App\Http\Controllers\Admin\ResponController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\SatkerController;
 use App\Http\Controllers\Admin\Setting\MessageTemplateController;
+use App\Http\Controllers\Admin\Setting\TemplateBiayaController;
 use App\Http\Controllers\Admin\Setting\TemplateCategoryController;
 use App\Http\Controllers\Admin\Setting\TemplateExportController;
 use App\Http\Controllers\Admin\Setting\TemplateMetaSyncController;
@@ -107,6 +108,13 @@ Route::middleware('auth')->group(function () {
             // Realisasi kunjungan dari sebuah penjadwalan → status selesai.
             Route::post('digital-reminder/{reminder}/kunjungan', [DigitalReminderController::class, 'catatKunjungan'])
                 ->name('digital-reminder.kunjungan');
+
+            // Jadwal ulang: jadwal lama ditandai jadwal_ulang, lalu dibuat
+            // baris baru dengan tanggal/jam baru (reschedule).
+            Route::get('digital-reminder/{reminder}/jadwal-ulang', [DigitalReminderController::class, 'formJadwalUlang'])
+                ->name('digital-reminder.jadwal-ulang');
+            Route::post('digital-reminder/{reminder}/jadwal-ulang', [DigitalReminderController::class, 'jadwalUlang'])
+                ->name('digital-reminder.jadwal-ulang.store');
         });
 
         // Outreach: riwayat & generate pesan undangan jadwal (rule H-7, H-1)
@@ -182,6 +190,10 @@ Route::middleware('auth')->group(function () {
         Route::prefix('setting')->name('setting.')->middleware('can:manage template')->group(function () {
             Route::get('/', [SettingController::class, 'index'])->name('index');
             Route::get('/template', [SettingController::class, 'template'])->name('template');
+
+            // Estimasi biaya template pesan — jumlah terpakai dari database,
+            // harga satuan sementara di-hardcode di controller.
+            Route::get('biaya', [TemplateBiayaController::class, 'index'])->name('biaya');
 
             // CRUD Kategori — halaman terpisah agar tambah & edit lebih lega.
             Route::get('kategori', [TemplateCategoryController::class, 'index'])->name('kategori.index');

@@ -38,6 +38,7 @@ class PencatatKunjungan
                 $reminder->kunjungan()->create([
                     'pnpp_id' => $reminder->pnpp_id,
                     'poli_id' => null,
+                    'home_visit' => (bool) $reminder->home_visit,
                     'tanggal_kunjungan' => $data['tanggal_kunjungan'],
                     'keluhan' => $data['keluhan'] ?? null,
                     'diagnosa' => $data['diagnosa'] ?? null,
@@ -66,9 +67,9 @@ class PencatatKunjungan
                     ];
 
                     if ($utama !== null && $poliId === $utama) {
-                        $reminder->kunjungan()->create($baris + ['pnpp_id' => $reminder->pnpp_id]);
+                        $reminder->kunjungan()->create($baris + ['pnpp_id' => $reminder->pnpp_id, 'home_visit' => (bool) $reminder->home_visit]);
                     } elseif ($hubungkanPertama) {
-                        $reminder->kunjungan()->create($baris + ['pnpp_id' => $reminder->pnpp_id]);
+                        $reminder->kunjungan()->create($baris + ['pnpp_id' => $reminder->pnpp_id, 'home_visit' => (bool) $reminder->home_visit]);
                         $hubungkanPertama = false;
                     } else {
                         $reminder->pnpp->kunjungans()->create($baris);

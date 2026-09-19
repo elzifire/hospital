@@ -136,6 +136,95 @@ class KunjunganDaftarTest extends TestCase
     }
 
     #[Test]
+    public function filter_tanggal_hanya_menampilkan_data_pada_tanggal_terpilih(): void
+    {
+        extract($this->pasangan());
+
+        $caca = Pnpp::create(['nama' => 'Caca Hari Ini', 'nip' => '9002', 'satker_id' => $satker->id]);
+        $dedi = Pnpp::create(['nama' => 'Dedi Besok', 'nip' => '9003', 'satker_id' => $satker->id]);
+        $eka = Pnpp::create(['nama' => 'Eka Kemarin', 'nip' => '9004', 'satker_id' => $satker->id]);
+
+        // Hari ini → tampil; besok → tidak masuk "Hari Ini"; kemarin & masa depan
+        // tidak tampil sehingga filter tanggal hanya menampilkan data terpilih.
+        Reminder::create([
+            'pnpp_id' => $caca->id,
+            'poli_id' => $poliA->id,
+            'tanggal' => today()->format('Y-m-d'),
+            'jam' => '08:00',
+            'status' => 'terjadwal',
+        ]);
+        Reminder::create([
+            'pnpp_id' => $dedi->id,
+            'poli_id' => $poliA->id,
+            'tanggal' => today()->addDay()->format('Y-m-d'),
+            'jam' => '09:00',
+            'status' => 'terjadwal',
+        ]);
+        $eka->kunjungans()->create([
+            'poli_id' => $poliB->id,
+            'tanggal_kunjungan' => today()->subDay()->format('Y-m-d'),
+        ]);
+
+        $this->actingAs($this->superadmin());
+
+        // Tanpa filter: ketiganya tampil.
+        $this->get(route('admin.digital-reminder.index'))
+            ->assertSee('Caca Hari Ini')
+            ->assertSee('Dedi Besok')
+            ->assertSee('Eka Kemarin');
+
+        // Periode "Hari Ini" hanya menampilkan tanggal hari ini (bukan besok/kemarin).
+        $this->get(route('admin.digital-reminder.index', ['periode' => 'hari-ini']))
+            ->assertSee('Caca Hari Ini')
+            ->assertDontSee('Dedi Besok')
+            ->assertDontSee('Eka Kemarin');
+
+        // Dari & sampai membatasi rentang tanggal.
+        $this->get(route('admin.digital-reminder.index', [
+            'dari' => today()->toDateString(),
+            'sampai' => today()->toDateString(),
+        ]))
+            ->assertSee('Caca Hari Ini')
+            ->assertDontSee('Dedi Besok')
+            ->assertDontSee('Eka Kemarin');
+    }
+
+    #[Test]
+    public function filter_home_visit_memisahkan_home_visit_dan_kunjungan_rs(): void
+    {
+        extract($this->pasangan());
+
+        $caca = Pnpp::create(['nama' => 'Caca Home Visit', 'nip' => '9005', 'satker_id' => $satker->id]);
+
+        $budi->kunjungans()->create([
+            'poli_id' => $poliA->id,
+            'tanggal_kunjungan' => today()->format('Y-m-d'),
+        ]);
+        $caca->kunjungans()->create([
+            'poli_id' => null,
+            'tanggal_kunjungan' => today()->format('Y-m-d'),
+            'home_visit' => true,
+        ]);
+
+        $this->actingAs($this->superadmin());
+
+        // Semua tampil tanpa filter.
+        $this->get(route('admin.kunjungan.index'))
+            ->assertSee('Budi Santoso')
+            ->assertSee('Caca Home Visit');
+
+        // Home=1 → hanya home visit.
+        $this->get(route('admin.kunjungan.index', ['home' => '1']))
+            ->assertSee('Caca Home Visit')
+            ->assertDontSee('Budi Santoso');
+
+        // Home=0 → hanya kunjungan RS.
+        $this->get(route('admin.kunjungan.index', ['home' => '0']))
+            ->assertSee('Budi Santoso')
+            ->assertDontSee('Caca Home Visit');
+    }
+
+    #[Test]
     public function akun_poli_hanya_bisa_mencatat_dari_jadwal_polinya_sendiri(): void
     {
         extract($this->pasangan());

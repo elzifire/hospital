@@ -91,14 +91,18 @@ class KunjunganController extends Controller
      */
     public function store(Request $request)
     {
-        $data = $request->validate(['pnpp_id' => ['required', Rule::exists('pnpps', 'id')]] + $this->aturanPolis());
+        $data = $request->validate(['pnpp_id' => ['required', Rule::exists('pnpps', 'id')]] + $this->aturanPolis($request));
 
         $pnpp = Pnpp::findOrFail($data['pnpp_id']);
-        $jumlah = $this->simpanBaris($pnpp, $data['tanggal_kunjungan'], $data['polis']);
+        $jumlah = $this->simpanBaris($pnpp, $data['tanggal_kunjungan'], $data);
+
+        $pesan = ! empty($data['home_visit'])
+            ? "Kunjungan home visit untuk \"{$pnpp->nama}\" berhasil dicatat."
+            : "{$jumlah} catatan poli untuk \"{$pnpp->nama}\" berhasil ditambahkan.";
 
         return redirect()
             ->route('admin.kunjungan.index')
-            ->with('success', "{$jumlah} catatan poli untuk \"{$pnpp->nama}\" berhasil ditambahkan.");
+            ->with('success', $pesan);
     }
 
     /**
@@ -137,13 +141,17 @@ class KunjunganController extends Controller
      */
     public function storeUntukPasien(Request $request, Pnpp $pnpp)
     {
-        $data = $request->validate($this->aturanPolis());
+        $data = $request->validate($this->aturanPolis($request));
 
-        $jumlah = $this->simpanBaris($pnpp, $data['tanggal_kunjungan'], $data['polis']);
+        $jumlah = $this->simpanBaris($pnpp, $data['tanggal_kunjungan'], $data);
+
+        $pesan = ! empty($data['home_visit'])
+            ? 'Kunjungan home visit berhasil dicatat.'
+            : "{$jumlah} catatan poli berhasil ditambahkan.";
 
         return redirect()
             ->route('admin.pnpp.kunjungan', $pnpp)
-            ->with('success', "{$jumlah} catatan poli berhasil ditambahkan.");
+            ->with('success', $pesan);
     }
 
     /**
@@ -173,12 +181,23 @@ class KunjunganController extends Controller
         abort_unless($kunjungan->pnpp_id === $pnpp->id, 404);
         $this->pastikanPoli($kunjungan);
 
+        $homeVisit = $request->boolean('home_visit', $kunjungan->home_visit);
+
         $data = $request->validate([
             'tanggal_kunjungan' => ['required', 'date'],
-            'poli_id' => array_merge(['required', Rule::exists('polis', 'id')], $this->pembatasanPoli()),
+            'home_visit' => ['sometimes', 'boolean'],
+            'poli_id' => array_merge(
+                [Rule::exists('polis', 'id')],
+                $homeVisit ? ['nullable'] : ['required'],
+                $this->pembatasanPoli(),
+            ),
             'keluhan' => ['nullable', 'string', 'max:1000'],
             'diagnosa' => ['nullable', 'string', 'max:1000'],
         ]);
+
+        if ($homeVisit) {
+            $data['poli_id'] = null;
+        }
 
         $kunjungan->update($data);
 
@@ -202,14 +221,20 @@ class KunjunganController extends Controller
     }
 
     /**
-     * Validasi form multi-poli: minimal satu poli, keluhan/diagnosa
-     * opsional per poli.
+     * Validasi form multi-poli: polis (keluhan/diagnosa per poli) JIKA
+     * bukan home visit. Home visit tanpa poli → wajib flag home_visit.
+     * Bila home_visit dicentang, polis boleh kosong (minimal 1 diabaikan).
      */
-    protected function aturanPolis(): array
+    protected function aturanPolis(Request $request): array
     {
+        $homeVisit = $request->boolean('home_visit');
+
         return [
             'tanggal_kunjungan' => ['required', 'date'],
-            'polis' => ['required', 'array', 'min:1'],
+            'home_visit' => ['sometimes', 'boolean'],
+            'keluhan' => ['nullable', 'string', 'max:1000'],
+            'diagnosa' => ['nullable', 'string', 'max:1000'],
+            'polis' => ['array', Rule::when(! $homeVisit, ['required', 'min:1'])],
             'polis.*.poli_id' => array_merge(['required', Rule::exists('polis', 'id')], $this->pembatasanPoli()),
             'polis.*.keluhan' => ['nullable', 'string', 'max:1000'],
             'polis.*.diagnosa' => ['nullable', 'string', 'max:1000'],
@@ -274,12 +299,25 @@ class KunjunganController extends Controller
     }
 
     /**
-     * Buat satu baris kunjungan per poli dalam satu transaksi.
+     * Buat baris kunjungan — satu baris per poli, atau satu baris tanpa
+     * poli (home_visit) bila flag tercentang.
      */
-    protected function simpanBaris(Pnpp $pnpp, string $tanggal, array $polis): int
+    protected function simpanBaris(Pnpp $pnpp, string $tanggal, array $data): int
     {
-        return DB::transaction(function () use ($pnpp, $tanggal, $polis): int {
-            foreach ($polis as $baris) {
+        return DB::transaction(function () use ($pnpp, $tanggal, $data): int {
+            if (! empty($data['home_visit'])) {
+                $pnpp->kunjungans()->create([
+                    'poli_id' => null,
+                    'home_visit' => true,
+                    'tanggal_kunjungan' => $tanggal,
+                    'keluhan' => $data['keluhan'] ?? null,
+                    'diagnosa' => $data['diagnosa'] ?? null,
+                ]);
+
+                return 1;
+            }
+
+            foreach ($data['polis'] as $baris) {
                 $pnpp->kunjungans()->create([
                     'poli_id' => $baris['poli_id'],
                     'tanggal_kunjungan' => $tanggal,
@@ -288,7 +326,7 @@ class KunjunganController extends Controller
                 ]);
             }
 
-            return count($polis);
+            return count($data['polis']);
         });
     }
 }

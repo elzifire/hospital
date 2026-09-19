@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Broadcasting\BroadcastService;
 use App\Http\Controllers\Controller;
 use App\Models\Dokter;
 use App\Models\Kunjungan;
@@ -189,6 +190,92 @@ class DigitalReminderController extends Controller
     }
 
     /**
+     * Form jadwal ulang — hanya untuk jadwal yang masih bisa diganti
+     * (terjadwal / tidak_datang tanpa kunjungan tercatat).
+     */
+    public function formJadwalUlang(Reminder $reminder)
+    {
+        $this->pastikanPoli($reminder);
+
+        if (! $this->bolehJadwalUlang($reminder)) {
+            return back()
+                ->with('error', 'Jadwal ini tidak bisa dijadwalkan ulang (status: '.$reminder->status.($reminder->kunjungan()->exists() ? ' — sudah ada kunjungan' : '').').');
+        }
+
+        $reminder->load('pnpp.satker:id,nama', 'poli:id,nama', 'dokter:id,nama', 'messageTemplate:id,judul');
+
+        return view('admin.digital-reminder.jadwal-ulang', ['reminder' => $reminder]);
+    }
+
+    /**
+     * Proses jadwal ulang: pesan menunggu milik jadwal lama dibatalkan,
+     * jadwal lama ditandai jadwal_ulang (tidak dipakai follow up lagi),
+     * lalu dibuat baris baru berstatus terjadwal dengan tanggal/jam baru.
+     * Baris baru nantinya menyusul jadi "selesai" saat kunjungan dicatat.
+     */
+    public function jadwalUlang(Request $request, Reminder $reminder)
+    {
+        $this->pastikanPoli($reminder);
+
+        if (! $this->bolehJadwalUlang($reminder)) {
+            return back()->with('error', 'Jadwal ini tidak bisa dijadwalkan ulang.');
+        }
+
+        $data = $request->validate([
+            'tanggal' => ['required', 'date', 'after_or_equal:today'],
+            'jam' => ['required', 'date_format:H:i'],
+            'catatan' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        if ($reminder->tanggal?->format('Y-m-d') === $data['tanggal']
+            && $reminder->jam?->format('H:i') === $data['jam']) {
+            return back()
+                ->with('error', 'Tanggal/jam baru sama dengan jadwal lama — tidak ada yang dijadwalkan ulang.')
+                ->withInput();
+        }
+
+        $baru = DB::transaction(function () use ($request, $reminder, $data): Reminder {
+            app(BroadcastService::class)->batalkan(
+                $reminder->messageLogs()->where('status', 'menunggu')->pluck('id'),
+            );
+
+            $lamaTanggal = $reminder->tanggal?->format('d/m/Y') ?? '—';
+            $catatanBaruLama = trim((string) $data['catatan']);
+            $catatanBaruLama = $catatanBaruLama !== '' ? ' ('.$catatanBaruLama.')' : '';
+            $catatanLama = 'dijadwal ulang ke '.$data['tanggal'].' '.$data['jam'].$catatanBaruLama;
+            $catatanLama = mb_substr(
+                trim((string) $reminder->catatan).(trim((string) $reminder->catatan) !== '' ? ' · ' : '').$catatanLama,
+                0,
+                500,
+            );
+
+            $reminder->update([
+                'status' => 'jadwal_ulang',
+                'catatan' => $catatanLama !== '' ? $catatanLama : null,
+            ]);
+
+            return Reminder::create([
+                'pnpp_id' => $reminder->pnpp_id,
+                'poli_id' => $reminder->poli_id,
+                'dokter_id' => $reminder->dokter_id,
+                'message_template_id' => $reminder->message_template_id,
+                'tanggal' => $data['tanggal'],
+                'jam' => $data['jam'],
+                'home_visit' => (bool) $reminder->home_visit,
+                'status' => 'terjadwal',
+                'created_by' => $request->user()?->id,
+                'catatan' => 'Dijadwal ulang dari '.$lamaTanggal.$catatanBaruLama,
+                'vars_kustom' => $reminder->vars_kustom,
+            ]);
+        });
+
+        return redirect()
+            ->route('admin.digital-reminder.index')
+            ->with('success', 'Penjadwalan untuk "'.($reminder->pnpp?->nama ?? 'pasien').'" dijadwalkan ulang ke '
+                .$baru->tanggal?->format('d/m/Y').' '.$baru->jam?->format('H:i').'.');
+    }
+
+    /**
      * Aturan validasi form. Create: pasien + chips poli (pengaturan
      * shared, tanpa dokter). Update: satu blok poli + dokter.
      * Home visit: poli tidak wajib (boleh kosong).
@@ -324,6 +411,17 @@ class DigitalReminderController extends Controller
     protected function bolehAkses(Reminder $reminder): bool
     {
         return ! $this->batasiPoli() || (int) $reminder->poli_id === $this->poliAktif();
+    }
+
+    /**
+     * Jadwal boleh dijadwalkan ulang bila masih "aktif" (terjadwal atau
+     * sudah ditandai tidak datang) dan belum memiliki kunjungan tercatat —
+     * jadwal yang sudah selesai/kunjungan tidak boleh dirombak ulang.
+     */
+    protected function bolehJadwalUlang(Reminder $reminder): bool
+    {
+        return in_array($reminder->status, ['terjadwal', 'tidak_datang'], true)
+            && ! $reminder->kunjungan()->exists();
     }
 
     /**

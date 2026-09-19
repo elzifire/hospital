@@ -36,6 +36,9 @@ class KunjunganDaftar
             '30-hari' => today()->subDays(29)->toDateString(),
             default => null,
         };
+        // Batas atas periode: "Hari Ini" hanya menampilkan tanggal hari ini,
+        // "7/30 Hari" hanya rentang terpilih (bukan masa depan).
+        $sampaiPeriode = $periode !== '' ? today()->toDateString() : null;
 
         $scopePoli = fn (Builder $t) => $t->when($batasiPoli, fn ($u) => $u->where('poli_id', $poliAktif));
 
@@ -57,6 +60,7 @@ class KunjunganDaftar
             ->when($dari, fn ($query) => $query->whereDate('tanggal', '>=', $dari))
             ->when($sampai, fn ($query) => $query->whereDate('tanggal', '<=', $sampai))
             ->when($mulai, fn ($query) => $query->whereDate('tanggal', '>=', $mulai))
+            ->when($sampaiPeriode, fn ($query) => $query->whereDate('tanggal', '<=', $sampaiPeriode))
             ->orderByDesc('tanggal')
             ->orderByDesc('id')
             ->get()
@@ -74,6 +78,7 @@ class KunjunganDaftar
             ->when($dari, fn ($query) => $query->whereDate('tanggal_kunjungan', '>=', $dari))
             ->when($sampai, fn ($query) => $query->whereDate('tanggal_kunjungan', '<=', $sampai))
             ->when($mulai, fn ($query) => $query->whereDate('tanggal_kunjungan', '>=', $mulai))
+            ->when($sampaiPeriode, fn ($query) => $query->whereDate('tanggal_kunjungan', '<=', $sampaiPeriode))
             ->orderByDesc('tanggal_kunjungan')
             ->get()
             ->groupBy(fn ($k) => $k->pnpp_id.'|'.$k->tanggal_kunjungan->format('Y-m-d'))
@@ -98,24 +103,22 @@ class KunjunganDaftar
             ['path' => $request->url(), 'query' => $request->query()],
         );
 
-        $perStatus = Reminder::query()
-            ->tap($scopePoli)
-            ->selectRaw('status, count(*) as total')
-            ->groupBy('status')
-            ->pluck('total', 'status');
+        // Statistik dihitung dari data yang sudah ter-filter (q/status/poli/tanggal),
+        // jadi kartu ikut "hanya menampilkan data yang terpilih".
+        $semuaCol = collect($semua);
+        $perStatus = $semuaCol->where('tipe', 'reminder')->pluck('status')->countBy();
 
         return [
             'items' => $items,
             'perStatus' => $perStatus,
-            'total' => count($semua),
-            'mendatang' => Reminder::query()
-                ->tap($scopePoli)
-                ->where('status', 'terjadwal')
-                ->whereDate('tanggal', '>=', today())
+            'total' => $semuaCol->count(),
+            'mendatang' => $semuaCol
+                ->where('tipe', 'reminder')
+                ->filter(fn ($b) => $b['status'] === 'terjadwal' && $b['tanggal']?->gte(today()))
                 ->count(),
-            'realisasi' => Reminder::query()
-                ->tap($scopePoli)
-                ->whereHas('kunjungan')
+            'realisasi' => $semuaCol
+                ->where('tipe', 'reminder')
+                ->where('sudahKunjungan', true)
                 ->count(),
             'manual' => $grupManual->count(),
             'polis' => $this->daftarPoliAktif($batasiPoli, $poliAktif),
@@ -137,6 +140,7 @@ class KunjunganDaftar
         $dari = (string) $request->query('dari', '');
         $sampai = (string) $request->query('sampai', '');
         $periode = (string) $request->query('periode', '');
+        $home = (string) $request->query('home', '');
         $mulai = match ($periode) {
             'hari-ini' => today()->toDateString(),
             '7-hari' => today()->subDays(6)->toDateString(),
@@ -162,6 +166,14 @@ class KunjunganDaftar
         // Filter poli diterapkan per grup (satu pasien bisa beberapa poli).
         if (! $batasiPoli && $poliId !== '') {
             $grup = $grup->filter(fn (Collection $baris) => $baris->contains(fn ($k) => (int) $k->poli_id === (int) $poliId));
+        }
+
+        // Filter home visit per grup: '1' → hanya home visit, '0' → kunjungan RS.
+        if ($home === '1' || $home === '0') {
+            $cariHome = $home === '1';
+            $grup = $grup->filter(fn (Collection $baris) => $baris->contains(
+                fn ($k) => (bool) $k->home_visit,
+            ) === $cariHome);
         }
 
         $baris = $grup
@@ -190,7 +202,7 @@ class KunjunganDaftar
             'manual' => $grup->reject($withReminder)->count(),
             'polis' => $this->daftarPoliAktif($batasiPoli, $poliAktif),
             'batasiPoli' => $batasiPoli,
-            'filters' => ['q' => $q, 'poli' => $poliId, 'dari' => $dari, 'sampai' => $sampai, 'periode' => $periode],
+            'filters' => ['q' => $q, 'poli' => $poliId, 'dari' => $dari, 'sampai' => $sampai, 'periode' => $periode, 'home' => $home],
         ];
     }
 
@@ -200,6 +212,7 @@ class KunjunganDaftar
     private function barisKunjungan(Collection $grup): array
     {
         $pertama = $grup->first();
+        $homeVisit = $grup->contains(fn ($k) => $k->home_visit);
 
         return [
             'tipe' => 'kunjungan',
@@ -208,8 +221,9 @@ class KunjunganDaftar
             'pnpp_id' => $pertama->pnpp_id,
             'pasien' => $pertama->pnpp,
             'poliBadges' => $grup->filter(fn ($k) => $k->poli)->pluck('poli.nama')->unique()->values()->all(),
+            'homeVisit' => $homeVisit,
             'diagnosa' => $grup->filter(fn ($k) => $k->diagnosa)->pluck('diagnosa')->implode(' · '),
-            'jumlahPoli' => $grup->pluck('poli_id')->unique()->count(),
+            'jumlahPoli' => $grup->pluck('poli_id')->unique()->filter()->count(),
             'sumber' => $grup->contains(fn ($k) => filled($k->reminder_id)) ? 'realisasi' : 'manual',
             'sumberLabel' => $grup->contains(fn ($k) => filled($k->reminder_id)) ? 'Realisasi Reminder' : 'Manual',
             'detailUrl' => route('admin.pnpp.kunjungan', $pertama->pnpp_id),
@@ -234,6 +248,7 @@ class KunjunganDaftar
             'status' => $r->status,
             'catatUrl' => route('admin.digital-reminder.edit', $r).'#kunjungan',
             'editUrl' => route('admin.digital-reminder.edit', $r),
+            'jadwalUlangUrl' => route('admin.digital-reminder.jadwal-ulang', $r),
             'hapusUrl' => route('admin.digital-reminder.destroy', $r),
             'detailUrl' => route('admin.pnpp.kunjungan', $r->pnpp_id),
         ];
@@ -253,7 +268,7 @@ class KunjunganDaftar
             'pasien' => $pertama->pnpp,
             'poliNama' => null,
             'dokter' => null,
-            'homeVisit' => false,
+            'homeVisit' => $grup->contains(fn ($k) => $k->home_visit),
             'sudahKunjungan' => true,
             'poliBadges' => $grup->filter(fn ($k) => $k->poli)->pluck('poli.nama')->unique()->values()->all(),
             'diagnosa' => $grup->filter(fn ($k) => $k->diagnosa)->pluck('diagnosa')->implode(' · '),

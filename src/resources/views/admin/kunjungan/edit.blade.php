@@ -48,35 +48,47 @@
                 <div>
                     <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Tanggal Kunjungan <span class="text-rose-500">*</span></label>
                     <input type="date" name="tanggal_kunjungan" value="{{ old('tanggal_kunjungan', $kunjungan->tanggal_kunjungan?->format('Y-m-d')) }}" required
-                           class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                           class="h-10 w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
                     @error('tanggal_kunjungan')<p class="mt-1 text-xs text-rose-500">{{ $message }}</p>@enderror
                 </div>
                 <div>
                     <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Poli <span class="text-rose-500">*</span></label>
-                    <select name="poli_id" required
-                            class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
-                        <option value="" disabled {{ old('poli_id', $kunjungan->poli_id) ? '' : 'selected' }}>— Pilih poli —</option>
-                        @foreach ($polis as $po)
-                            <option value="{{ $po->id }}" {{ old('poli_id', $kunjungan->poli_id) == $po->id ? 'selected' : '' }}>{{ $po->nama }}</option>
-                        @endforeach
-                    </select>
+                    @if ($kunjungan->home_visit)
+                        <span class="inline-flex h-10 w-full items-center gap-1.5 rounded-lg bg-teal-50 px-3.5 text-sm font-semibold text-teal-700 ring-1 ring-inset ring-teal-200/70">
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75" /></svg>
+                            Home Visit — tanpa poli
+                        </span>
+                    @else
+                        <select name="poli_id" required
+                                class="h-10 w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                            <option value="" disabled {{ old('poli_id', $kunjungan->poli_id) ? '' : 'selected' }}>— Pilih poli —</option>
+                            @foreach ($polis as $po)
+                                <option value="{{ $po->id }}" {{ old('poli_id', $kunjungan->poli_id) == $po->id ? 'selected' : '' }}>{{ $po->nama }}</option>
+                            @endforeach
+                        </select>
+                    @endif
                     @error('poli_id')<p class="mt-1 text-xs text-rose-500">{{ $message }}</p>@enderror
                 </div>
                 <div class="md:col-span-2">
                     <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Keluhan</label>
                     <input type="text" name="keluhan" maxlength="1000" value="{{ old('keluhan', $kunjungan->keluhan) }}" placeholder="cth. Pusing, demam"
-                           class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                           class="h-10 w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
                     @error('keluhan')<p class="mt-1 text-xs text-rose-500">{{ $message }}</p>@enderror
                 </div>
                 <div class="md:col-span-2">
                     <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Diagnosa</label>
                     <input type="text" name="diagnosa" maxlength="1000" value="{{ old('diagnosa', $kunjungan->diagnosa) }}" placeholder="cth. Hipertensi"
-                           class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                           class="h-10 w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
                     @error('diagnosa')<p class="mt-1 text-xs text-rose-500">{{ $message }}</p>@enderror
                 </div>
             </div>
             <div class="flex items-center justify-between gap-3 border-t border-slate-100 bg-slate-50/50 px-5 py-4">
-                <button type="button" onclick='confirmSubmit( @json(route("admin.pnpp.kunjungan.destroy", [$pnpp, $kunjungan])), { title: "Hapus Catatan Poli?", html: @json( '<p class="text-sm text-slate-600"> Catatan poli <strong>' . ($kunjungan->poli?->nama ?? 'tanpa poli') . '</strong> tanggal <strong>' . ($kunjungan->tanggal_kunjungan?->translatedFormat('d M Y') ?? '-') . '</strong> akan dihapus permanen. </p>' ), confirmText: "Ya, hapus" } )' class="inline-flex items-center gap-2 rounded-xl bg-rose-50 px-4 py-2.5 text-sm font-bold text-rose-600 ring-1 ring-inset ring-rose-200 transition hover:bg-rose-100" >
+                <button type="button"
+                        onclick="confirmSubmit(@js(route('admin.pnpp.kunjungan.destroy', [$pnpp, $kunjungan])), @js([
+                            'title' => 'Hapus Catatan Poli?',
+                            'html' => '<p class="text-sm text-slate-600">Catatan poli <strong>' . ($kunjungan->poli?->nama ?? 'tanpa poli') . '</strong> tanggal <strong>' . ($kunjungan->tanggal_kunjungan?->translatedFormat('d M Y') ?? '-') . '</strong> akan dihapus permanen.</p>',
+                            'confirmText' => 'Ya, hapus',
+                        ]))"
                         class="inline-flex items-center gap-2 rounded-xl bg-rose-50 px-4 py-2.5 text-sm font-bold text-rose-600 ring-1 ring-inset ring-rose-200 transition hover:bg-rose-100">
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></svg>
                     Hapus

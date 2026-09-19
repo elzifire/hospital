@@ -97,7 +97,7 @@ nilaiToken(token) {
                 <div>
                     <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Poli <span x-show="homeVisit === '0'" class="text-rose-500">*</span></label>
                     <select name="poli_id" x-model="poliId" :required="homeVisit === '0'"
-                            class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                            class="h-10 w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
                         <option value="" disabled>— Pilih poli —</option>
                         @foreach ($polis as $po)
                             <option value="{{ $po->id }}" {{ old('poli_id', $reminder->poli_id) == $po->id ? 'selected' : '' }}>{{ $po->nama }}</option>
@@ -108,7 +108,7 @@ nilaiToken(token) {
                 <div>
                     <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Dokter</label>
                     <select name="dokter_id" x-model="dokterId" :disabled="!poliId"
-                            class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400">
+                            class="h-10 w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400">
                         <option value="">— Opsional —</option>
                         @foreach ($dokters as $d)
                             <option value="{{ $d->id }}" data-poli="{{ $d->poli_id }}"
@@ -121,13 +121,13 @@ nilaiToken(token) {
                 <div>
                     <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Tanggal <span class="text-rose-500">*</span></label>
                     <input type="date" name="tanggal" x-model="tanggal" value="{{ old('tanggal', $reminder->tanggal?->format('Y-m-d')) }}" required
-                           class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                           class="h-10 w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
                     @error('tanggal')<p class="mt-1 text-xs text-rose-500">{{ $message }}</p>@enderror
                 </div>
                 <div>
                     <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Jam <span class="text-rose-500">*</span></label>
                     <input type="time" name="jam" x-model="jam" value="{{ old('jam', $reminder->jam?->format('H:i')) }}" required
-                           class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                           class="h-10 w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
                     @error('jam')<p class="mt-1 text-xs text-rose-500">{{ $message }}</p>@enderror
                 </div>
                 <div class="md:col-span-2">
@@ -149,7 +149,7 @@ nilaiToken(token) {
                 <div class="md:col-span-2">
                     <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Status</label>
                     <select name="status" required
-                            class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500 md:w-1/3">
+                            class="h-10 w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500 md:w-1/3">
                         @foreach (\App\Models\Reminder::STATUS as $st)
                             <option value="{{ $st }}" {{ old('status', $reminder->status) === $st ? 'selected' : '' }}>{{ ucfirst(str_replace('_', ' ', $st)) }}</option>
                         @endforeach
@@ -166,7 +166,7 @@ nilaiToken(token) {
                 <div class="md:col-span-2">
                     <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Template Pesan WhatsApp</label>
                     <select name="message_template_id" x-model="templateId" @change="pilihTemplate($el.value)"
-                            class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                            class="h-10 w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
                         <option value="">Default — mengikuti aturan modul (Outreach / Follow Up)</option>
                         @foreach ($templates as $tpl)
                             <option value="{{ $tpl->id }}" {{ (string) old('message_template_id', $reminder->message_template_id) === (string) $tpl->id ? 'selected' : '' }}>{{ $tpl->judul }}</option>
@@ -196,7 +196,7 @@ nilaiToken(token) {
                                    x-model="varsKustom[token]"
                                    :readonly="tokenPribadi().includes(token)"
                                    :placeholder="tokenPribadi().includes(token) ? 'otomatis per penerima' : 'kosong = otomatis'"
-                                   class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400">
+                                   class="h-10 w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400">
                         </div>
                     </template>
                 </div>
@@ -274,7 +274,7 @@ nilaiToken(token) {
                 <div>
                     <label class="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Tanggal Kunjungan <span class="text-rose-500">*</span></label>
                     <input type="date" name="tanggal_kunjungan" value="{{ old('tanggal_kunjungan', $reminder->tanggal?->format('Y-m-d')) }}" required
-                           class="w-full max-w-xs rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                           class="h-10 w-full max-w-xs rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
                     @error('tanggal_kunjungan')<p class="mt-1 text-xs text-rose-500">{{ $message }}</p>@enderror
                 </div>
 
@@ -293,9 +293,9 @@ nilaiToken(token) {
                                 </div>
                                 <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                                     <input type="text" name="polis[{{ $reminder->poli_id }}][keluhan]" maxlength="1000" value="{{ old('polis.'.$reminder->poli_id.'.keluhan') }}" placeholder="Keluhan di poli ini (opsional)…"
-                                           class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                                           class="h-10 w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
                                     <input type="text" name="polis[{{ $reminder->poli_id }}][diagnosa]" maxlength="1000" value="{{ old('polis.'.$reminder->poli_id.'.diagnosa') }}" placeholder="Diagnosa di poli ini (opsional)…"
-                                           class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                                           class="h-10 w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
                                 </div>
                             </div>
                         @else
@@ -314,9 +314,9 @@ nilaiToken(token) {
                                 </label>
                                 <div x-show="pilih[{{ $po->id }}]" x-cloak class="mt-2 grid grid-cols-1 gap-3 px-1 sm:grid-cols-2">
                                     <input type="text" name="polis[{{ $po->id }}][keluhan]" maxlength="1000" value="{{ old('polis.'.$po->id.'.keluhan') }}" placeholder="Keluhan di poli ini (opsional)…"
-                                           class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                                           class="h-10 w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
                                     <input type="text" name="polis[{{ $po->id }}][diagnosa]" maxlength="1000" value="{{ old('polis.'.$po->id.'.diagnosa') }}" placeholder="Diagnosa di poli ini (opsional)…"
-                                           class="w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                                           class="h-10 w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
                                 </div>
                             </div>
                         @endforeach

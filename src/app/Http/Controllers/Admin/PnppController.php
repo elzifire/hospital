@@ -150,11 +150,15 @@ class PnppController extends Controller
     /**
      * Halaman riwayat kunjungan untuk satu PNPP (group per tanggal,
      * satu tanggal bisa beberapa poli). User akun poli hanya melihat
-     * catatan polinya sendiri.
+     * catatan polinya sendiri. Mendukung filter rentang tanggal + poli.
      */
-    public function kunjungan(Pnpp $pnpp)
+    public function kunjungan(Request $request, Pnpp $pnpp)
     {
         $poliId = auth()->user()?->poliId();
+
+        $dari = $request->filled('dari') ? $request->date('dari') : null;
+        $sampai = $request->filled('sampai') ? $request->date('sampai') : null;
+        $filterPoli = $request->integer('poli') ?: null;
 
         $pnpp->load([
             'satker',
@@ -163,6 +167,9 @@ class PnppController extends Controller
             'kunjungans' => fn ($q) => $q
                 ->with('poli:id,nama')
                 ->when($poliId, fn ($u) => $u->where('poli_id', $poliId))
+                ->when($filterPoli, fn ($u) => $u->where('poli_id', $filterPoli))
+                ->when($dari, fn ($u) => $u->whereDate('tanggal_kunjungan', '>=', $dari))
+                ->when($sampai, fn ($u) => $u->whereDate('tanggal_kunjungan', '<=', $sampai))
                 ->orderByDesc('tanggal_kunjungan'),
         ]);
 
@@ -173,6 +180,12 @@ class PnppController extends Controller
                 ->orderBy('nama')
                 ->get(['id', 'nama']),
             'poliTerkunci' => $poliId !== null,
+            'batasiPoli' => $poliId !== null,
+            'filters' => [
+                'dari' => $dari?->format('Y-m-d') ?? '',
+                'sampai' => $sampai?->format('Y-m-d') ?? '',
+                'poli' => $filterPoli,
+            ],
         ]);
     }
 

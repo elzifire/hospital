@@ -16,9 +16,11 @@ class Reminder extends Model
     /**
      * Status penjadwalan: selesai/tidak_datang bisa tercatat otomatis
      * (kunjungan tersambung / lewat tanpa kunjungan) maupun manual
-     * (jaga-jaga petugas lupa mencatat kunjungan).
+     * (jaga-jaga petugas lupa mencatat kunjungan). "jadwal_ulang" adalah
+     * status terminasi sebuah jadwal yang diganti jadwal baru (reschedule)
+     * — otomatis tidak dipakai sebagai bahan pesan/saran follow up.
      */
-    public const STATUS = ['terjadwal', 'selesai', 'tidak_datang', 'dibatalkan'];
+    public const STATUS = ['terjadwal', 'selesai', 'tidak_datang', 'dibatalkan', 'jadwal_ulang'];
 
     protected $fillable = [
         'pnpp_id',

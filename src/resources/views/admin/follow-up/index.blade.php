@@ -71,15 +71,40 @@
         @endforeach
     </div>
 
-    {{-- ===== Saran Follow Up (2 tab: belum_hadir & outreach_belum_balas) ===== --}}
-    @if (count($saranBelumHadir) > 0 || count($saranOutreach) > 0)
+    {{-- ===== Saran Follow Up (3 tab: belum_hadir, belum_berkunjung & outreach_belum_balas) ===== --}}
+    @if (count($saranBelumHadir) > 0 || count($saranBelumBerkunjung) > 0 || count($saranOutreach) > 0)
         <div x-data="{ tabSaran: 'belum_hadir' }"
              class="overflow-hidden rounded-2xl border border-amber-200 bg-amber-50/60 shadow-sm">
-            <div class="flex flex-col gap-1 border-b border-amber-100 px-5 py-4">
-                <h3 class="text-sm font-bold text-amber-900">Saran Follow Up</h3>
-                <p class="text-xs text-amber-700">
-                    Pasien yang perlu ditindaklanjuti. Pilih tab lalu “Follow Up Semua” untuk membuka form dengan penerima terpilih.
-                </p>
+            <div class="flex flex-col gap-2 border-b border-amber-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h3 class="text-sm font-bold text-amber-900">Saran Follow Up</h3>
+                    <p class="text-xs text-amber-700">
+                        Pasien yang perlu ditindaklanjuti. Pilih tab lalu “Follow Up Semua” untuk membuka form dengan penerima terpilih.
+                    </p>
+                </div>
+                <form method="GET" action="{{ route('admin.follow-up.index') }}"
+                      class="flex shrink-0 items-center gap-2">
+                    @foreach (['q' => $filters['q'], 'status' => $filters['status'], 'rule' => $filters['rule'], 'tanggal_awal' => $filters['tanggal_awal'], 'tanggal_akhir' => $filters['tanggal_akhir']] as $nama => $nilai)
+                        @if (filled($nilai))
+                            <input type="hidden" name="{{ $nama }}" value="{{ $nilai }}">
+                        @endif
+                    @endforeach
+                    <label for="saran-template" class="text-[11px] font-semibold uppercase tracking-wide text-amber-600">Tampil per template</label>
+                    <select id="saran-template" name="template" onchange="this.form.submit()"
+                            class="rounded-lg border-amber-200 bg-white text-sm shadow-sm focus:border-amber-400 focus:ring-amber-400">
+                        <option value="">Semua template</option>
+                        @foreach ($saranTemplates as $label => $jumlah)
+                            <option value="{{ $label }}" {{ $currentSaranTemplate === $label ? 'selected' : '' }}>{{ $label }} ({{ $jumlah }})</option>
+                        @endforeach
+                    </select>
+                    @if ($currentSaranTemplate !== '')
+                        <a href="{{ route('admin.follow-up.index') }}"
+                           class="rounded-full bg-white px-3 py-1.5 text-[11px] font-bold text-amber-700 ring-1 ring-inset ring-amber-200 transition hover:bg-amber-100">Reset</a>
+                    @endif
+                    <noscript>
+                        <button type="submit" class="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white">Filter</button>
+                    </noscript>
+                </form>
             </div>
 
             <div class="flex flex-wrap items-center gap-2 border-b border-amber-100 bg-white/60 px-5 py-3">
@@ -87,6 +112,11 @@
                         class="rounded-full px-3 py-1 text-[11px] font-bold ring-1 ring-inset transition"
                         :class="tabSaran === 'belum_hadir' ? 'bg-rose-600 text-white ring-rose-600' : 'bg-white text-rose-700 ring-rose-200 hover:bg-rose-50'">
                     Belum Hadir ({{ count($saranBelumHadir) }})
+                </button>
+                <button type="button" @click="tabSaran = 'belum_berkunjung'"
+                        class="rounded-full px-3 py-1 text-[11px] font-bold ring-1 ring-inset transition"
+                        :class="tabSaran === 'belum_berkunjung' ? 'bg-violet-600 text-white ring-violet-600' : 'bg-white text-violet-700 ring-violet-200 hover:bg-violet-50'">
+                    Belum Berkunjung ({{ count($saranBelumBerkunjung) }})
                 </button>
                 <button type="button" @click="tabSaran = 'outreach_belum_balas'"
                         class="rounded-full px-3 py-1 text-[11px] font-bold ring-1 ring-inset transition"
@@ -112,9 +142,35 @@
                             </li>
                         @endforeach
                     </ul>
-                    <a href="{{ route('admin.follow-up.create', ['sasar' => 'belum_hadir']) }}"
+                    <a href="{{ route('admin.follow-up.create', array_filter(['sasar' => 'belum_hadir', 'template' => $currentSaranTemplate], fn ($v) => $v !== '')) }}"
                        class="mt-3 inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-rose-700">
                         Follow Up Semua ({{ count($saranBelumHadir) }})
+                    </a>
+                @else
+                    <p class="text-xs text-amber-700">Tidak ada pasien dalam kategori ini.</p>
+                @endif
+            </div>
+
+            {{-- Tab: belum_berkunjung --}}
+            <div x-show="tabSaran === 'belum_berkunjung'" class="px-5 py-4">
+                @if (count($saranBelumBerkunjung) > 0)
+                    <ul class="divide-y divide-amber-100 rounded-xl border border-amber-200 bg-white">
+                        @foreach ($saranBelumBerkunjung as $s)
+                            @php($p = $s['pnpp'])
+                            <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
+                                <div class="min-w-0 flex-1">
+                                    <p class="truncate text-sm font-semibold text-slate-800">{{ $p->nama }}</p>
+                                    <p class="text-xs text-slate-400">NIP/NRP {{ $p->nip ?? '—' }} · {{ $p->satker?->nama ?? '—' }}</p>
+                                </div>
+                                <span class="rounded-full bg-violet-50 px-2.5 py-0.5 text-[10px] font-bold text-violet-700 ring-1 ring-inset ring-violet-200">
+                                    {{ $s['alasan'][0] ?? 'Jadwal hari ini/mendatang belum berkunjung.' }}
+                                </span>
+                            </li>
+                        @endforeach
+                    </ul>
+                    <a href="{{ route('admin.follow-up.create', array_filter(['sasar' => 'belum_berkunjung', 'template' => $currentSaranTemplate], fn ($v) => $v !== '')) }}"
+                       class="mt-3 inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-violet-700">
+                        Follow Up Semua ({{ count($saranBelumBerkunjung) }})
                     </a>
                 @else
                     <p class="text-xs text-amber-700">Tidak ada pasien dalam kategori ini.</p>
@@ -138,7 +194,7 @@
                             </li>
                         @endforeach
                     </ul>
-                    <a href="{{ route('admin.follow-up.create', ['sasar' => 'outreach_belum_balas']) }}"
+                    <a href="{{ route('admin.follow-up.create', array_filter(['sasar' => 'outreach_belum_balas', 'template' => $currentSaranTemplate], fn ($v) => $v !== '')) }}"
                        class="mt-3 inline-flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-sky-700">
                         Follow Up Semua ({{ count($saranOutreach) }})
                     </a>
@@ -171,10 +227,23 @@
                     @endforeach
                 </select>
             </div>
+            <div>
+                <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Dari Tanggal</label>
+                <input type="date" name="tanggal_awal" value="{{ $filters['tanggal_awal'] }}"
+                       class="rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+            </div>
+            <div>
+                <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Sampai Tanggal</label>
+                <input type="date" name="tanggal_akhir" value="{{ $filters['tanggal_akhir'] }}"
+                       class="rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+            </div>
             <div class="flex gap-2">
                 <button type="submit" class="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700">Filter</button>
                 <a href="{{ route('admin.follow-up.index') }}" class="rounded-lg bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-300">Reset</a>
             </div>
+            @if ($currentSaranTemplate !== '')
+                <input type="hidden" name="template" value="{{ $currentSaranTemplate }}">
+            @endif
         </form>
 
         @if ($logs->isEmpty())

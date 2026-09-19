@@ -17,12 +17,14 @@ class Kunjungan extends Model
         'tanggal_kunjungan',
         'keluhan',
         'diagnosa',
+        'home_visit',
     ];
 
     protected function casts(): array
     {
         return [
             'tanggal_kunjungan' => 'date',
+            'home_visit' => 'boolean',
         ];
     }
 
