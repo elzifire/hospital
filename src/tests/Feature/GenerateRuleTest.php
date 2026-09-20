@@ -249,4 +249,121 @@ class GenerateRuleTest extends TestCase
 
         $this->assertSame('dibatalkan', $log->refresh()->status);
     }
+
+    #[Test]
+    public function filter_rentang_tanggal_menyaring_tabel_dan_kartu_statistik(): void
+    {
+        extract($this->skenario());
+
+        $buat = function (string $nama, string $status, string $tanggal) use ($budi, $template) {
+            $log = MessageLog::create([
+                'jenis' => 'outreach',
+                'rule' => 'manual',
+                'message_template_id' => $template->id,
+                'pnpp_id' => $budi->id,
+                'penerima_nama' => $nama,
+                'penerima_no_hp' => '081234567890',
+                'konten' => 'Halo, jadwal Anda di Poli Umum.',
+                'status' => $status,
+            ]);
+            $log->timestamps = false;
+            $log->created_at = $tanggal.' 08:00:00';
+            $log->save();
+
+            return $log;
+        };
+        $buat('Lama Terkirim', 'terkirim', today()->subDay()->format('Y-m-d'));
+        $buat('Lama Menunggu', 'menunggu', today()->subDay()->format('Y-m-d'));
+        $buat('Hari Ini Terkirim', 'terkirim', today()->format('Y-m-d'));
+
+        // Kartu statistik ikut menghitung total, seluruh rentang.
+        $this->actingAs($this->superadmin())
+            ->get(route('admin.outreach.index'))
+            ->assertOk()
+            ->assertSee('Lama Terkirim')
+            ->assertSee('Lama Menunggu')
+            ->assertSee('Hari Ini Terkirim');
+
+        // Filter hanya hari ini: tabel & kartu menyesuaikan.
+        $this->get(route('admin.outreach.index', [
+            'dari' => today()->format('Y-m-d'),
+            'sampai' => today()->format('Y-m-d'),
+        ]))
+            ->assertOk()
+            ->assertSee('Hari Ini Terkirim')
+            ->assertDontSee('Lama Terkirim')
+            ->assertDontSee('Lama Menunggu');
+    }
+
+    #[Test]
+    public function filter_template_menyaring_tabel_dan_kartu_statistik(): void
+    {
+        extract($this->skenario());
+
+        $templateLain = MessageTemplate::create([
+            'judul' => 'Pengingat Alternatif',
+            'channel' => 'WhatsApp',
+            'konten' => 'Halo {nama}, jangan lupa kontrol.',
+            'is_active' => true,
+        ]);
+
+        $buat = fn (string $nama, string $status, int $templateId) => MessageLog::create([
+            'jenis' => 'outreach',
+            'rule' => 'manual',
+            'message_template_id' => $templateId,
+            'pnpp_id' => $budi->id,
+            'penerima_nama' => $nama,
+            'penerima_no_hp' => '081234567890',
+            'konten' => 'Halo, jadwal Anda di Poli Umum.',
+            'status' => $status,
+        ]);
+        $buat('Pakai Default', 'terkirim', $template->id);
+        $buat('Pakai Alternatif', 'terkirim', $templateLain->id);
+
+        $this->actingAs($this->superadmin())
+            ->get(route('admin.outreach.index'))
+            ->assertOk()
+            ->assertSee('Pakai Default')
+            ->assertSee('Pakai Alternatif');
+
+        // Filter template default: tabel & kartu hanya template terpilih.
+        $this->get(route('admin.outreach.index', ['template' => $template->id]))
+            ->assertOk()
+            ->assertSee('Pakai Default')
+            ->assertDontSee('Pakai Alternatif');
+    }
+
+    #[Test]
+    public function filter_satker_menyaring_tabel_dan_kartu_statistik(): void
+    {
+        extract($this->skenario());
+
+        $satkerLain = Satker::create(['kode' => 'TEST2', 'nama' => 'Satker Kedua']);
+        $siti = Pnpp::create(['nama' => 'Siti dari Satker Kedua', 'nip' => '456', 'satker_id' => $satkerLain->id, 'no_hp' => '081234567891']);
+
+        $buat = fn (string $nama, Pnpp $pasien) => MessageLog::create([
+            'jenis' => 'outreach',
+            'rule' => 'manual',
+            'message_template_id' => $template->id,
+            'pnpp_id' => $pasien->id,
+            'penerima_nama' => $nama,
+            'penerima_no_hp' => $pasien->no_hp,
+            'konten' => 'Halo, jadwal Anda di Poli Umum.',
+            'status' => 'terkirim',
+        ]);
+        $buat('Budi Satker Satu', $budi);
+        $buat('Siti Satker Kedua', $siti);
+
+        $this->actingAs($this->superadmin())
+            ->get(route('admin.outreach.index'))
+            ->assertOk()
+            ->assertSee('Budi Satker Satu')
+            ->assertSee('Siti Satker Kedua');
+
+        // Filter satker: tabel & kartu hanya pesan pasien satker terpilih.
+        $this->get(route('admin.outreach.index', ['satker' => $satkerLain->id]))
+            ->assertOk()
+            ->assertSee('Siti Satker Kedua')
+            ->assertDontSee('Budi Satker Satu');
+    }
 }

@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Admin;
 
 use App\Broadcasting\BroadcastService;
 use App\Models\MessageLog;
+use App\Models\MessageTemplate;
 use App\Models\Pnpp;
 use App\Models\Reminder;
+use App\Models\Satker;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -27,22 +29,36 @@ class OutreachController extends ManualBroadcastController
         $q = (string) $request->query('q', '');
         $status = (string) $request->query('status', '');
         $rule = (string) $request->query('rule', '');
+        $templateId = (string) $request->query('template', '');
+        $satkerId = (string) $request->query('satker', '');
+        $dari = (string) $request->query('dari', '');
+        $sampai = (string) $request->query('sampai', '');
 
-        $logs = MessageLog::query()
+        // Scope bersama: tabel riwayat dan kartu statistik memakai
+        // filter yang sama sehingga kartu ikut berubah.
+        $scope = fn ($query) => $query
             ->jenis('outreach')
-            ->with('template:id,judul', 'reminder.poli:id,nama')
-            ->when($q, fn ($query) => $query->where(
-                fn ($sub) => $sub->where('penerima_nama', 'like', "%{$q}%")
+            ->when($q, fn ($sub) => $sub->where(
+                fn ($inner) => $inner->where('penerima_nama', 'like', "%{$q}%")
                     ->orWhere('penerima_no_hp', 'like', "%{$q}%")
                     ->orWhere('konten', 'like', "%{$q}%")
             ))
-            ->when($status, fn ($query) => $query->where('status', $status))
-            ->when($rule, fn ($query) => $query->where('rule', $rule))
+            ->when($status, fn ($sub) => $sub->where('status', $status))
+            ->when($rule, fn ($sub) => $sub->where('rule', $rule))
+            ->when($templateId, fn ($sub) => $sub->where('message_template_id', $templateId))
+            ->when($satkerId, fn ($sub) => $sub->whereHas('pnpp', fn ($p) => $p->where('satker_id', $satkerId)))
+            ->when($dari, fn ($sub) => $sub->whereDate('created_at', '>=', $dari))
+            ->when($sampai, fn ($sub) => $sub->whereDate('created_at', '<=', $sampai));
+
+        $logs = MessageLog::query()
+            ->tap($scope)
+            ->with('template:id,judul', 'reminder.poli:id,nama')
             ->orderByDesc('id')
             ->paginate(10)
             ->withQueryString();
 
-        $perStatus = MessageLog::jenis('outreach')
+        $perStatus = MessageLog::query()
+            ->tap($scope)
             ->selectRaw('status, count(*) as total')
             ->groupBy('status')
             ->pluck('total', 'status');
@@ -50,9 +66,14 @@ class OutreachController extends ManualBroadcastController
         return view('admin.outreach.index', [
             'logs' => $logs,
             'perStatus' => $perStatus,
-            'penerimaUnik' => MessageLog::jenis('outreach')->distinct()->count('pnpp_id'),
+            'penerimaUnik' => MessageLog::query()->tap($scope)->distinct()->count('pnpp_id'),
             'total' => (int) $perStatus->sum(),
-            'filters' => ['q' => $q, 'status' => $status, 'rule' => $rule],
+            'templates' => MessageTemplate::query()
+                ->whereIn('id', MessageLog::query()->jenis('outreach')->pluck('message_template_id'))
+                ->orderBy('judul')
+                ->get(['id', 'judul']),
+            'satkers' => Satker::orderBy('nama')->get(['id', 'nama']),
+            'filters' => ['q' => $q, 'status' => $status, 'rule' => $rule, 'template' => $templateId, 'satker' => $satkerId, 'dari' => $dari, 'sampai' => $sampai],
         ]);
     }
 

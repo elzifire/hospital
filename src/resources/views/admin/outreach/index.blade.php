@@ -101,6 +101,15 @@
                        class="h-10 w-56 rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
             </div>
             <div>
+                <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Satker</label>
+                <select name="satker" class="h-10 rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                    <option value="">Semua</option>
+                    @foreach ($satkers as $sk)
+                        <option value="{{ $sk->id }}" {{ $filters['satker'] == $sk->id ? 'selected' : '' }}>{{ $sk->nama }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
                 <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Status</label>
                 <select name="status" class="h-10 rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
                     <option value="">Semua</option>
@@ -109,9 +118,28 @@
                     @endforeach
                 </select>
             </div>
+            <div>
+                <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Template</label>
+                <select name="template" class="h-10 rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                    <option value="">Semua</option>
+                    @foreach ($templates as $tpl)
+                        <option value="{{ $tpl->id }}" {{ $filters['template'] == $tpl->id ? 'selected' : '' }}>{{ $tpl->judul }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Dari</label>
+                <input type="date" name="dari" value="{{ $filters['dari'] }}"
+                       class="h-10 rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+            </div>
+            <div>
+                <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Sampai</label>
+                <input type="date" name="sampai" value="{{ $filters['sampai'] }}"
+                       class="h-10 rounded-lg border-slate-300 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+            </div>
             <div class="flex gap-2">
                 <button type="submit" class="h-10 rounded-lg bg-sky-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700">Filter</button>
-                <button type="button" onclick="location.reload()" class="h-10 rounded-lg bg-slate-200 px-4 text-sm font-semibold text-slate-600 shadow-sm transition hover:bg-slate-300">Reset</button>
+                <a href="{{ route('admin.outreach.index') }}" class="inline-flex h-10 items-center rounded-lg bg-slate-200 px-4 text-sm font-semibold text-slate-600 shadow-sm transition hover:bg-slate-300">Reset</a>
             </div>
         </form>
 
