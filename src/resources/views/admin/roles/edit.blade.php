@@ -213,7 +213,7 @@
             originalSelected: @js(old('permissions', $role->permissions->pluck('name')->all())),
             groups: @js($groups->map(fn ($perms, $g) => [
                 'key'   => strtolower($g),
-                'perms' => $perms->pluck('name')->all(),
+                'perms' => collect($perms)->pluck('name')->all(),
             ])->values()),
 
             get isDirty() {

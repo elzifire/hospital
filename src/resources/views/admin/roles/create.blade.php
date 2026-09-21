@@ -202,7 +202,7 @@
             selected: @js(old('permissions', [])),
             groups: @js($groups->map(fn ($perms, $g) => [
                 'key'   => strtolower($g),
-                'perms' => $perms->pluck('name')->all(),
+                'perms' => collect($perms)->pluck('name')->all(),
             ])->values()),
 
             get isDirty() { return this.name !== '' || this.selected.length > 0; },
