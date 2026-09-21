@@ -110,6 +110,7 @@ class BroadcastService
     {
         return Reminder::query()
             ->with('pnpp.satker', 'poli', 'dokter', 'messageTemplate')
+            ->where('home_visit', false)
             ->when($poliId !== null, fn ($query) => $query->where('poli_id', $poliId))
             ->when(
                 $rule === 'tidak_datang',

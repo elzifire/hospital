@@ -44,12 +44,19 @@ class ResponController extends Controller
             'filters' => $filters,
             'queryString' => http_build_query(array_filter($filters, fn ($v) => $v !== '')),
             'signature' => $this->signaturePercakapan($stats, $konversasi),
+            'hasMore' => $konversasi->hasMorePages(),
+            'templates' => MessageTemplate::query()
+                ->where('is_active', true)
+                ->orderBy('judul')
+                ->get(['id', 'judul']),
         ]);
     }
 
     /**
      * Polling JS (tanpa websocket): kembalikan signature + statistik +
      * HTML daftar percakapan. Frontend mengganti isi list bila berubah.
+     * `hasMore` ikut dikirim agar state infinite scroll direset bila
+     * daftar disegarkan.
      */
     public function poll(Request $request)
     {
@@ -61,6 +68,22 @@ class ResponController extends Controller
             'html' => view('admin.respon._chatlist', [
                 'konversasi' => $konversasi,
             ])->render(),
+            'hasMore' => $konversasi->hasMorePages(),
+        ]);
+    }
+
+    /**
+     * Endpoint fragment daftar percakapan untuk infinite scroll: baris
+     * halaman berikutnya (`_chatrows`) + penanda masih ada data.
+     */
+    public function konten(Request $request)
+    {
+        [$konversasi, ,] = $this->daftarKonversasi($request);
+
+        return response()->json([
+            'html' => view('admin.respon._chatrows', ['konversasi' => $konversasi])->render(),
+            'hasMore' => $konversasi->hasMorePages(),
+            'halaman' => $konversasi->currentPage(),
         ]);
     }
 
@@ -78,7 +101,22 @@ class ResponController extends Controller
         $statusBaca = (string) $request->query('status_baca', '');
         // Filter asal kontak: terdaftar / tak terdaftar di tabel PNPP.
         $asal = (string) $request->query('asal', '');
+        // Filter rentang tanggal masuk balasan (dari/sampai).
+        $dari = (string) $request->query('dari', '');
+        $sampai = (string) $request->query('sampai', '');
+        // Filter percakapan yang pernah menerima pesan dari template Meta.
+        $templateId = (string) $request->query('template', '');
         $poliId = $request->user()?->poliId();
+
+        $tanggal = function (string $nilai): ?Carbon {
+            try {
+                return Carbon::parse($nilai);
+            } catch (\Throwable) {
+                return null;
+            }
+        };
+        $dariAtas = ($dari !== '' ? $tanggal($dari) : null)?->startOfDay();
+        $sampaiAtas = ($sampai !== '' ? $tanggal($sampai) : null)?->endOfDay();
 
         $scopePoli = fn ($query) => $query->when(
             $poliId !== null,
@@ -95,6 +133,14 @@ class ResponController extends Controller
                     ->orWhere('no_hp', 'like', "%{$q}%")
                     ->orWhere('isi_pesan', 'like', "%{$q}%")
             ))
+            ->when($dariAtas !== null, fn ($query) => $query->where('waktu_masuk', '>=', $dariAtas))
+            ->when($sampaiAtas !== null, fn ($query) => $query->where('waktu_masuk', '<=', $sampaiAtas))
+            ->when($templateId !== '', function ($query) use ($templateId) {
+                $query->whereIn('no_hp', MessageLog::query()
+                    ->where('message_template_id', $templateId)
+                    ->whereNotNull('message_template_id')
+                    ->select('penerima_no_hp'));
+            })
             ->select('no_hp')
             ->selectRaw('MAX("waktu_masuk") as waktu_terakhir')
             ->selectRaw('COUNT(*) as total_pesan')
@@ -156,7 +202,14 @@ class ResponController extends Controller
             'poliId' => $poliId,
         ];
 
-        return [$konversasi, $stats, ['q' => $q, 'status_baca' => $statusBaca, 'asal' => $asal]];
+        return [$konversasi, $stats, [
+            'q' => $q,
+            'status_baca' => $statusBaca,
+            'asal' => $asal,
+            'dari' => $dari,
+            'sampai' => $sampai,
+            'template' => $templateId,
+        ]];
     }
 
     /**
@@ -367,28 +420,91 @@ class ResponController extends Controller
         MessageReply::tandaiDibaca($noHp);
 
         $pnpp = $this->pnppUntukNomor($noHp);
+        $konteksAkhir = (string) MessageReply::query()
+            ->where('no_hp', $noHp)
+            ->orderByDesc('waktu_masuk')
+            ->value('isi_pesan');
 
         return view('admin.respon.show', [
             'noHp' => $noHp,
             'pnpp' => $pnpp,
             'timeline' => $this->timelineData($noHp),
+            'replis' => $this->replisKontekstual($konteksAkhir),
+            'konteksAkhir' => $konteksAkhir,
         ]);
     }
 
     /**
-     * Kirim balasan langsung ke pasien (teks bebas). Dipanggil frontend
-     * lewat fetch (JSON event) — tanpa websocket; hasil pengiriman sinkron.
+     * Balasan kontekstual: saran balas cepat yang disesuaikan dengan
+     * pesan terakhir pasien. Item yang kata kuncinya cocok dengan
+     * konteks ditandai `kontekstual` agar ditampil lebih dulu; sisanya
+     * tetap tersedia sebagai balasan cepat.
+     *
+     * @return array<int, array{pemicu: array<int, string>, label: string, teks: string, kontekstual: bool}>
+     */
+    protected function replisKontekstual(string $konteks): array
+    {
+        $daftar = [
+            [
+                'pemicu' => ['jadwal', 'kontrol', 'perjanjian', 'pemeriksaan'],
+                'label' => 'Jadwal kontrol',
+                'teks' => 'Baik, jadwal kontrol Bapak/Ibu akan kami siapkan. Silakan datang sesuai jam pada pesan jadwal sebelumnya dan bawa kartu berobat.',
+            ],
+            [
+                'pemicu' => ['poli', 'dokter', 'klinik'],
+                'label' => 'Jadwal poli / dokter',
+                'teks' => 'Jadwal poli dan dokter sudah tertera pada pesan yang kami kirimkan. Bila masih ragu, kami bantu konfirmasikan ke bagian pendaftaran.',
+            ],
+            [
+                'pemicu' => ['sakit', 'keluhan', 'demam', 'nyeri', 'pusing'],
+                'label' => 'Keluhan kesehatan',
+                'teks' => 'Mohon dijaga kesehatannya. Bila keluhan berlanjut atau memberat, segera datang ke instalasi gawat darurat atau poli terdekat.',
+            ],
+            [
+                'pemicu' => ['obat', 'resep'],
+                'label' => 'Info obat / resep',
+                'teks' => 'Untuk informasi obat atau resep, mohon menanyakan langsung ke apotek atau petugas poli agar petunjuk pemakaiannya sesuai kondisi Bapak/Ibu.',
+            ],
+            [
+                'pemicu' => ['hadir', 'datang', 'siap', 'insya'],
+                'label' => 'Konfirmasi kehadiran',
+                'teks' => 'Terima kasih konfirmasinya. Mohon datang 30 menit sebelum jadwal untuk proses administrasi.',
+            ],
+            [
+                'pemicu' => ['daftar', 'pendaftaran', 'antrian', 'registrasi'],
+                'label' => 'Cara pendaftaran',
+                'teks' => 'Pendaftaran dapat dilakukan di loket rumah sakit dengan membawa identitas dan kartu berobat.',
+            ],
+        ];
+
+        $kecil = mb_strtolower($konteks);
+
+        foreach ($daftar as &$item) {
+            $item['kontekstual'] = $kecil !== '' && Str::contains($kecil, $item['pemicu']);
+        }
+
+        return $daftar;
+    }
+
+    /**
+     * Kirim balasan langsung ke pasien: teks bebas, media (image/audio/
+     * video/document), atau pesan interactive CTA-URL. Dipanggil
+     * frontend lewat fetch (JSON event) — tanpa websocket; hasil
+     * pengiriman sinkron.
      */
     public function balas(Request $request, string $nomor)
     {
-        $validated = $request->validate([
-            'isi' => ['required', 'string', 'max:5000'],
-        ]);
-
         $noHp = PhoneFormat::toWa($nomor) ?? $nomor;
         $this->pastikanAksesNomor($request, $noHp);
 
+        $tipe = (string) $request->input('tipe', 'text');
+
+        abort_unless(in_array($tipe, ['text', 'image', 'audio', 'video', 'document', 'interactive'], true), 422);
+        $validated = $request->validate($this->aturanBalasan($tipe));
+
         $pnpp = $this->pnppUntukNomor($noHp);
+
+        [$konten, $metaPayload] = $this->siapkanBalasan($request, $tipe, $validated);
 
         $log = MessageLog::create([
             'jenis' => 'respon',
@@ -397,13 +513,14 @@ class ResponController extends Controller
             'created_by' => $request->user()?->id,
             'penerima_nama' => (string) ($pnpp?->nama ?? 'Nomor Tak Dikenal'),
             'penerima_no_hp' => $noHp,
-            'konten' => $validated['isi'],
+            'konten' => $konten,
             'status' => 'menunggu',
             'provider' => (string) config('whatsapp.driver'),
             // Tanpa meta_template_name → MetaSender mengirim teks bebas
             // (bukan template), aman dari galat parameter template.
             'meta_template_name' => null,
             'template_params' => [],
+            'meta_payload' => $metaPayload,
         ]);
 
         $hasil = app(AntreanKirim::class)->kirimSinkron([$log]);
@@ -420,6 +537,7 @@ class ResponController extends Controller
                     'id' => $log->id,
                     'arah' => 'keluar',
                     'isi' => $log->konten,
+                    'tipe' => $tipe,
                     'status' => $log->status,
                     'waktu' => ($log->sent_at ?? $log->created_at)?->toIso8601String(),
                 ],
@@ -427,6 +545,95 @@ class ResponController extends Controller
         }
 
         return back()->with($ok ? 'success' : 'error', $pesan);
+    }
+
+    /**
+     * Aturan validasi per tipe balasan.
+     *
+     * @return array<string, mixed>
+     */
+    protected function aturanBalasan(string $tipe): array
+    {
+        $file = ['required', 'file', 'max:10240'];
+
+        return match ($tipe) {
+            'text' => ['isi' => ['required', 'string', 'max:5000']],
+            'interactive' => [
+                'isi' => ['required', 'string', 'max:1024'],
+                'cta_url' => ['required', 'url', 'max:2048'],
+                'cta_label' => ['required', 'string', 'max:40'],
+                'cta_header' => ['nullable', 'string', 'max:60'],
+                'cta_footer' => ['nullable', 'string', 'max:60'],
+            ],
+            'image' => [
+                'media' => [...$file, 'mimes:jpeg,jpg,png,webp,gif'],
+                'caption' => ['nullable', 'string', 'max:1000'],
+            ],
+            'audio' => [
+                'media' => [...$file, 'mimes:mp3,m4a,aac,ogg,amr,wav'],
+                'caption' => ['nullable', 'string', 'max:1000'],
+            ],
+            'video' => [
+                'media' => [...$file, 'mimes:mp4,mov,3gp'],
+                'caption' => ['nullable', 'string', 'max:1000'],
+            ],
+            'document' => [
+                'media' => [...$file, 'mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,txt'],
+                'caption' => ['nullable', 'string', 'max:1000'],
+            ],
+            default => [],
+        };
+    }
+
+    /**
+     * Siapkan konten + meta_payload sesuai tipe balasan. Media disimpan
+     * ke storage publik agar bisa di-preview di timeline; saat kirim,
+     * MetaSender mengunggahnya ke WABA dan memakai id hasil upload.
+     *
+     * @param  array<string, mixed>  $validated
+     * @return array{0: string, 1: array<string, mixed>|null}
+     */
+    protected function siapkanBalasan(Request $request, string $tipe, array $validated): array
+    {
+        if ($tipe === 'text') {
+            return [TextSanitizer::win1252((string) $validated['isi']), null];
+        }
+
+        if ($tipe === 'interactive') {
+            $sanitasi = fn ($nilai) => TextSanitizer::win1252(trim((string) ($validated[$nilai] ?? '')));
+
+            return [$sanitasi('isi'), [
+                'kind' => 'interactive',
+                'tipe' => 'cta_url',
+                'body' => $sanitasi('isi'),
+                'url' => trim((string) $validated['cta_url']),
+                'label' => $sanitasi('cta_label'),
+                'header' => $sanitasi('cta_header'),
+                'footer' => $sanitasi('cta_footer'),
+            ]];
+        }
+
+        $file = $request->file('media');
+        $nama = (string) Str::random(24).'.'.($file->getClientOriginalExtension() ?: $file->extension());
+        $path = $file->storeAs('respon-media', $nama, 'public');
+
+        if ($path === false) {
+            abort(422, 'Media gagal disimpan.');
+        }
+
+        $caption = TextSanitizer::win1252(trim((string) ($validated['caption'] ?? '')));
+
+        return [
+            $caption !== '' ? $caption : '['.$tipe.']',
+            [
+                'kind' => 'media',
+                'tipe' => $tipe,
+                'nama' => (string) $file->getClientOriginalName(),
+                'mime' => (string) ($file->getMimeType() ?? 'application/octet-stream'),
+                'path' => (string) $path,
+                'caption' => $caption,
+            ],
+        ];
     }
 
     /**
@@ -452,7 +659,7 @@ class ResponController extends Controller
     }
 
     /**
-     * @return Collection<int, array{arah: string, isi: string, waktu: Carbon, status?: string, jenis?: string, nama?: string}>
+     * @return Collection<int, array{arah: string, isi: string, waktu: Carbon, status?: string, jenis?: string, nama?: string, meta_payload?: array<string, mixed>|null, media_kind?: string|null}>
      */
     protected function timelineData(string $noHp): Collection
     {
@@ -466,6 +673,7 @@ class ResponController extends Controller
                 'waktu' => $log->sent_at ?? $log->created_at,
                 'status' => $log->status,
                 'jenis' => $log->jenis,
+                'meta_payload' => $log->meta_payload,
             ]);
 
         $masuk = MessageReply::query()
@@ -477,12 +685,25 @@ class ResponController extends Controller
                 'isi' => $b->isi_pesan,
                 'waktu' => $b->waktu_masuk,
                 'nama' => $b->nama,
+                'media_kind' => $this->tipeMediaMasuk($b),
             ]);
 
         return $keluar->toBase()
             ->merge($masuk->toBase())
             ->sortBy(fn ($item) => $item['waktu']?->getTimestamp() ?? 0)
             ->values();
+    }
+
+    /**
+     * Jenis media balasan masuk (image/audio/video/document/sticker) dari
+     * payload mentah webhook — dipakai render ikon lampiran di timeline.
+     */
+    protected function tipeMediaMasuk(MessageReply $balasan): ?string
+    {
+        $pesan = (array) ($balasan->payload['pesan'] ?? []);
+        $tipe = (string) ($pesan['type'] ?? 'text');
+
+        return in_array($tipe, ['image', 'audio', 'video', 'document', 'sticker'], true) ? $tipe : null;
     }
 
     protected function pnppUntukNomor(string $noHp): ?Pnpp

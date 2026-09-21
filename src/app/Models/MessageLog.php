@@ -56,6 +56,7 @@ class MessageLog extends Model
         'meta_template_name',
         'meta_language',
         'template_params',
+        'meta_payload',
     ];
 
     protected function casts(): array
@@ -64,6 +65,7 @@ class MessageLog extends Model
             'sent_at' => 'datetime',
             'kirim_pada' => 'datetime',
             'template_params' => 'array',
+            'meta_payload' => 'array',
         ];
     }
 

@@ -31,6 +31,7 @@ class KunjunganDaftar
         $dari = (string) $request->query('dari', '');
         $sampai = (string) $request->query('sampai', '');
         $periode = (string) $request->query('periode', '');
+        $home = (string) $request->query('home', '');
         $mulai = match ($periode) {
             'hari-ini' => today()->toDateString(),
             '7-hari' => today()->subDays(6)->toDateString(),
@@ -91,8 +92,18 @@ class KunjunganDaftar
         // ---- Gabung, urutkan by tanggal menurun, lalu paginate ----
         $semua = $reminders->concat($grupManual)
             ->sortByDesc(fn ($baris) => $baris['tanggal']?->timestamp ?? 0)
-            ->values()
-            ->all();
+            ->values();
+
+        // Filter home visit: '1' → hanya home visit, '0' → kunjungan RS,
+        // kosong (nilai default) → semuanya.
+        if ($home === '1' || $home === '0') {
+            $cariHome = $home === '1';
+            $semua = $semua->filter(
+                fn ($baris) => ((bool) ($baris['homeVisit'] ?? false)) === $cariHome,
+            );
+        }
+
+        $semua = $semua->all();
 
         $perPage = 10;
         $halaman = max(1, (int) $request->query('page', 1));
@@ -124,7 +135,7 @@ class KunjunganDaftar
             'manual' => $grupManual->count(),
             'polis' => $this->daftarPoliAktif($batasiPoli, $poliAktif),
             'batasiPoli' => $batasiPoli,
-            'filters' => ['q' => $q, 'status' => $status, 'poli' => $poliId, 'dari' => $dari, 'sampai' => $sampai, 'periode' => $periode],
+            'filters' => ['q' => $q, 'status' => $status, 'poli' => $poliId, 'dari' => $dari, 'sampai' => $sampai, 'periode' => $periode, 'home' => $home],
         ];
     }
 

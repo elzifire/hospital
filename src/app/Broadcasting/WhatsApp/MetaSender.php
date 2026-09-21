@@ -6,7 +6,9 @@ use App\Models\MessageLog;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use RuntimeException;
 
 /**
  * Pengirim WhatsApp official (Meta Cloud API). Pesan inisiasi bisnis
@@ -41,9 +43,15 @@ class MetaSender implements WhatsAppSender
             'konten' => (string) $log->konten,
             'meta_template_name' => (string) $log->meta_template_name,
             'template_params' => (array) ($log->template_params ?? []),
+            'meta_payload' => (array) ($log->meta_payload ?? []),
             'payload' => $payload,
         ]);
 
+        return $this->post($config, $payload);
+    }
+
+    protected function post(array $config, array $payload): HasilKirim
+    {
         $respons = Http::withToken((string) $config['token'])
             ->timeout((int) ($config['timeout'] ?? 15))
             ->acceptJson()
@@ -61,6 +69,18 @@ class MetaSender implements WhatsAppSender
      */
     protected function payload(MessageLog $log): array
     {
+        $metaPayload = (array) ($log->meta_payload ?? []);
+
+        // Balasan media / interactive CTA-URL dari modul Respon (berlaku
+        // dalam sesi 24 jam setelah balasan masuk).
+        if (($metaPayload['kind'] ?? '') === 'media') {
+            return $this->payloadMedia($log, $metaPayload);
+        }
+
+        if (($metaPayload['kind'] ?? '') === 'interactive') {
+            return $this->payloadInteraktif($log, $metaPayload);
+        }
+
         $config = (array) config('whatsapp.meta');
 
         // Balasan langsung (modul Respon) dikirim sebagai teks bebas —
@@ -147,6 +167,104 @@ class MetaSender implements WhatsAppSender
         }
 
         return $payload;
+    }
+
+    /**
+     * Payload pesan media (image/audio/video/document) dari modul Respon.
+     * Berkas disimpan di storage lokal lalu diunggah ke WABA saat kirim;
+     * kegagalan unggah (atau berkas hilang) dilempar supaya AntreanKirim
+     * mencatat pesan sebagai gagal dengan alasan yang bisa dibaca.
+     *
+     * @param  array<string, mixed>  $meta
+     * @return array<string, mixed>
+     */
+    protected function payloadMedia(MessageLog $log, array $meta): array
+    {
+        $tipe = in_array((string) ($meta['tipe'] ?? ''), ['image', 'audio', 'video', 'document'], true)
+            ? (string) $meta['tipe']
+            : 'image';
+
+        $path = (string) ($meta['path'] ?? '');
+        $berkas = $path !== '' ? Storage::disk('public')->get($path) : null;
+
+        if (blank($berkas)) {
+            throw new RuntimeException('Berkas media tidak ditemukan di storage ('.$path.').');
+        }
+
+        $mediaId = $this->media->unggahBerkas(
+            (string) $berkas,
+            (string) ($meta['nama'] ?? 'media'),
+            (string) ($meta['mime'] ?? 'application/octet-stream'),
+        );
+
+        if (blank($mediaId)) {
+            throw new RuntimeException('Gagal mengunggah media ke WhatsApp (Media Upload API).');
+        }
+
+        $caption = trim((string) ($meta['caption'] ?? ''));
+        $payload = [
+            'messaging_product' => 'whatsapp',
+            'recipient_type' => 'individual',
+            'to' => $log->penerima_no_hp,
+            'type' => $tipe,
+            $tipe => ['id' => $mediaId],
+        ];
+
+        if ($tipe === 'image' || $tipe === 'video') {
+            if ($caption !== '') {
+                $payload[$tipe]['caption'] = $caption;
+            }
+        } elseif ($tipe === 'document') {
+            $payload[$tipe]['filename'] = (string) ($meta['nama'] ?? 'berkas');
+            if ($caption !== '') {
+                $payload[$tipe]['caption'] = $caption;
+            }
+        }
+
+        return $payload;
+    }
+
+    /**
+     * Payload pesan interactive tipe CTA-URL. Header & footer opsional;
+     * panjang text dibatasi sesuai ketentuan WhatsApp (header 60, body
+     * 1024, footer 60) dan URL harus terdaftar di WABA.
+     *
+     * @param  array<string, mixed>  $meta
+     * @return array<string, mixed>
+     */
+    protected function payloadInteraktif(MessageLog $log, array $meta): array
+    {
+        $interactive = [
+            'type' => 'cta_url',
+            'body' => [
+                'text' => mb_substr((string) ($meta['body'] ?? ''), 0, 1024),
+            ],
+            'action' => [
+                'name' => 'cta_url',
+                'parameters' => [
+                    'display_text' => mb_substr((string) ($meta['label'] ?? 'Buka'), 0, 40),
+                    'url' => (string) ($meta['url'] ?? ''),
+                ],
+            ],
+        ];
+
+        $header = trim((string) ($meta['header'] ?? ''));
+        if ($header !== '') {
+            $interactive['header'] = ['type' => 'text', 'text' => mb_substr($header, 0, 60)];
+        }
+
+        $footer = trim((string) ($meta['footer'] ?? ''));
+        if ($footer !== '') {
+            $interactive['footer'] = ['text' => mb_substr($footer, 0, 60)];
+        }
+
+        return [
+            'messaging_product' => 'whatsapp',
+            'recipient_type' => 'individual',
+            'to' => $log->penerima_no_hp,
+            'type' => 'interactive',
+            'interactive' => $interactive,
+        ];
     }
 
     /**

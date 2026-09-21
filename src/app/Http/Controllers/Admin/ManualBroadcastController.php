@@ -6,8 +6,8 @@ use App\Broadcasting\BroadcastService;
 use App\Broadcasting\MessageRenderer;
 use App\Broadcasting\PesanFactory;
 use App\Broadcasting\PhoneFormat;
-use App\Broadcasting\WhatsApp\AntreanKirim;
 use App\Http\Controllers\Controller;
+use App\Jobs\KirimPesanJob;
 use App\Models\MessageLog;
 use App\Models\MessageTemplate;
 use App\Models\Pnpp;
@@ -201,19 +201,25 @@ abstract class ManualBroadcastController extends Controller
                 );
         }
 
-        $hasil = $menunggu->isEmpty()
-            ? ['terkirim' => 0, 'gagal' => 0, 'dilewati' => 0]
-            : app(AntreanKirim::class)->kirimSinkron($menunggu->all());
+        // Kirim sekarang menjadi async: pesan langsung diantrekan lewat
+        // queue dan dikirim worker di background — form cepat kembali walau
+        // banyak penerima, tanpa timeout di sisi frontend.
+        $diantrekan = 0;
+        foreach ($menunggu as $log) {
+            KirimPesanJob::dispatch($log->id);
+            $diantrekan++;
+        }
 
         $pesan = implode(' ', array_filter([
-            ($hasil['terkirim'] ?? 0) > 0 ? 'Pesan terkirim ke '.$hasil['terkirim'].' pasien.' : null,
-            ($hasil['gagal'] ?? 0) > 0 ? 'Pesan gagal terkirim untuk '.$hasil['gagal'].' pasien: '.($logs->first(fn ($l) => $l->status === 'gagal')?->error ?? 'kendala di sisi WhatsApp.').' ' : '',
+            $diantrekan > 0
+                ? 'Pesan untuk '.$diantrekan.' pasien masuk antrean pengiriman dan akan dikirim otomatis sesaat lagi.'
+                : null,
             $tambahan,
         ]));
 
         return redirect()
             ->route($tujuan)
-            ->with(($hasil['terkirim'] ?? 0) > 0 ? 'success' : 'error', $pesan ?: 'Tidak ada pesan yang perlu dikirim.');
+            ->with($diantrekan > 0 ? 'success' : 'error', $pesan ?: 'Tidak ada pesan yang perlu dikirim.');
     }
 
     /**
@@ -445,9 +451,12 @@ abstract class ManualBroadcastController extends Controller
                 // terjadwal; filter tanggal mempersempit ke jadwal tanggal
                 // itu. Mode "semua" melewati pembatasan ini.
                 if (! $tampilkanSemua) {
-                    $query->whereHas('reminders', fn ($jadwal) => $jadwal
-                        ->where('status', 'terjadwal')
-                        ->when($tanggal !== '', fn ($sub) => $sub->whereDate('tanggal', $tanggal)));
+                    $query->whereHas('reminders', function ($jadwal) use ($tanggal) {
+                        ($this->saringTargetJadwal())(
+                            $jadwal->where('status', 'terjadwal')
+                                ->when($tanggal !== '', fn ($sub) => $sub->whereDate('tanggal', $tanggal)),
+                        );
+                    });
                 }
 
                 // Target yang sudah dipilih TETAP tampil walau tidak cocok
@@ -489,6 +498,16 @@ abstract class ManualBroadcastController extends Controller
     protected function saringBelumBalas(Collection $pnpps, array $wajibTampil): Collection
     {
         return $pnpps;
+    }
+
+    /**
+     * Batasan atas query jadwal calon penerima di daftar target manual.
+     * Bawaan: tanpa pembatasan. Follow Up memakainya untuk menyisihkan
+     * jadwal Home Visit (kunjungan home visit tidak masuk follow up).
+     */
+    protected function saringTargetJadwal(): \Closure
+    {
+        return fn ($query) => $query;
     }
 
     /**

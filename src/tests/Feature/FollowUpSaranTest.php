@@ -46,12 +46,12 @@ class FollowUpSaranTest extends TestCase
         ], $attrs));
     }
 
-    protected function buatReminder(Pnpp $pnpp, ?string $tanggal = null, string $status = 'terjadwal', ?int $templateId = null): Reminder
+    protected function buatReminder(Pnpp $pnpp, ?string $tanggal = null, string $status = 'terjadwal', ?int $templateId = null, array $ekstra = []): Reminder
     {
         $poli = Poli::create(['kode' => 'POL-'.str()->random(4), 'nama' => 'Poli Umum']);
         $dokter = Dokter::create(['poli_id' => $poli->id, 'nama' => 'dr. Umum']);
 
-        return Reminder::create([
+        return Reminder::create(array_merge([
             'pnpp_id' => $pnpp->id,
             'poli_id' => $poli->id,
             'dokter_id' => $dokter->id,
@@ -59,7 +59,7 @@ class FollowUpSaranTest extends TestCase
             'jam' => now()->format('H:i'),
             'status' => $status,
             'message_template_id' => $templateId,
-        ]);
+        ], $ekstra));
     }
 
     protected function buatTemplate(?int $categoryId = null): MessageTemplate
@@ -492,5 +492,69 @@ class FollowUpSaranTest extends TestCase
         $data = $this->ambilDataAlpine($html);
         $this->assertSame([(int) $pasienA->id], $data['selected']);
         $this->assertNotContains((int) $pasienB->id, $data['selected']);
+    }
+
+    #[Test]
+    public function home_visit_tidak_masuk_saran_follow_up(): void
+    {
+        $rs = $this->buatPnpp();
+        $this->buatReminder($rs, now()->subDays(2)->format('Y-m-d'), 'tidak_datang');
+
+        $rsBerkunjung = $this->buatPnpp(['nama' => 'Gun Gun RS', 'no_hp' => '081244433322']);
+        $this->buatReminder($rsBerkunjung, now()->format('Y-m-d'));
+
+        $homeHadir = $this->buatPnpp(['nama' => 'Euis Home', 'no_hp' => '081266655544']);
+        $this->buatReminder($homeHadir, now()->subDays(2)->format('Y-m-d'), 'tidak_datang', null, [
+            'home_visit' => true,
+            'poli_id' => null,
+        ]);
+
+        $homeBerkunjung = $this->buatPnpp(['nama' => 'Fahmi Home', 'no_hp' => '081277788866']);
+        $this->buatReminder($homeBerkunjung, now()->format('Y-m-d'), 'terjadwal', null, [
+            'home_visit' => true,
+            'poli_id' => null,
+        ]);
+
+        $html = $this->actingAs($this->superadmin())
+            ->get(route('admin.follow-up.create'))
+            ->assertOk()
+            ->getContent();
+
+        // Hanya jadwal kunjungan RS yang disaran; home visit dikecualikan.
+        $this->assertStringContainsString('Budi Santoso', $html);
+        $this->assertStringContainsString('Gun Gun RS', $html);
+        $this->assertStringNotContainsString('Euis Home', $html);
+        $this->assertStringNotContainsString('Fahmi Home', $html);
+
+        $data = $this->ambilDataAlpine($html);
+        $this->assertCount(2, $data['saran']);
+        $this->assertNotContains((int) $homeHadir->id, $data['saran']);
+        $this->assertNotContains((int) $homeBerkunjung->id, $data['saran']);
+
+        // Daftar penerima manual juga tidak memuat jadwal home visit.
+        $this->assertContains((int) $rsBerkunjung->id, $data['allIds']);
+        $this->assertNotContains((int) $homeBerkunjung->id, $data['allIds']);
+    }
+
+    #[Test]
+    public function saran_index_mengecualikan_home_visit_dari_tab_belum_hadir(): void
+    {
+        $this->buatReminder($this->buatPnpp(), now()->subDays(2)->format('Y-m-d'), 'tidak_datang');
+        $this->buatReminder(
+            $this->buatPnpp(['nama' => 'Hendra Home', 'no_hp' => '081299900011']),
+            now()->subDays(2)->format('Y-m-d'),
+            'tidak_datang',
+            null,
+            ['home_visit' => true, 'poli_id' => null],
+        );
+
+        $html = $this->actingAs($this->superadmin())
+            ->get(route('admin.follow-up.index'))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertStringNotContainsString('Hendra Home', $html);
+        $this->assertStringContainsString('Budi Santoso', $html);
+        $this->assertStringContainsString('Belum Hadir (1)', $html);
     }
 }

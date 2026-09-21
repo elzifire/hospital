@@ -55,8 +55,10 @@ Route::middleware('guest')->group(function () {
     Route::post('/login', [AuthController::class, 'login']);
 
     // Pendaftaran PNPP publik — bisa diakses tanpa login.
-    Route::get('register-pnpp', [RegisterPnppController::class, 'create'])->name('register-pnpp.create');
-    Route::post('register-pnpp', [RegisterPnppController::class, 'store'])->name('register-pnpp.store');
+    // Throttle mencegah spam/bot: menampilkan form & mengirim pendaftaran
+    // dibatasi per IP. 429 akan dikembalikan otomatis bila terlewati.
+    Route::get('register-pnpp', [RegisterPnppController::class, 'create'])->name('register-pnpp.create')->middleware('throttle:60,1');
+    Route::post('register-pnpp', [RegisterPnppController::class, 'store'])->name('register-pnpp.store')->middleware('throttle:20,1');
 });
 
 // Webhook WhatsApp lama (WAHA) dihapus — fokus pengiriman pesan.
@@ -151,6 +153,7 @@ Route::middleware('auth')->group(function () {
             Route::get('respon/import', [ResponController::class, 'indexImport'])->name('respon.import');
             Route::get('respon', [ResponController::class, 'index'])->name('respon.index');
             Route::get('respon/poll', [ResponController::class, 'poll'])->name('respon.poll');
+            Route::get('respon/konten', [ResponController::class, 'konten'])->name('respon.konten');
             Route::get('respon/pesan-manual', [ResponController::class, 'pesanManual'])->name('respon.pesan-manual');
             Route::post('respon/pesan-manual', [ResponController::class, 'kirimPesanManual'])->name('respon.pesan-manual-kirim');
             Route::get('respon/{nomor}', [ResponController::class, 'show'])->name('respon.show');
@@ -203,7 +206,9 @@ Route::middleware('auth')->group(function () {
             Route::put('kategori/{kategori}', [TemplateCategoryController::class, 'update'])->name('kategori.update');
             Route::delete('kategori/{kategori}', [TemplateCategoryController::class, 'destroy'])->name('kategori.destroy');
 
-            // CRUD Template Pesan — dikelola hanya via sinkronisasi Meta.
+            // CRUD Template Pesan — pendaftaran lewat sistem, sinkron dengan Meta.
+            Route::get('template/create', [MessageTemplateController::class, 'create'])->name('template.create');
+            Route::post('template', [MessageTemplateController::class, 'store'])->name('template.store');
             Route::get('template/{template}/edit', [MessageTemplateController::class, 'edit'])->name('template.edit');
             Route::delete('template/{template}', [MessageTemplateController::class, 'destroy'])->name('template.destroy');
             Route::put('template/{template}', [MessageTemplateController::class, 'update'])->name('template.update');

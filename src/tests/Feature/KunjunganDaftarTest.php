@@ -225,6 +225,48 @@ class KunjunganDaftarTest extends TestCase
     }
 
     #[Test]
+    public function filter_home_visit_di_digital_reminder_default_semua(): void
+    {
+        extract($this->pasangan());
+
+        $caca = Pnpp::create(['nama' => 'Caca Home Visit', 'nip' => '9006', 'satker_id' => $satker->id]);
+
+        Reminder::create([
+            'pnpp_id' => $budi->id,
+            'poli_id' => $poliA->id,
+            'tanggal' => today()->format('Y-m-d'),
+            'jam' => '08:00',
+            'status' => 'terjadwal',
+            'home_visit' => false,
+        ]);
+        Reminder::create([
+            'pnpp_id' => $caca->id,
+            'poli_id' => null,
+            'tanggal' => today()->format('Y-m-d'),
+            'jam' => '09:00',
+            'status' => 'terjadwal',
+            'home_visit' => true,
+        ]);
+
+        $this->actingAs($this->superadmin());
+
+        // Nilai default "Semua" menampilkan keduanya.
+        $this->get(route('admin.digital-reminder.index'))
+            ->assertSee('Budi Santoso')
+            ->assertSee('Caca Home Visit');
+
+        // home=1 → hanya Home Visit.
+        $this->get(route('admin.digital-reminder.index', ['home' => '1']))
+            ->assertSee('Caca Home Visit')
+            ->assertDontSee('Budi Santoso');
+
+        // home=0 → hanya Kunjungan RS.
+        $this->get(route('admin.digital-reminder.index', ['home' => '0']))
+            ->assertSee('Budi Santoso')
+            ->assertDontSee('Caca Home Visit');
+    }
+
+    #[Test]
     public function akun_poli_hanya_bisa_mencatat_dari_jadwal_polinya_sendiri(): void
     {
         extract($this->pasangan());

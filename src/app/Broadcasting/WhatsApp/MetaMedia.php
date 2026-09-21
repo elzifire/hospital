@@ -62,18 +62,25 @@ class MetaMedia
     }
 
     /**
+     * Unggah byte mentah media chat (balasan Respon) ke WABA; kembalikan
+     * media id, atau null bila gagal. Berbeda dari header template, media
+     * obrolan menerima juga audio/video/document sehingga MIME tidak
+     * dibatasi ke image.
+     */
+    public function unggahBerkas(string $bytes, string $nama, string $mime): ?string
+    {
+        return $this->unggahBytes($bytes, $nama, $mime);
+    }
+
+    /**
      * Unduh gambar dari image_url lalu unggah ke WABA; kembalikan media
      * id dari respons Meta, atau null bila gagal.
      */
     protected function unggah(string $url): ?string
     {
         $config = (array) config('whatsapp.meta');
-        $base = rtrim((string) ($config['base_url'] ?? 'https://graph.facebook.com'), '/');
-        $version = (string) ($config['version'] ?? 'v25.0');
-        $phone = (string) ($config['phone_number_id'] ?? '');
-        $token = (string) ($config['token'] ?? '');
 
-        if ($phone === '' || $token === '') {
+        if ($this->konfigurasiBelumSiap($config)) {
             Log::channel('whatsapp')->warning('MetaMedia: token / phone_number_id belum dikonfigurasi.', ['url' => $url]);
 
             return null;
@@ -97,6 +104,28 @@ class MetaMedia
         }
 
         $nama = basename((string) parse_url($url, PHP_URL_PATH)) ?: 'sampul';
+
+        return $this->unggahBytes($bytes, $nama, $mime, $config);
+    }
+
+    /**
+     * Post media ke endpoint WABA via Media Upload API.
+     */
+    protected function unggahBytes(string $bytes, string $nama, string $mime, ?array $config = null): ?string
+    {
+        $config ??= (array) config('whatsapp.meta');
+
+        if ($this->konfigurasiBelumSiap($config)) {
+            Log::channel('whatsapp')->warning('MetaMedia: token / phone_number_id belum dikonfigurasi.', ['nama' => $nama]);
+
+            return null;
+        }
+
+        $base = rtrim((string) ($config['base_url'] ?? 'https://graph.facebook.com'), '/');
+        $version = (string) ($config['version'] ?? 'v25.0');
+        $phone = (string) ($config['phone_number_id'] ?? '');
+        $token = (string) ($config['token'] ?? '');
+
         $respon = Http::asMultipart()
             ->withToken($token)
             ->timeout((int) ($config['timeout'] ?? 20))
@@ -107,7 +136,7 @@ class MetaMedia
 
         if ($respon->failed()) {
             Log::channel('whatsapp')->warning('MetaMedia: upload media ditolak Meta.', [
-                'url' => $url,
+                'nama' => $nama,
                 'status' => $respon->status(),
                 'body' => Str::limit((string) $respon->body(), 1000),
             ]);
@@ -119,7 +148,7 @@ class MetaMedia
 
         if (! is_string($mediaId) || $mediaId === '') {
             Log::channel('whatsapp')->warning('MetaMedia: respons upload tanpa media id.', [
-                'url' => $url,
+                'nama' => $nama,
                 'body' => Str::limit((string) $respon->body(), 1000),
             ]);
 
@@ -127,6 +156,12 @@ class MetaMedia
         }
 
         return $mediaId;
+    }
+
+    protected function konfigurasiBelumSiap(array $config): bool
+    {
+        return (string) ($config['phone_number_id'] ?? '') === ''
+            || (string) ($config['token'] ?? '') === '';
     }
 
     /**

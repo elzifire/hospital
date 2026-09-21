@@ -152,6 +152,7 @@ class FollowUpController extends ManualBroadcastController
     {
         $jadwal = Reminder::query()
             ->with('pnpp.satker:id,nama', 'poli:id,nama', 'messageTemplate:id,judul')
+            ->where('home_visit', false)
             ->where(function ($query) {
                 $query->where('status', 'tidak_datang')
                     ->orWhere(function ($terlambat) {
@@ -201,6 +202,7 @@ class FollowUpController extends ManualBroadcastController
 
         $jadwal = Reminder::query()
             ->with('pnpp.satker:id,nama', 'poli:id,nama', 'messageTemplate:id,judul')
+            ->where('home_visit', false)
             ->where('status', 'terjadwal')
             ->whereDate('tanggal', '>=', today()->toDateString())
             ->whereDoesntHave('kunjungan')
@@ -467,6 +469,14 @@ class FollowUpController extends ManualBroadcastController
     protected function jenisManual(): string
     {
         return 'follow_up';
+    }
+
+    /**
+     * Jadwal Home Visit tidak termasuk calon penerima follow up manual.
+     */
+    protected function saringTargetJadwal(): \Closure
+    {
+        return fn ($query) => $query->where('home_visit', false);
     }
 
     protected function kategoriManual(): ?string

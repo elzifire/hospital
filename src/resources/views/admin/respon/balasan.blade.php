@@ -44,8 +44,10 @@
     <div class="space-y-6"
          x-data="balasanLive({
              endpoint: @js(route('admin.respon.poll')),
+             endpointKonten: @js(route('admin.respon.konten')),
              signature: @js($signature ?? ''),
              query: @js($queryString ?? ''),
+             hasMore: @js($hasMore ?? false),
          })"
          x-init="init()">
 
@@ -109,9 +111,28 @@
                         <option value="tak_terdaftar" {{ $filters['asal'] === 'tak_terdaftar' ? 'selected' : '' }}>Tak terdaftar</option>
                     </select>
                 </div>
+                <div>
+                    <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Dari tanggal</label>
+                    <input type="date" name="dari" value="{{ $filters['dari'] }}"
+                           class="h-10 rounded-lg border-slate-300 text-sm shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                </div>
+                <div>
+                    <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Sampai tanggal</label>
+                    <input type="date" name="sampai" value="{{ $filters['sampai'] }}"
+                           class="h-10 rounded-lg border-slate-300 text-sm shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                </div>
+                <div>
+                    <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-slate-400">Template terkirim</label>
+                    <select name="template" class="h-10 rounded-lg border-slate-300 text-sm shadow-sm focus:border-emerald-500 focus:ring-emerald-500">
+                        <option value="">Semua</option>
+                        @foreach ($templates as $tpl)
+                            <option value="{{ $tpl->id }}" {{ $filters['template'] === (string) $tpl->id ? 'selected' : '' }}>{{ $tpl->judul }}</option>
+                        @endforeach
+                    </select>
+                </div>
                 <div class="flex gap-2">
                     <button type="submit" class="h-10 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700">Terapkan</button>
-                    @if (filled($filters['q']) || filled($filters['status_baca']) || filled($filters['asal']))
+                    @if (collect($filters)->filter(fn ($v) => $v !== '')->isNotEmpty())
                         <a href="{{ route('admin.respon.index') }}" class="h-10 rounded-lg bg-slate-200 px-4 text-sm font-semibold text-slate-600 transition hover:bg-slate-300">Reset</a>
                     @endif
                 </div>
@@ -138,14 +159,24 @@
     document.addEventListener('alpine:init', () => {
         Alpine.data('balasanLive', (config) => ({
             endpoint: config.endpoint,
+            endpointKonten: config.endpointKonten,
             signature: config.signature,
             query: config.query,
             aktif: false,
             notif: 0,
             timer: null,
+            notifTimer: null,
+            observer: null,
+            halaman: 1,
+            hasMore: Boolean(config.hasMore),
+            sibuk: false,
+            prasimpan: {},
 
             init() {
-                this.$nextTick(() => this.cek());
+                this.$nextTick(() => {
+                    this.cek();
+                    this.pasangObserver();
+                });
                 this.mulai();
                 document.addEventListener('visibilitychange', () => {
                     if (document.hidden) {
@@ -189,6 +220,7 @@
 
                     const panel = document.getElementById('chat-list-section');
                     if (panel) panel.innerHTML = data.html;
+                    this.aturPagination(data);
 
                     const sekarang = Number(data.stats.belumDibaca) || 0;
                     if (sekarang > sebelum) {
@@ -199,6 +231,135 @@
                 } catch (e) {
                     // Abaikan — polling diulang berikutnya.
                 }
+            },
+
+            aturPagination(data) {
+                this.halaman = 1;
+                this.prasimpan = {};
+                this.sibuk = false;
+                this.hasMore = typeof data.hasMore === 'boolean' ? data.hasMore : (document.getElementById('muat-lagi') !== null);
+                this.pasangObserver();
+            },
+
+            pasangObserver() {
+                this.lepasObserver();
+                if (!this.hasMore) return;
+
+                const sentinel = document.getElementById('muat-lagi');
+                if (!sentinel) {
+                    this.hasMore = false;
+                    return;
+                }
+
+                this.observer = new IntersectionObserver((entri) => {
+                    if (entri.some((e) => e.isIntersecting)) {
+                        this.muat();
+                    }
+                }, { rootMargin: '240px 0px' });
+                this.observer.observe(sentinel);
+            },
+
+            lepasObserver() {
+                if (this.observer) {
+                    this.observer.disconnect();
+                    this.observer = null;
+                }
+            },
+
+            async muat() {
+                if (this.sibuk || !this.hasMore) return;
+
+                const berikut = this.halaman + 1;
+                if (this.prasimpan[berikut] !== undefined) {
+                    this.sisipkan(this.prasimpan[berikut]);
+                    delete this.prasimpan[berikut];
+                    this.halaman = berikut;
+                    if (this.prasimpan[berikut + 1] === undefined) {
+                        this.prefetch(berikut + 1);
+                    }
+                    return;
+                }
+
+                this.sibuk = true;
+                this.tampilPemuat();
+
+                try {
+                    const resp = await fetch(this.urlHalaman(berikut), {
+                        headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+                    });
+                    if (!resp.ok) return;
+
+                    const data = await resp.json();
+                    this.sisipkan(data.html);
+                    this.halaman = berikut;
+                    this.hasMore = Boolean(data.hasMore);
+                    if (!this.hasMore) {
+                        this.sembunyikanPemuat();
+                    } else {
+                        this.kosongkanPemuat();
+                        this.prefetch(this.halaman + 1);
+                    }
+                } catch (e) {
+                    // Biarkan — pengguna bisa scroll lagi.
+                } finally {
+                    this.sibuk = false;
+                }
+            },
+
+            async prefetch(halaman) {
+                if (!this.hasMore || this.sibuk) return;
+                const url = this.urlHalaman(halaman);
+                const resp = await fetch(url, {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+                });
+                if (!resp.ok) return;
+                const data = await resp.json();
+                this.prasimpan[halaman] = data.html;
+                if (!data.hasMore && this.hasMore && halaman === this.halaman + 1) {
+                    this.hasMore = false;
+                }
+            },
+
+            urlHalaman(halaman) {
+                return this.endpointKonten + '?' + (this.query ? this.query + '&' : '') + 'page=' + halaman;
+            },
+
+            sisipkan(html) {
+                const daftar = document.getElementById('daftar-konversasi');
+                const sentinel = document.getElementById('muat-lagi');
+                if (!daftar) {
+                    this.hasMore = false;
+                    return;
+                }
+                if (html.trim() === '') {
+                    this.hasMore = false;
+                    this.sembunyikanPemuat();
+                    return;
+                }
+                if (sentinel) {
+                    sentinel.insertAdjacentHTML('beforebegin', html);
+                } else {
+                    daftar.insertAdjacentHTML('beforeend', html);
+                }
+            },
+
+            tampilPemuat() {
+                const sentinel = document.getElementById('muat-lagi');
+                if (sentinel) {
+                    sentinel.classList.add('flex', 'items-center', 'justify-center');
+                    sentinel.innerHTML = '<span class="inline-flex items-center gap-2 text-xs font-medium text-slate-400"><svg class="h-4 w-4 animate-spin text-slate-300" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Memuat lebih banyak…</span>';
+                }
+            },
+
+            kosongkanPemuat() {
+                const sentinel = document.getElementById('muat-lagi');
+                if (sentinel) sentinel.innerHTML = '';
+            },
+
+            sembunyikanPemuat() {
+                const sentinel = document.getElementById('muat-lagi');
+                if (sentinel) sentinel.style.display = 'none';
+                this.lepasObserver();
             },
 
             updateStats(stats) {

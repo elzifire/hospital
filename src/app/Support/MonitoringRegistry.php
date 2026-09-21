@@ -129,6 +129,14 @@ class MonitoringRegistry
             }
         };
 
+        // Follow Up tidak boleh memuat pesan yang dibentuk dari
+        // penjadwalan Home Visit — kunjungan home visit tidak masuk
+        // poin follow up. Pesan manual (tanpa reminder) tetap dihitung.
+        $tanpaHomeVisitPesan = function (Builder $query): void {
+            $query->where(fn ($q) => $q->whereNull('reminder_id')
+                ->orWhereHas('reminder', fn ($r) => $r->where('home_visit', false)));
+        };
+
         // Peta permission per jenis pesan + warna status pengiriman
         // (laporan broadcasting) — laporan terkunci permission fiturnya.
         $jenisPermission = [
@@ -155,11 +163,25 @@ class MonitoringRegistry
             'icon' => $o['icon'],
             'tone' => $o['tone'],
             'available' => true,
-            'count' => fn () => MessageLog::where('jenis', $o['jenis'])->tap($scopePoliPesan)->count(),
+            'count' => function () use ($o, $scopePoliPesan) {
+                $q = MessageLog::where('jenis', $o['jenis'])->tap($scopePoliPesan);
+
+                if (isset($o['queryEkstra'])) {
+                    ($o['queryEkstra'])($q);
+                }
+
+                return $q->count();
+            },
             'model' => MessageLog::class,
             'eager' => ['template', 'pnpp.satker'],
             'withCount' => $o['withCount'] ?? [],
-            'query' => fn (Builder $q) => $q->where('jenis', $o['jenis']),
+            'query' => function (Builder $q) use ($o) {
+                $q->where('jenis', $o['jenis']);
+
+                if (isset($o['queryEkstra'])) {
+                    ($o['queryEkstra'])($q);
+                }
+            },
             'poliScope' => $scopePoliPesan,
             'searchHint' => 'Cari nama/NIP pasien, nomor HP, isi pesan, atau nama template...',
             'search' => function (Builder $q, string $t) {
@@ -1044,6 +1066,7 @@ class MonitoringRegistry
                 'description' => 'Laporan tindak lanjut jadwal (H-1, hari-H, dan tidak datang).',
                 'icon' => $iconPhone,
                 'tone' => 'amber',
+                'queryEkstra' => $tanpaHomeVisitPesan,
                 'filtersExtra' => [
                     [
                         'key' => 'rule',
@@ -1057,10 +1080,10 @@ class MonitoringRegistry
                     ],
                 ],
                 'stats' => fn () => [
-                    ['label' => 'Total Follow Up', 'value' => MessageLog::jenis('follow_up')->tap($scopePoliPesan)->count(),                        'icon' => $iconPhone, 'tone' => 'amber'],
-                    ['label' => 'Dalam Proses',    'value' => MessageLog::jenis('follow_up')->tap($scopePoliPesan)->whereIn('status', ['menunggu', 'mengirim'])->count(), 'icon' => $iconClock, 'tone' => 'violet'],
-                    ['label' => 'Tidak Datang',    'value' => MessageLog::jenis('follow_up')->tap($scopePoliPesan)->rule('tidak_datang')->count(),    'icon' => $iconWarn,  'tone' => 'rose'],
-                    ['label' => 'Gagal',           'value' => MessageLog::jenis('follow_up')->tap($scopePoliPesan)->status('gagal')->count(),          'icon' => $iconPin,   'tone' => 'sky'],
+                    ['label' => 'Total Follow Up', 'value' => MessageLog::jenis('follow_up')->tap($scopePoliPesan)->tap($tanpaHomeVisitPesan)->count(),                        'icon' => $iconPhone, 'tone' => 'amber'],
+                    ['label' => 'Dalam Proses',    'value' => MessageLog::jenis('follow_up')->tap($scopePoliPesan)->tap($tanpaHomeVisitPesan)->whereIn('status', ['menunggu', 'mengirim'])->count(), 'icon' => $iconClock, 'tone' => 'violet'],
+                    ['label' => 'Tidak Datang',    'value' => MessageLog::jenis('follow_up')->tap($scopePoliPesan)->tap($tanpaHomeVisitPesan)->rule('tidak_datang')->count(),    'icon' => $iconWarn,  'tone' => 'rose'],
+                    ['label' => 'Gagal',           'value' => MessageLog::jenis('follow_up')->tap($scopePoliPesan)->tap($tanpaHomeVisitPesan)->status('gagal')->count(),          'icon' => $iconPin,   'tone' => 'sky'],
                 ],
                 'columns' => [
                     ['label' => 'Aturan',   'type' => 'badge',  'tone' => 'amber', 'value' => fn ($m) => $m->rule ? [$m->rule, 'amber'] : null],

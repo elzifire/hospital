@@ -35,8 +35,8 @@ class RegisterPnppController extends Controller
     {
         $data = $request->validate([
             'nama' => ['required', 'string', 'max:255'],
-            'nik' => ['nullable', 'string', 'max:16', 'unique:register_pnpp,nik'],
-            'nip' => ['nullable', 'string', 'max:50', 'unique:register_pnpp,nip'],
+            'nik' => ['nullable', 'string', 'max:16'],
+            'nip' => ['nullable', 'string', 'max:50'],
             'jabatan' => ['required', 'string', 'max:255'],
             'satker_id' => ['nullable', 'integer', 'exists:satkers,id'],
             'satker_baru' => ['nullable', 'string', 'max:255'],

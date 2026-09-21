@@ -94,6 +94,18 @@ class MonitoringReportTest extends TestCase
             'catatan' => 'Home visit rutin bulanan',
         ]);
 
+        // Jadwal kunjungan RS untuk sumber pesan follow up — pesan yang
+        // berasal dari jadwal home visit dikecualikan dari laporan follow up.
+        $reminderBudiKunjunganRs = Reminder::create([
+            'pnpp_id' => $budi->id,
+            'poli_id' => $poli->id,
+            'dokter_id' => $dokter->id,
+            'tanggal' => today()->subDays(2)->format('Y-m-d'),
+            'jam' => '09:00',
+            'home_visit' => false,
+            'status' => 'tidak_datang',
+        ]);
+
         MessageLog::create([
             'jenis' => 'outreach',
             'rule' => 'h-7',
@@ -120,7 +132,7 @@ class MonitoringReportTest extends TestCase
         MessageLog::create([
             'jenis' => 'follow_up',
             'rule' => 'tidak_datang',
-            'reminder_id' => $reminderBudi->id,
+            'reminder_id' => $reminderBudiKunjunganRs->id,
             'message_template_id' => $templateWa->id,
             'pnpp_id' => $budi->id,
             'penerima_nama' => 'Budi Santoso',

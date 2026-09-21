@@ -9,6 +9,8 @@ use App\Models\Poli;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -118,6 +120,105 @@ class ResponBalasTest extends TestCase
             ->assertOk()
             ->assertJsonStructure(['signature', 'html'])
             ->assertJsonPath('signature', fn ($signature) => $signature !== '' && $signature !== '0');
+    }
+
+    #[Test]
+    public function admin_mengirim_gambar_sebagai_balasan(): void
+    {
+        extract($this->pasangan());
+        Storage::fake('public');
+
+        $this->actingAs($this->superadmin())
+            ->postJson(route('admin.respon.balas', '6281234567890'), [
+                'tipe' => 'image',
+                'media' => UploadedFile::fake()->image('resep-dokter.jpg'),
+                'caption' => 'Ini foto resepnya.',
+            ])
+            ->assertOk()
+            ->assertJsonPath('ok', true)
+            ->assertJsonPath('log.tipe', 'image');
+
+        $log = MessageLog::where('penerima_no_hp', '6281234567890')->firstOrFail();
+        $this->assertSame('terkirim', $log->status);
+        $this->assertSame('Ini foto resepnya.', $log->konten);
+        $this->assertSame('media', $log->meta_payload['kind'] ?? null);
+        $this->assertSame('image', $log->meta_payload['tipe'] ?? null);
+        $this->assertStringContainsString('respon-media/', (string) ($log->meta_payload['path'] ?? ''));
+        Storage::disk('public')->assertExists($log->meta_payload['path']);
+
+        $html = $this->actingAs($this->superadmin())
+            ->getJson(route('admin.respon.timeline', '6281234567890'))
+            ->assertOk()
+            ->json('html');
+        $this->assertStringContainsString('respon-media/', $html);
+        $this->assertStringContainsString('Ini foto resepnya.', $html);
+    }
+
+    #[Test]
+    public function balasan_media_wajib_mengirim_berkas(): void
+    {
+        extract($this->pasangan());
+
+        $this->actingAs($this->superadmin())
+            ->postJson(route('admin.respon.balas', '6281234567890'), [
+                'tipe' => 'image',
+                'caption' => 'Tanpa berkas.',
+            ])
+            ->assertUnprocessable();
+    }
+
+    #[Test]
+    public function admin_mengirim_tombol_cta_url(): void
+    {
+        extract($this->pasangan());
+
+        $this->actingAs($this->superadmin())
+            ->postJson(route('admin.respon.balas', '6281234567890'), [
+                'tipe' => 'interactive',
+                'isi' => 'Silakan buka tautan pendaftaran berikut.',
+                'cta_url' => 'https://rs-bhayangkara.id/daftar',
+                'cta_label' => 'Daftar Sekarang',
+                'cta_header' => 'Pendaftaran Online',
+            ])
+            ->assertOk()
+            ->assertJsonPath('ok', true)
+            ->assertJsonPath('log.tipe', 'interactive');
+
+        $log = MessageLog::where('penerima_no_hp', '6281234567890')->firstOrFail();
+        $this->assertSame('terkirim', $log->status);
+        $this->assertSame('Silakan buka tautan pendaftaran berikut.', $log->konten);
+        $this->assertSame('interactive', $log->meta_payload['kind'] ?? null);
+        $this->assertSame('https://rs-bhayangkara.id/daftar', $log->meta_payload['url'] ?? null);
+        $this->assertSame('Daftar Sekarang', $log->meta_payload['label'] ?? null);
+
+        $html = $this->actingAs($this->superadmin())
+            ->getJson(route('admin.respon.timeline', '6281234567890'))
+            ->assertOk()
+            ->json('html');
+        $this->assertStringContainsString('rs-bhayangkara.id/daftar', $html);
+        $this->assertStringContainsString('Daftar Sekarang', $html);
+    }
+
+    #[Test]
+    public function cta_url_wajib_mengisi_url_dan_label(): void
+    {
+        extract($this->pasangan());
+
+        $this->actingAs($this->superadmin())
+            ->postJson(route('admin.respon.balas', '6281234567890'), [
+                'tipe' => 'interactive',
+                'isi' => 'Tes.',
+            ])
+            ->assertUnprocessable();
+
+        $this->actingAs($this->superadmin())
+            ->postJson(route('admin.respon.balas', '6281234567890'), [
+                'tipe' => 'interactive',
+                'isi' => 'Tes.',
+                'cta_url' => 'bukan-url',
+                'cta_label' => 'Buka',
+            ])
+            ->assertUnprocessable();
     }
 
     #[Test]

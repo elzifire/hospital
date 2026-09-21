@@ -109,12 +109,14 @@
                                         <p class="text-xs text-slate-600" title="{{ $d->isi }}">{{ \Illuminate\Support\Str::limit($d->isi, 110) }}</p>
                                     </td>
                                     <td class="whitespace-nowrap px-5 py-3 text-right">
+                                        {{-- Tombol Hapus disembunyikan sementara.
                                         <form method="POST" action="{{ route('admin.respon.manual-destroy', $d) }}"
                                               onsubmit="return confirm('Hapus data respon ini?')">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="rounded-lg bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-100">Hapus</button>
                                         </form>
+                                        --}}
                                     </td>
                                 </tr>
                             @endforeach

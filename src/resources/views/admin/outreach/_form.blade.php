@@ -606,7 +606,7 @@ tokenPribadi() {
                     <input type="radio" name="mode" value="sekarang" checked x-model="mode" class="mt-1 h-4 w-4 border-slate-300 text-sky-600 focus:ring-sky-500">
                     <span>
                         <span class="block text-sm font-semibold text-slate-800">Kirim Sekarang</span>
-                        <span class="block text-xs text-slate-500">Pesan langsung terkirim begitu Anda menekan tombol.</span>
+                        <span class="block text-xs text-slate-500">Pesan masuk antrean dan dikirim otomatis oleh sistem sesaat setelah Anda menekan tombol.</span>
                     </span>
                 </label>
                 {{-- <label class="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 p-3 transition has-[:checked]:border-sky-400 has-[:checked]:bg-sky-50/60">
@@ -636,8 +636,8 @@ tokenPribadi() {
             <div class="text-xs text-slate-500">
                 @if ($kirimPesan)
                     <p>
-                        Akan mengirim pesan ke <strong class="text-slate-800" x-text="selected.length">0</strong> pasien
-                        menggunakan format resmi WhatsApp Business.
+                        Akan mengirim pesan ke <strong class="text-slate-800" x-text="selected.length">0</strong> pasien menggunakan format resmi WhatsApp Business.
+                        Semua pesan masuk antrean — berjalan otomatis di latar belakang tanpa membuat halaman menunggu.
                     </p>
                 @else
                     <p>

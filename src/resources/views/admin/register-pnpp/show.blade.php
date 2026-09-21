@@ -40,6 +40,7 @@
                     {{ $approved ? 'Batalkan Persetujuan' : 'Setujui Pendaftar' }}
                 </button>
             </form>
+            {{-- Tombol Hapus disembunyikan sementara.
             <form method="POST" action="{{ route('admin.register-pnpp.destroy', $registerPnpp) }}" onsubmit="return confirm('Hapus pendaftaran {{ $registerPnpp->nama }}? Tindakan ini permanen.')">
                 @csrf
                 @method('DELETE')
@@ -48,6 +49,7 @@
                     Hapus
                 </button>
             </form>
+            --}}
         </div>
     </div>
 

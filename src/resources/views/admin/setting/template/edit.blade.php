@@ -122,6 +122,60 @@
             {{-- ===== Kolom Pratinjau (sticky) ===== --}}
             <div class="lg:col-span-1">
                 <div class="lg:sticky lg:top-6 space-y-4">
+                    @if ($template->meta_template_id)
+                        <div class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
+                            <div class="border-b border-slate-100 px-5 py-4">
+                                <h3 class="text-sm font-bold text-slate-900">Status Meta WhatsApp</h3>
+                            </div>
+                            <div class="space-y-3 p-5">
+                                <div class="flex items-center gap-2">
+                                    @php
+                                        $metaBadge = match (strtoupper((string) $template->meta_status)) {
+                                            'APPROVED' => 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+                                            'PENDING', 'IN_APPEAL', 'REINSTATED' => 'bg-amber-50 text-amber-700 ring-amber-200',
+                                            default => 'bg-rose-50 text-rose-700 ring-rose-200',
+                                        };
+                                    @endphp
+                                    <span class="rounded-full px-2.5 py-1 text-[11px] font-black uppercase tracking-wide ring-1 ring-inset {{ $metaBadge }}">
+                                        {{ $template->meta_status ?? 'PENDING' }}
+                                    </span>
+                                    <span class="rounded-full bg-slate-100 px-2.5 py-1 font-mono text-[11px] font-bold text-slate-600">{{ $template->meta_language }}</span>
+                                </div>
+
+                                <dl class="space-y-2 text-xs">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <dt class="font-medium text-slate-400">Nama di Meta</dt>
+                                        <dd class="truncate font-mono text-slate-700">{{ $template->meta_template_name }}</dd>
+                                    </div>
+                                    <div class="flex items-center justify-between gap-2">
+                                        <dt class="font-medium text-slate-400">Kategori</dt>
+                                        <dd class="font-semibold text-slate-700">{{ $template->meta_category ?? '—' }}</dd>
+                                    </div>
+                                    <div class="flex items-center justify-between gap-2">
+                                        <dt class="font-medium text-slate-400">ID Template</dt>
+                                        <dd class="truncate font-mono text-slate-700">{{ $template->meta_template_id }}</dd>
+                                    </div>
+                                    @if ($template->last_synced_at)
+                                        <div class="flex items-center justify-between gap-2">
+                                            <dt class="font-medium text-slate-400">Terakhir sinkron</dt>
+                                            <dd class="text-slate-700">{{ $template->last_synced_at->format('d M Y H:i') }}</dd>
+                                        </div>
+                                    @endif
+                                </dl>
+
+                                <div class="flex items-start gap-2 rounded-xl bg-sky-50 px-3 py-2.5 text-[11px] leading-relaxed text-sky-800 ring-1 ring-inset ring-sky-100">
+                                    <svg class="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-sky-600" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" /></svg>
+                                    <span>Perubahan di halaman ini <strong>tidak</strong> mengubah template yang terdaftar di Meta. Untuk versi baru, buat atau duplikat template lalu daftarkan ulang.</span>
+                                </div>
+                            </div>
+                        </div>
+                    @else
+                        <div class="flex items-start gap-2.5 rounded-2xl bg-slate-50 px-4 py-3.5 text-[11px] leading-relaxed text-slate-500 ring-1 ring-inset ring-slate-200">
+                            <svg class="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0zM15.75 16.5a3.75 3.75 0 00-7.5 0" /></svg>
+                            <span>Template ini belum terdaftar di Meta WhatsApp. Template yang terdaftar dapat dipakai untuk kirim pesan official dan otomatis aktif setelah disetujui.</span>
+                        </div>
+                    @endif
+
                     <div class="overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
                         <div class="border-b border-slate-100 px-5 py-4">
                             <h3 class="text-sm font-bold text-slate-900">Pratinjau WhatsApp</h3>

@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\MessageLog;
 use App\Models\MessageReply;
+use App\Models\MessageTemplate;
 use App\Models\Pnpp;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
@@ -124,5 +126,81 @@ class ResponIndexFilterTest extends TestCase
 
         $this->assertStringContainsString('6281111111111', $json->json('html'));
         $this->assertStringNotContainsString('6282222222222', $json->json('html'));
+    }
+
+    #[Test]
+    public function filter_rentang_tanggal_menyaring_percakapan(): void
+    {
+        $this->buatBalasan('6281111111111', 'Andi Lama', 'Pesan kemarin.', now()->subDays(2));
+        $this->buatBalasan('6282222222222', 'Ratna Baru', 'Pesan hari ini.', now());
+
+        $html = $this->actingAs($this->superadmin())
+            ->get(route('admin.respon.index', [
+                'dari' => today()->format('Y-m-d'),
+                'sampai' => today()->format('Y-m-d'),
+            ]))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertStringNotContainsString('6281111111111', $html);
+        $this->assertStringContainsString('6282222222222', $html);
+    }
+
+    #[Test]
+    public function filter_template_terkirim_menyaring_percakapan(): void
+    {
+        $template = MessageTemplate::create([
+            'judul' => 'Ingatkan Kontrol',
+            'konten' => 'Ingat kontrol besok.',
+            'is_active' => true,
+        ]);
+
+        $this->buatBalasan('6281111111111', 'Andi Terima', 'Siap dok.', now());
+        $this->buatBalasan('6282222222222', 'Ratna Tanpa', 'Siapa ini?', now());
+
+        MessageLog::create([
+            'jenis' => 'outreach',
+            'rule' => 'h-7',
+            'message_template_id' => $template->id,
+            'penerima_nama' => 'Andi Terima',
+            'penerima_no_hp' => '6281111111111',
+            'konten' => 'Ingat kontrol besok.',
+            'status' => 'terkirim',
+        ]);
+
+        $html = $this->actingAs($this->superadmin())
+            ->get(route('admin.respon.index', ['template' => $template->id]))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertStringContainsString('6281111111111', $html);
+        $this->assertStringNotContainsString('6282222222222', $html);
+    }
+
+    #[Test]
+    public function konten_endpoint_mendukung_infinite_scroll(): void
+    {
+        for ($i = 16; $i >= 1; $i--) {
+            $nomor = '6280000000'.str_pad((string) $i, 2, '0', STR_PAD_LEFT);
+            $this->buatBalasan($nomor, "Kontak $i", "Pesan $i", now()->subMinutes($i));
+        }
+
+        $halaman1 = $this->actingAs($this->superadmin())
+            ->getJson(route('admin.respon.konten'))
+            ->assertOk()
+            ->json();
+
+        $this->assertGreaterThan(0, substr_count($halaman1['html'], '<li'));
+        $this->assertTrue($halaman1['hasMore']);
+        $this->assertSame(1, $halaman1['halaman']);
+
+        $halaman2 = $this->actingAs($this->superadmin())
+            ->getJson(route('admin.respon.konten', ['page' => 2]))
+            ->assertOk()
+            ->json();
+
+        $this->assertFalse($halaman2['hasMore']);
+        $this->assertSame(2, $halaman2['halaman']);
+        $this->assertStringContainsString('628000000016', $halaman2['html']);
     }
 }

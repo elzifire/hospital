@@ -116,6 +116,14 @@
                     </select>
                 </div>
             @endif
+            <div class="w-44">
+                <label class="{{ $lbl }}">Jenis</label>
+                <select name="home" class="{{ $ctl }}">
+                    <option value="" {{ $filters['home'] === '' ? 'selected' : '' }}>Semua</option>
+                    <option value="1" {{ $filters['home'] === '1' ? 'selected' : '' }}>Home Visit</option>
+                    <option value="0" {{ $filters['home'] === '0' ? 'selected' : '' }}>Kunjungan RS</option>
+                </select>
+            </div>
             <div class="w-40">
                 <label class="{{ $lbl }}">Periode</label>
                 <select name="periode" class="{{ $ctl }}">
@@ -269,6 +277,7 @@
                                            class="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-200">
                                             Edit
                                         </a>
+                                        {{-- Tombol Hapus disembunyikan sementara.
                                         <button type="button"
                                                 onclick="confirmSubmit('{{ $r['hapusUrl'] }}', {
                                                     title: 'Hapus penjadwalan?',
@@ -278,6 +287,7 @@
                                                 class="rounded-lg bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-600 ring-1 ring-inset ring-rose-200 transition hover:bg-rose-100">
                                             Hapus
                                         </button>
+                                        --}}
                                     </td>
                                 </tr>
                             @endif
