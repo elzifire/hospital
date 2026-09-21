@@ -73,6 +73,7 @@ class ResponController extends Controller
     protected function daftarKonversasi(Request $request, int $perPage = 15): array
     {
         $q = (string) $request->query('q', '');
+        $qAtas = strtoupper($q);
         // Filter urut: belum dibaca dulu (badge merah), lalu pesan terbaru.
         $statusBaca = (string) $request->query('status_baca', '');
         // Filter asal kontak: terdaftar / tak terdaftar di tabel PNPP.
@@ -90,7 +91,7 @@ class ResponController extends Controller
         $konversasi = MessageReply::query()
             ->tap($scopePoli)
             ->when($q, fn ($query) => $query->where(
-                fn ($sub) => $sub->where('nama', 'like', "%{$q}%")
+                fn ($sub) => $sub->whereRaw('UPPER(nama) LIKE ?', ["%{$qAtas}%"])
                     ->orWhere('no_hp', 'like', "%{$q}%")
                     ->orWhere('isi_pesan', 'like', "%{$q}%")
             ))
@@ -185,10 +186,11 @@ class ResponController extends Controller
     public function indexData(Request $request)
     {
         $q = (string) $request->query('q', '');
+        $qAtas = strtoupper($q);
 
         $dataRespon = ResponManual::query()
             ->when($q, fn ($query) => $query->where(
-                fn ($sub) => $sub->where('nama', 'like', "%{$q}%")
+                fn ($sub) => $sub->whereRaw('UPPER(nama) LIKE ?', ["%{$qAtas}%"])
                     ->orWhere('nrp_nip', 'like', "%{$q}%")
                     ->orWhere('no_hp', 'like', "%{$q}%")
                     ->orWhere('satker', 'like', "%{$q}%")
@@ -223,13 +225,14 @@ class ResponController extends Controller
     public function pesanManual(Request $request)
     {
         $q = trim((string) $request->query('q', ''));
+        $qAtas = strtoupper($q);
         $satkerId = (string) $request->query('satker', '');
 
         $pnpps = Pnpp::query()
             ->with('satker:id,nama')
-            ->when($q !== '', function ($query) use ($q) {
+            ->when($q !== '', function ($query) use ($q, $qAtas) {
                 $query->where(
-                    fn ($sub) => $sub->where('nama', 'like', "%{$q}%")
+                    fn ($sub) => $sub->whereRaw('UPPER(nama) LIKE ?', ["%{$qAtas}%"])
                         ->orWhere('nip', 'like', "%{$q}%")
                         ->orWhere('no_hp', 'like', "%{$q}%")
                 );

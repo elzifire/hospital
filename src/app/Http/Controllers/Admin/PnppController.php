@@ -33,7 +33,7 @@ class PnppController extends Controller
         if ($search = $request->query('search')) {
             $searchAtas = strtoupper($search);
             $query->where(function ($q) use ($searchAtas, $search) {
-                $q->where('nama', 'like', "%{$searchAtas}%")
+                $q->whereRaw('UPPER(nama) LIKE ?', ["%{$searchAtas}%"])
                     ->orWhere('nip', 'like', "%{$search}%")
                     ->orWhere('no_hp', 'like', "%{$search}%");
             });

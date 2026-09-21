@@ -326,12 +326,13 @@ class DigitalReminderController extends Controller
     protected function dataTarget(Request $request): array
     {
         $q = (string) $request->query('q', '');
+        $qAtas = strtoupper($q);
         $satkerId = (string) $request->query('satker', '');
 
         $pnpps = Pnpp::query()
             ->with('satker:id,nama')
             ->when($q, fn ($query) => $query->where(
-                fn ($sub) => $sub->where('nama', 'like', "%{$q}%")
+                fn ($sub) => $sub->whereRaw('UPPER(nama) LIKE ?', ["%{$qAtas}%"])
                     ->orWhere('nip', 'like', "%{$q}%")
                     ->orWhere('no_hp', 'like', "%{$q}%")
             ))

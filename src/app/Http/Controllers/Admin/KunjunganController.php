@@ -44,12 +44,13 @@ class KunjunganController extends Controller
     public function create(Request $request)
     {
         $q = (string) $request->query('q', '');
+        $qAtas = strtoupper($q);
         $satkerId = (string) $request->query('satker', '');
 
         $pnpps = Pnpp::query()
             ->with('satker:id,nama')
             ->when($q, fn ($t) => $t->where(
-                fn ($sub) => $sub->where('nama', 'like', "%{$q}%")
+                fn ($sub) => $sub->whereRaw('UPPER(nama) LIKE ?', ["%{$qAtas}%"])
                     ->orWhere('nip', 'like', "%{$q}%")
                     ->orWhere('no_hp', 'like', "%{$q}%")
             ))
@@ -64,7 +65,7 @@ class KunjunganController extends Controller
             ->with('pnpp.satker:id,nama', 'poli:id,nama')
             ->when($q || $satkerId, fn ($query) => $query->whereHas('pnpp', fn ($p) => $p
                 ->when($q, fn ($sub) => $sub->where(
-                    fn ($s) => $s->where('nama', 'like', "%{$q}%")
+                    fn ($s) => $s->whereRaw('UPPER(nama) LIKE ?', ["%{$qAtas}%"])
                         ->orWhere('nip', 'like', "%{$q}%")
                         ->orWhere('no_hp', 'like', "%{$q}%")
                 ))

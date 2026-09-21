@@ -352,6 +352,7 @@ class FollowUpController extends ManualBroadcastController
     public function index(Request $request)
     {
         $q = (string) $request->query('q', '');
+        $qAtas = strtoupper($q);
         $status = (string) $request->query('status', '');
         $rule = (string) $request->query('rule', '');
         // Rentang tanggal dibuat: filter riwayat pesan follow up.
@@ -371,7 +372,7 @@ class FollowUpController extends ManualBroadcastController
             ->with('template:id,judul', 'reminder.poli:id,nama')
             ->tap($scopePoli)
             ->when($q, fn ($query) => $query->where(
-                fn ($sub) => $sub->where('penerima_nama', 'like', "%{$q}%")
+                fn ($sub) => $sub->whereRaw('UPPER(penerima_nama) LIKE ?', ["%{$qAtas}%"])
                     ->orWhere('penerima_no_hp', 'like', "%{$q}%")
                     ->orWhere('konten', 'like', "%{$q}%")
             ))

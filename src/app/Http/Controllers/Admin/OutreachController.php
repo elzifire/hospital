@@ -27,6 +27,7 @@ class OutreachController extends ManualBroadcastController
     public function index(Request $request)
     {
         $q = (string) $request->query('q', '');
+        $qAtas = strtoupper($q);
         $status = (string) $request->query('status', '');
         $rule = (string) $request->query('rule', '');
         $templateId = (string) $request->query('template', '');
@@ -39,7 +40,7 @@ class OutreachController extends ManualBroadcastController
         $scope = fn ($query) => $query
             ->jenis('outreach')
             ->when($q, fn ($sub) => $sub->where(
-                fn ($inner) => $inner->where('penerima_nama', 'like', "%{$q}%")
+                fn ($inner) => $inner->whereRaw('UPPER(penerima_nama) LIKE ?', ["%{$qAtas}%"])
                     ->orWhere('penerima_no_hp', 'like', "%{$q}%")
                     ->orWhere('konten', 'like', "%{$q}%")
             ))

@@ -389,6 +389,44 @@ class MonitoringReportTest extends TestCase
     }
 
     #[Test]
+    public function filter_template_laporan_outreach_menyaring_baris()
+    {
+        $this->actingAs($this->superadmin());
+
+        $templateLain = MessageTemplate::create([
+            'judul' => 'Pengingat Alternatif',
+            'channel' => 'WhatsApp',
+            'konten' => 'Halo {nama}, cek jadwal Anda.',
+            'is_active' => true,
+        ]);
+
+        $budi = Pnpp::where('nama', 'Budi Santoso')->firstOrFail();
+
+        MessageLog::create([
+            'jenis' => 'outreach',
+            'rule' => 'manual',
+            'message_template_id' => $templateLain->id,
+            'pnpp_id' => $budi->id,
+            'penerima_nama' => 'Cici via Alternatif',
+            'penerima_no_hp' => '6281234567891',
+            'konten' => 'Halo Cici, cek jadwal Anda.',
+            'status' => 'terkirim',
+        ]);
+
+        // Tanpa filter: kedua baris tampil.
+        $this->get(route('admin.monitoring.report.show', 'outreach'))
+            ->assertOk()
+            ->assertSee('Budi Santoso')
+            ->assertSee('Cici via Alternatif');
+
+        // Filter template: hanya baris dengan template terpilih.
+        $this->get(route('admin.monitoring.report.show', ['outreach', 'template' => $templateLain->id]))
+            ->assertOk()
+            ->assertSee('Cici via Alternatif')
+            ->assertDontSee('Budi Santoso');
+    }
+
+    #[Test]
     public function user_tanpa_permission_broadcasting_ditolak_dari_laporan_broadcasting()
     {
         $user = $this->plainUser();

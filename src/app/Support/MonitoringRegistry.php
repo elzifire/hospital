@@ -7,6 +7,7 @@ use App\Models\Jadwal;
 use App\Models\Kunjungan;
 use App\Models\MessageLog;
 use App\Models\MessageReply;
+use App\Models\MessageTemplate;
 use App\Models\PenyakitKronis;
 use App\Models\PenyakitMenahun;
 use App\Models\Pnpp;
@@ -161,14 +162,18 @@ class MonitoringRegistry
             'query' => fn (Builder $q) => $q->where('jenis', $o['jenis']),
             'poliScope' => $scopePoliPesan,
             'searchHint' => 'Cari nama/NIP pasien, nomor HP, isi pesan, atau nama template...',
-            'search' => fn (Builder $q, string $t) => $q->where(fn ($w) => $w
-                ->where('penerima_nama', 'like', "%{$t}%")
-                ->orWhere('penerima_no_hp', 'like', "%{$t}%")
-                ->orWhere('konten', 'like', "%{$t}%")
-                ->orWhereHas('pnpp', fn ($p) => $p
-                    ->where('nama', 'like', "%{$t}%")
-                    ->orWhere('nip', 'like', "%{$t}%"))
-                ->orWhereHas('template', fn ($p) => $p->where('judul', 'like', "%{$t}%"))),
+            'search' => function (Builder $q, string $t) {
+                $tAtas = strtoupper($t);
+
+                return $q->where(fn ($w) => $w
+                    ->whereRaw('UPPER(penerima_nama) LIKE ?', ["%{$tAtas}%"])
+                    ->orWhere('penerima_no_hp', 'like', "%{$t}%")
+                    ->orWhere('konten', 'like', "%{$t}%")
+                    ->orWhereHas('pnpp', fn ($p) => $p
+                        ->whereRaw('UPPER(nama) LIKE ?', ["%{$tAtas}%"])
+                        ->orWhere('nip', 'like', "%{$t}%"))
+                    ->orWhereHas('template', fn ($p) => $p->where('judul', 'like', "%{$t}%")));
+            },
             'filters' => array_merge(
                 [
                     [
@@ -252,12 +257,16 @@ class MonitoringRegistry
                 'eager' => ['satker', 'penyakit', 'penyakitMenahun', 'latestKunjungan'],
                 'withCount' => ['kunjungans'],
                 'searchHint' => 'Cari nama, NIP, No. BPJS, No. HP, atau email...',
-                'search' => fn (Builder $q, string $t) => $q->where(fn ($w) => $w
-                    ->where('nama', 'like', "%{$t}%")
-                    ->orWhere('nip', 'like', "%{$t}%")
-                    ->orWhere('no_bpjs', 'like', "%{$t}%")
-                    ->orWhere('no_hp', 'like', "%{$t}%")
-                    ->orWhere('email', 'like', "%{$t}%")),
+                'search' => function (Builder $q, string $t) {
+                    $tAtas = strtoupper($t);
+
+                    return $q->where(fn ($w) => $w
+                        ->whereRaw('UPPER(nama) LIKE ?', ["%{$tAtas}%"])
+                        ->orWhere('nip', 'like', "%{$t}%")
+                        ->orWhere('no_bpjs', 'like', "%{$t}%")
+                        ->orWhere('no_hp', 'like', "%{$t}%")
+                        ->orWhere('email', 'like', "%{$t}%"));
+                },
                 'filters' => [
                     [
                         'key' => 'satker',
@@ -354,9 +363,13 @@ class MonitoringRegistry
                 'eager' => [],
                 'withCount' => ['pnpps'],
                 'searchHint' => 'Cari nama atau kode satker...',
-                'search' => fn (Builder $q, string $t) => $q->where(fn ($w) => $w
-                    ->where('nama', 'like', "%{$t}%")
-                    ->orWhere('kode', 'like', "%{$t}%")),
+                'search' => function (Builder $q, string $t) {
+                    $tAtas = strtoupper($t);
+
+                    return $q->where(fn ($w) => $w
+                        ->whereRaw('UPPER(nama) LIKE ?', ["%{$tAtas}%"])
+                        ->orWhere('kode', 'like', "%{$t}%"));
+                },
                 'filters' => [
                     [
                         'key' => 'pnpp',
@@ -404,9 +417,13 @@ class MonitoringRegistry
                 'eager' => [],
                 'withCount' => ['pnpps'],
                 'searchHint' => 'Cari nama atau kode penyakit...',
-                'search' => fn (Builder $q, string $t) => $q->where(fn ($w) => $w
-                    ->where('nama', 'like', "%{$t}%")
-                    ->orWhere('kode', 'like', "%{$t}%")),
+                'search' => function (Builder $q, string $t) {
+                    $tAtas = strtoupper($t);
+
+                    return $q->where(fn ($w) => $w
+                        ->whereRaw('UPPER(nama) LIKE ?', ["%{$tAtas}%"])
+                        ->orWhere('kode', 'like', "%{$t}%"));
+                },
                 'filters' => [
                     [
                         'key' => 'pnpp',
@@ -454,9 +471,13 @@ class MonitoringRegistry
                 'eager' => [],
                 'withCount' => ['pnpps'],
                 'searchHint' => 'Cari nama atau kode penyakit...',
-                'search' => fn (Builder $q, string $t) => $q->where(fn ($w) => $w
-                    ->where('nama', 'like', "%{$t}%")
-                    ->orWhere('kode', 'like', "%{$t}%")),
+                'search' => function (Builder $q, string $t) {
+                    $tAtas = strtoupper($t);
+
+                    return $q->where(fn ($w) => $w
+                        ->whereRaw('UPPER(nama) LIKE ?', ["%{$tAtas}%"])
+                        ->orWhere('kode', 'like', "%{$t}%"));
+                },
                 'filters' => [
                     [
                         'key' => 'pnpp',
@@ -504,9 +525,13 @@ class MonitoringRegistry
                 'eager' => [],
                 'withCount' => ['dokters'],
                 'searchHint' => 'Cari nama atau kode instalasi...',
-                'search' => fn (Builder $q, string $t) => $q->where(fn ($w) => $w
-                    ->where('nama', 'like', "%{$t}%")
-                    ->orWhere('kode', 'like', "%{$t}%")),
+                'search' => function (Builder $q, string $t) {
+                    $tAtas = strtoupper($t);
+
+                    return $q->where(fn ($w) => $w
+                        ->whereRaw('UPPER(nama) LIKE ?', ["%{$tAtas}%"])
+                        ->orWhere('kode', 'like', "%{$t}%"));
+                },
                 'filters' => [
                     [
                         'key' => 'dokter',
@@ -555,10 +580,14 @@ class MonitoringRegistry
                 'eager' => ['poli'],
                 'withCount' => ['jadwals'],
                 'searchHint' => 'Cari nama dokter, spesialisasi, atau instalasi...',
-                'search' => fn (Builder $q, string $t) => $q->where(fn ($w) => $w
-                    ->where('nama', 'like', "%{$t}%")
-                    ->orWhere('spesialisasi', 'like', "%{$t}%")
-                    ->orWhereHas('poli', fn ($p) => $p->where('nama', 'like', "%{$t}%"))),
+                'search' => function (Builder $q, string $t) {
+                    $tAtas = strtoupper($t);
+
+                    return $q->where(fn ($w) => $w
+                        ->whereRaw('UPPER(nama) LIKE ?', ["%{$tAtas}%"])
+                        ->orWhere('spesialisasi', 'like', "%{$t}%")
+                        ->orWhereHas('poli', fn ($p) => $p->whereRaw('UPPER(nama) LIKE ?', ["%{$tAtas}%"])));
+                },
                 'filters' => [
                     [
                         'key' => 'poli',
@@ -611,10 +640,14 @@ class MonitoringRegistry
                 'eager' => ['dokter.poli'],
                 'withCount' => [],
                 'searchHint' => 'Cari nama dokter atau instalasi...',
-                'search' => fn (Builder $q, string $t) => $q->where(fn ($w) => $w
-                    ->whereHas('dokter', fn ($d) => $d
-                        ->where('nama', 'like', "%{$t}%")
-                        ->orWhereHas('poli', fn ($p) => $p->where('nama', 'like', "%{$t}%")))),
+                'search' => function (Builder $q, string $t) {
+                    $tAtas = strtoupper($t);
+
+                    return $q->where(fn ($w) => $w
+                        ->whereHas('dokter', fn ($d) => $d
+                            ->whereRaw('UPPER(nama) LIKE ?', ["%{$tAtas}%"])
+                            ->orWhereHas('poli', fn ($p) => $p->whereRaw('UPPER(nama) LIKE ?', ["%{$tAtas}%"]))));
+                },
                 'filters' => [
                     [
                         'key' => 'hari',
@@ -678,12 +711,16 @@ class MonitoringRegistry
                 'withCount' => [],
                 'poliScope' => $scopePoli,
                 'searchHint' => 'Cari nama/NIP pasien, keluhan, atau diagnosa...',
-                'search' => fn (Builder $q, string $t) => $q->where(fn ($w) => $w
-                    ->where('keluhan', 'like', "%{$t}%")
-                    ->orWhere('diagnosa', 'like', "%{$t}%")
-                    ->orWhereHas('pnpp', fn ($p) => $p
-                        ->where('nama', 'like', "%{$t}%")
-                        ->orWhere('nip', 'like', "%{$t}%"))),
+                'search' => function (Builder $q, string $t) {
+                    $tAtas = strtoupper($t);
+
+                    return $q->where(fn ($w) => $w
+                        ->where('keluhan', 'like', "%{$t}%")
+                        ->orWhere('diagnosa', 'like', "%{$t}%")
+                        ->orWhereHas('pnpp', fn ($p) => $p
+                            ->whereRaw('UPPER(nama) LIKE ?', ["%{$tAtas}%"])
+                            ->orWhere('nip', 'like', "%{$t}%")));
+                },
                 'filters' => [
                     [
                         'key' => 'from',
@@ -765,13 +802,17 @@ class MonitoringRegistry
                 'query' => fn (Builder $q) => $q,
                 'poliScope' => $scopePoli,
                 'searchHint' => 'Cari nama/NIP pasien, poli, dokter, atau catatan...',
-                'search' => fn (Builder $q, string $t) => $q->where(fn ($w) => $w
-                    ->where('catatan', 'like', "%{$t}%")
-                    ->orWhereHas('pnpp', fn ($p) => $p
-                        ->where('nama', 'like', "%{$t}%")
-                        ->orWhere('nip', 'like', "%{$t}%"))
-                    ->orWhereHas('poli', fn ($p) => $p->where('nama', 'like', "%{$t}%"))
-                    ->orWhereHas('dokter', fn ($p) => $p->where('nama', 'like', "%{$t}%"))),
+                'search' => function (Builder $q, string $t) {
+                    $tAtas = strtoupper($t);
+
+                    return $q->where(fn ($w) => $w
+                        ->where('catatan', 'like', "%{$t}%")
+                        ->orWhereHas('pnpp', fn ($p) => $p
+                            ->whereRaw('UPPER(nama) LIKE ?', ["%{$tAtas}%"])
+                            ->orWhere('nip', 'like', "%{$t}%"))
+                        ->orWhereHas('poli', fn ($p) => $p->whereRaw('UPPER(nama) LIKE ?', ["%{$tAtas}%"]))
+                        ->orWhereHas('dokter', fn ($p) => $p->whereRaw('UPPER(nama) LIKE ?', ["%{$tAtas}%"])));
+                },
                 'filters' => [
                     [
                         'key' => 'status',
@@ -865,6 +906,17 @@ class MonitoringRegistry
                         ],
                         'apply' => fn (Builder $q, string $v) => $q->where('rule', $v),
                     ],
+                    [
+                        'key' => 'template',
+                        'label' => 'Semua Template',
+                        'type' => 'select',
+                        'options' => fn () => MessageTemplate::query()
+                            ->whereIn('id', MessageLog::query()->jenis('outreach')->pluck('message_template_id'))
+                            ->orderBy('judul')
+                            ->pluck('judul', 'id')
+                            ->all(),
+                        'apply' => fn (Builder $q, string $v) => $q->where('message_template_id', (int) $v),
+                    ],
                 ],
                 'stats' => fn () => [
                     ['label' => 'Total Pesan',  'value' => MessageLog::jenis('outreach')->tap($scopePoliPesan)->count(),                                 'icon' => $iconMega,  'tone' => 'emerald'],
@@ -893,13 +945,17 @@ class MonitoringRegistry
                 'eager' => ['pnpp.satker'],
                 'withCount' => [],
                 'searchHint' => 'Cari nama pengirim, nomor HP, isi balasan, atau nama pasien...',
-                'search' => fn (Builder $q, string $t) => $q->where(fn ($w) => $w
-                    ->where('nama', 'like', "%{$t}%")
-                    ->orWhere('no_hp', 'like', "%{$t}%")
-                    ->orWhere('isi_pesan', 'like', "%{$t}%")
-                    ->orWhereHas('pnpp', fn ($p) => $p
-                        ->where('nama', 'like', "%{$t}%")
-                        ->orWhere('nip', 'like', "%{$t}%"))),
+                'search' => function (Builder $q, string $t) {
+                    $tAtas = strtoupper($t);
+
+                    return $q->where(fn ($w) => $w
+                        ->whereRaw('UPPER(nama) LIKE ?', ["%{$tAtas}%"])
+                        ->orWhere('no_hp', 'like', "%{$t}%")
+                        ->orWhere('isi_pesan', 'like', "%{$t}%")
+                        ->orWhereHas('pnpp', fn ($p) => $p
+                            ->whereRaw('UPPER(nama) LIKE ?', ["%{$tAtas}%"])
+                            ->orWhere('nip', 'like', "%{$t}%")));
+                },
                 'filters' => [
                     [
                         'key' => 'jenis',

@@ -25,7 +25,7 @@ class RegisterPnppController extends Controller
                 $cariLike = '%'.$cariAtas.'%';
                 $cariRaw = '%'.trim($cari).'%';
                 $q->where(fn (Builder $sub): Builder => $sub
-                    ->where('nama', 'like', $cariLike)
+                    ->whereRaw('UPPER(nama) LIKE ?', [$cariLike])
                     ->orWhere('nik', 'like', $cariRaw)
                     ->orWhere('nip', 'like', $cariRaw)
                     ->orWhere('no_hp', 'like', $cariRaw));

@@ -25,6 +25,7 @@ class KunjunganDaftar
     public function data(Request $request, bool $batasiPoli, ?int $poliAktif): array
     {
         $q = (string) $request->query('q', '');
+        $qAtas = strtoupper($q);
         $status = (string) $request->query('status', '');
         $poliId = (string) $request->query('poli', '');
         $dari = (string) $request->query('dari', '');
@@ -51,7 +52,7 @@ class KunjunganDaftar
                 fn ($sub) => $sub
                     ->where('catatan', 'like', "%{$q}%")
                     ->orWhereHas('pnpp', fn ($p) => $p
-                        ->where('nama', 'like', "%{$q}%")
+                        ->whereRaw('UPPER(nama) LIKE ?', ["%{$qAtas}%"])
                         ->orWhere('nip', 'like', "%{$q}%"))
             ))
             ->when($status && $status !== 'tercatat', fn ($query) => $query->where('status', $status))
@@ -72,7 +73,7 @@ class KunjunganDaftar
             ->tap($scopePoli)
             ->with('pnpp.satker:id,nama', 'poli:id,nama')
             ->when($q, fn ($query) => $query->whereHas('pnpp', fn ($p) => $p
-                ->where('nama', 'like', "%{$q}%")
+                ->whereRaw('UPPER(nama) LIKE ?', ["%{$qAtas}%"])
                 ->orWhere('nip', 'like', "%{$q}%")))
             ->when($status && $status !== 'tercatat', fn ($query) => $query->whereRaw('1 = 0'))
             ->when($dari, fn ($query) => $query->whereDate('tanggal_kunjungan', '>=', $dari))
@@ -136,6 +137,7 @@ class KunjunganDaftar
     public function dataKunjungan(Request $request, bool $batasiPoli, ?int $poliAktif): array
     {
         $q = (string) $request->query('q', '');
+        $qAtas = strtoupper($q);
         $poliId = (string) $request->query('poli', '');
         $dari = (string) $request->query('dari', '');
         $sampai = (string) $request->query('sampai', '');
@@ -154,7 +156,7 @@ class KunjunganDaftar
             ->with('pnpp.satker:id,nama', 'poli:id,nama')
             ->tap($scopePoli)
             ->when($q, fn ($query) => $query->whereHas('pnpp', fn ($p) => $p
-                ->where('nama', 'like', "%{$q}%")
+                ->whereRaw('UPPER(nama) LIKE ?', ["%{$qAtas}%"])
                 ->orWhere('nip', 'like', "%{$q}%")))
             ->when($dari, fn ($query) => $query->whereDate('tanggal_kunjungan', '>=', $dari))
             ->when($sampai, fn ($query) => $query->whereDate('tanggal_kunjungan', '<=', $sampai))

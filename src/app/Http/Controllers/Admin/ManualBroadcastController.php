@@ -407,6 +407,7 @@ abstract class ManualBroadcastController extends Controller
     protected function kumpulanTarget(Request $request, array $wajibTampil): array
     {
         $q = trim((string) $request->query('q', ''));
+        $qAtas = strtoupper($q);
         $satkerId = (string) $request->query('satker', '');
         $tanggal = (string) $request->query('tanggal', '');
         // tampilkan=berjadwal (bawaan) → hanya PNPP yang punya jadwal
@@ -417,12 +418,12 @@ abstract class ManualBroadcastController extends Controller
 
         $pnpps = Pnpp::query()
             ->with('satker:id,nama', 'latestKunjungan.poli:id,nama')
-            ->where(function ($query) use ($wajibTampil, $q, $satkerId, $tanggal, $tampilkanSemua) {
-                $query->where(function ($cocok) use ($q, $satkerId) {
+            ->where(function ($query) use ($wajibTampil, $q, $qAtas, $satkerId, $tanggal, $tampilkanSemua) {
+                $query->where(function ($cocok) use ($q, $qAtas, $satkerId) {
                     $dibuka = false;
 
                     if ($q !== '') {
-                        $cocok->where(fn ($cari) => $cari->where('nama', 'like', "%{$q}%")
+                        $cocok->where(fn ($cari) => $cari->whereRaw('UPPER(nama) LIKE ?', ["%{$qAtas}%"])
                             ->orWhere('nip', 'like', "%{$q}%")
                             ->orWhere('no_hp', 'like', "%{$q}%"));
                         $dibuka = true;
