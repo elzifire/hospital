@@ -38,6 +38,10 @@ return [
         'jeda_kirim' => (int) env('WA_JEDA_KIRIM', 30),
     ],
 
+    // Nomor tujuan uji coba: bila diisi, semua pengiriman dialihkan ke
+    // nomor ini agar bisa diverifikasi tanpa mengganggu pasien asli.
+    'test_target' => env('WA_TEST_TARGET'),
+
     'webhook' => [
         'verify_token' => env('WA_WEBHOOK_VERIFY_TOKEN'),
         'app_secret' => env('WA_APP_SECRET'),

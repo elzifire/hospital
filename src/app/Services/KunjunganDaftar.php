@@ -263,6 +263,7 @@ class KunjunganDaftar
             'editUrl' => route('admin.digital-reminder.edit', $r),
             'jadwalUlangUrl' => route('admin.digital-reminder.jadwal-ulang', $r),
             'hapusUrl' => route('admin.digital-reminder.destroy', $r),
+            'forceHapusUrl' => route('admin.digital-reminder.force-destroy', $r),
             'detailUrl' => route('admin.pnpp.kunjungan', $r->pnpp_id),
         ];
     }

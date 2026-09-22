@@ -154,7 +154,25 @@ class DigitalReminderController extends Controller
 
         return redirect()
             ->route('admin.digital-reminder.index')
-            ->with('success', 'Penjadwalan untuk "'.$nama.'" berhasil dihapus.');
+            ->with('success', 'Penjadwalan untuk "'.$nama.'" berhasil dihapus (soft delete).');
+    }
+
+    /**
+     * Hapus permanen — khusus role superadmin. Soft-deleted jadwal tetap
+     * bisa dibuka lewat ikatan route withTrashed().
+     */
+    public function forceDestroy(Request $request, Reminder $reminder)
+    {
+        abort_unless($request->user()?->hasRole('superadmin'), 403, 'Hanya superadmin yang dapat menghapus permanen.');
+
+        $this->pastikanPoli($reminder);
+
+        $nama = $reminder->pnpp?->nama;
+        $reminder->forceDelete();
+
+        return redirect()
+            ->route('admin.digital-reminder.index')
+            ->with('success', 'Penjadwalan untuk "'.$nama.'" berhasil dihapus permanen.');
     }
 
     /**

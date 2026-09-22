@@ -3,6 +3,7 @@
 namespace App\Broadcasting\WhatsApp;
 
 use App\Models\MessageLog;
+use App\Broadcasting\PhoneFormat;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -40,6 +41,9 @@ class MetaSender implements WhatsAppSender
             'jenis' => $log->jenis,
             'rule' => $log->rule,
             'reminder_id' => $log->reminder_id,
+            'to' => $payload['to'] ?? null,
+            'tujuan_asli' => $log->penerima_no_hp,
+            'test_target' => config('whatsapp.test_target'),
             'konten' => (string) $log->konten,
             'meta_template_name' => (string) $log->meta_template_name,
             'template_params' => (array) ($log->template_params ?? []),
@@ -52,10 +56,35 @@ class MetaSender implements WhatsAppSender
 
     protected function post(array $config, array $payload): HasilKirim
     {
-        $respons = Http::withToken((string) $config['token'])
-            ->timeout((int) ($config['timeout'] ?? 15))
-            ->acceptJson()
-            ->post($this->url($config), $payload);
+        $url = $this->url($config);
+
+        Log::channel('whatsapp')->info('MetaSender::post mulai', [
+            'url' => $url,
+            'to' => $payload['to'] ?? null,
+            'type' => $payload['type'] ?? null,
+        ]);
+
+        try {
+            $respons = Http::withToken((string) $config['token'])
+                ->timeout((int) ($config['timeout'] ?? 15))
+                ->acceptJson()
+                ->post($url, $payload);
+        } catch (\Throwable $e) {
+            Log::channel('whatsapp')->error('MetaSender::post jaringan gagal', [
+                'url' => $url,
+                'to' => $payload['to'] ?? null,
+                'error' => $e->getMessage(),
+            ]);
+
+            throw $e;
+        }
+
+        Log::channel('whatsapp')->info('MetaSender::post respons', [
+            'url' => $url,
+            'to' => $payload['to'] ?? null,
+            'status' => $respons->status(),
+            'body' => $respons->body(),
+        ]);
 
         if ($respons->failed()) {
             return HasilKirim::gagal('meta', $this->galat($respons));
@@ -68,6 +97,30 @@ class MetaSender implements WhatsAppSender
      * @return array<string, mixed>
      */
     protected function payload(MessageLog $log): array
+    {
+        $payload = $this->payloadAsli($log);
+
+        // Mode uji coba: semua kiriman dialihkan ke satu nomor tujuan
+        // (config whatsapp.test_target) agar bisa diverifikasi langsung.
+        $testTarget = config('whatsapp.test_target');
+        if (filled($testTarget)) {
+            $payload['to'] = PhoneFormat::toWa((string) $testTarget);
+
+            Log::channel('whatsapp')->warning('MetaSender::payload dialihkan ke nomor uji coba', [
+                'log_id' => $log->id,
+                'tujuan_asli' => $log->penerima_no_hp,
+                'test_target' => $testTarget,
+                'to' => $payload['to'],
+            ]);
+        }
+
+        return $payload;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function payloadAsli(MessageLog $log): array
     {
         $metaPayload = (array) ($log->meta_payload ?? []);
 

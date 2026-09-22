@@ -186,7 +186,7 @@ class ReminderCrudTest extends TestCase
     }
 
     #[Test]
-    public function hapus_penjadwalan(): void
+    public function hapus_penjadwalan_menjadi_soft_delete(): void
     {
         extract($this->pasangan());
 
@@ -202,7 +202,13 @@ class ReminderCrudTest extends TestCase
             ->delete(route('admin.digital-reminder.destroy', $reminder))
             ->assertRedirect(route('admin.digital-reminder.index'));
 
-        $this->assertModelMissing($reminder);
+        // Soft delete: baris tetap di database dengan deleted_at terisi.
+        $this->assertNotNull(Reminder::withTrashed()->find($reminder->id)->deleted_at);
+
+        // Tidak lagi tampil di daftar penjadwalan.
+        $this->get(route('admin.digital-reminder.index'))
+            ->assertOk()
+            ->assertDontSee('NIP 123');
     }
 
     #[Test]

@@ -10,6 +10,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\RateLimited;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Kirim satu pesan WhatsApp dari outbox message_logs. Status diklaim
@@ -40,9 +41,19 @@ class KirimPesanJob implements ShouldQueue
 
     public function handle(WhatsAppSender $sender): void
     {
+        Log::channel('whatsapp')->info('KirimPesanJob::handle mulai', [
+            'log_id' => $this->logId,
+            'attempt' => $this->attempts(),
+        ]);
+
         $log = MessageLog::find($this->logId);
 
         if (! $log || $log->status !== 'menunggu') {
+            Log::channel('whatsapp')->warning('KirimPesanJob::handle skip — pesan tidak menunggu', [
+                'log_id' => $this->logId,
+                'status' => $log?->status,
+            ]);
+
             return;
         }
 
@@ -52,10 +63,23 @@ class KirimPesanJob implements ShouldQueue
             ->update(['status' => 'mengirim']);
 
         if ($diklaim === 0) {
+            Log::channel('whatsapp')->warning('KirimPesanJob::handle skip — status sudah diklaim', [
+                'log_id' => $this->logId,
+            ]);
+
             return;
         }
 
         $log->refresh();
+
+        Log::channel('whatsapp')->info('KirimPesanJob::handle mengirim', [
+            'log_id' => $log->id,
+            'to' => $log->penerima_no_hp,
+            'driver' => config('whatsapp.driver'),
+            'template' => $log->meta_template_name,
+            'language' => $log->meta_language,
+            'params' => $log->template_params,
+        ]);
 
         try {
             $hasil = $sender->kirim($log);
@@ -64,6 +88,11 @@ class KirimPesanJob implements ShouldQueue
                 ->whereKey($log->id)
                 ->where('status', 'mengirim')
                 ->update(['status' => 'menunggu']);
+
+            Log::channel('whatsapp')->error('KirimPesanJob::handle gagal jaringan', [
+                'log_id' => $log->id,
+                'error' => $e->getMessage(),
+            ]);
 
             throw $e;
         }
@@ -77,6 +106,13 @@ class KirimPesanJob implements ShouldQueue
                 'error' => null,
             ]);
 
+            Log::channel('whatsapp')->info('KirimPesanJob::handle sukses', [
+                'log_id' => $log->id,
+                'to' => $log->penerima_no_hp,
+                'provider' => $hasil->provider,
+                'provider_message_id' => $hasil->messageId,
+            ]);
+
             return;
         }
 
@@ -85,10 +121,22 @@ class KirimPesanJob implements ShouldQueue
             'provider' => $hasil->provider,
             'error' => $hasil->error,
         ]);
+
+        Log::channel('whatsapp')->error('KirimPesanJob::handle gagal', [
+            'log_id' => $log->id,
+            'to' => $log->penerima_no_hp,
+            'provider' => $hasil->provider,
+            'error' => $hasil->error,
+        ]);
     }
 
     public function failed(\Throwable $e): void
     {
+        Log::channel('whatsapp')->error('KirimPesanJob::failed', [
+            'log_id' => $this->logId,
+            'error' => $e->getMessage(),
+        ]);
+
         MessageLog::query()
             ->whereKey($this->logId)
             ->whereIn('status', ['menunggu', 'mengirim'])

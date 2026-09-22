@@ -107,6 +107,13 @@ Route::middleware('auth')->group(function () {
                 ->except('show')
                 ->parameters(['digital-reminder' => 'reminder']);
 
+            // Hapus permanen penjadwalan — khusus superadmin (soft delete
+            // adalah perilaku default destroy). withTrashed() agar jadwal
+            // yang sudah dihapus (soft) tetap bisa dihapus permanen.
+            Route::delete('digital-reminder/{reminder}/hapus-permanen', [DigitalReminderController::class, 'forceDestroy'])
+                ->name('digital-reminder.force-destroy')
+                ->withTrashed();
+
             // Realisasi kunjungan dari sebuah penjadwalan → status selesai.
             Route::post('digital-reminder/{reminder}/kunjungan', [DigitalReminderController::class, 'catatKunjungan'])
                 ->name('digital-reminder.kunjungan');

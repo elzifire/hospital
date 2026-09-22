@@ -277,17 +277,28 @@
                                            class="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-200">
                                             Edit
                                         </a>
-                                        {{-- Tombol Hapus disembunyikan sementara.
+                                        {{-- Hapus = soft delete (tersedia untuk semua pemegang permission). --}}
                                         <button type="button"
                                                 onclick="confirmSubmit('{{ $r['hapusUrl'] }}', {
                                                     title: 'Hapus penjadwalan?',
-                                                    html: 'Jadwal <strong>{{ $r['pasien']?->nama }}</strong> pada {{ $r['tanggal']?->translatedFormat('d M Y') }} akan dihapus permanen.',
+                                                    html: 'Jadwal <strong>{{ $r['pasien']?->nama }}</strong> pada {{ $r['tanggal']?->translatedFormat('d M Y') }} akan dihapus dari daftar (soft delete).',
                                                     confirmText: 'Ya, hapus'
                                                 })"
                                                 class="rounded-lg bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-600 ring-1 ring-inset ring-rose-200 transition hover:bg-rose-100">
                                             Hapus
                                         </button>
-                                        --}}
+                                        {{-- Hapus permanen — khusus superadmin. --}}
+                                        @if (auth()->user()?->hasRole('superadmin'))
+                                            <button type="button"
+                                                    onclick="confirmSubmit('{{ $r['forceHapusUrl'] }}', {
+                                                        title: 'Hapus permanen penjadwalan?',
+                                                        html: 'Jadwal <strong>{{ $r['pasien']?->nama }}</strong> pada {{ $r['tanggal']?->translatedFormat('d M Y') }} akan <strong>dihapus permanen</strong> dari sistem.',
+                                                        confirmText: 'Ya, hapus permanen'
+                                                    })"
+                                                    class="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white ring-1 ring-inset ring-rose-700 transition hover:bg-rose-700">
+                                                Hapus Permanen
+                                            </button>
+                                        @endif
                                     </td>
                                 </tr>
                             @endif

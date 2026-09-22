@@ -210,6 +210,18 @@ abstract class ManualBroadcastController extends Controller
             $diantrekan++;
         }
 
+        Log::channel('whatsapp')->info('ManualBroadcastController::store selesai', [
+            'kirim_group' => $kirimGroup,
+            'jenis' => $data['jenis'],
+            'mode' => $mode,
+            'jumlah_pnpp' => $pnpps->count(),
+            'jumlah_logs' => $logs->count(),
+            'menunggu' => $menunggu->count(),
+            'tanpa_nomor' => $tanpaNomor->count(),
+            'diantrekan' => $diantrekan,
+            'reminder_ids' => $data['reminder_ids'] ?? [],
+        ]);
+
         $pesan = implode(' ', array_filter([
             $diantrekan > 0
                 ? 'Pesan untuk '.$diantrekan.' pasien masuk antrean pengiriman dan akan dikirim otomatis sesaat lagi.'
