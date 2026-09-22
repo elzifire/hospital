@@ -11,6 +11,7 @@ use App\Models\Satker;
 use App\Support\MasterRegistry;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class PnppController extends Controller
 {
@@ -136,7 +137,8 @@ class PnppController extends Controller
     }
 
     /**
-     * Hapus data PNPP (kunjungan ikut terhapus via cascade).
+     * Hapus data PNPP (soft delete). Baris tetap tersimpan sehingga riwayat
+     * kunjungan / penjadwalan yang menunjuk pasien ini tetap terbaca.
      */
     public function destroy(Pnpp $pnpp)
     {
@@ -144,7 +146,22 @@ class PnppController extends Controller
         $pnpp->delete();
 
         return redirect()->route('admin.pnpp.index')
-            ->with('success', "Data PNPP \"{$nama}\" berhasil dihapus.");
+            ->with('success', "Data PNPP \"{$nama}\" berhasil dihapus (soft delete).");
+    }
+
+    /**
+     * Hapus permanen — khusus superadmin. Baris beserta kunjungan dan
+     * penjadwalan terkait dihilangkan dari sistem (cascade).
+     */
+    public function forceDestroy(Request $request, Pnpp $pnpp)
+    {
+        abort_unless($request->user()?->hasRole('superadmin'), 403, 'Hanya superadmin yang dapat menghapus permanen.');
+
+        $nama = $pnpp->nama;
+        $pnpp->forceDelete();
+
+        return redirect()->route('admin.pnpp.index')
+            ->with('success', "Data PNPP \"{$nama}\" berhasil dihapus permanen.");
     }
 
     /**
@@ -199,7 +216,7 @@ class PnppController extends Controller
 
         return $request->validate([
             'nama' => ['required', 'string', 'max:255'],
-            'nip' => ['nullable', 'string', 'max:50', 'unique:pnpps,nip'.($pnpp ? ','.$pnpp->id : '')],
+            'nip' => ['nullable', 'string', 'max:50', Rule::unique('pnpps', 'nip')->whereNull('deleted_at')->ignore($pnpp?->id)],
             'status_kepegawaian' => ['nullable', 'string', 'max:100'],
             'pangkat' => ['nullable', 'string', 'max:100'],
             'jabatan' => ['nullable', 'string', 'max:100'],
@@ -207,7 +224,7 @@ class PnppController extends Controller
             'bagian' => ['nullable', 'string', 'max:100'],
             'email' => ['nullable', 'string', 'email', 'max:255'],
             'alamat' => ['nullable', 'string', 'max:500'],
-            'no_bpjs' => ['nullable', 'string', 'max:50', 'unique:pnpps,no_bpjs'.($pnpp ? ','.$pnpp->id : '')],
+            'no_bpjs' => ['nullable', 'string', 'max:50', Rule::unique('pnpps', 'no_bpjs')->whereNull('deleted_at')->ignore($pnpp?->id)],
             'satker_id' => ['nullable', 'integer', 'exists:satkers,id'],
             'no_hp' => ['nullable', 'string', 'max:20'],
             'tanggal_lahir' => ['nullable', 'date'],

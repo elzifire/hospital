@@ -47,7 +47,7 @@ class KunjunganDaftar
         // ---- Baris penjadwalan (reminder) ----
         $reminders = Reminder::query()
             ->tap($scopePoli)
-            ->with('pnpp.satker:id,nama', 'poli:id,nama', 'dokter:id,nama')
+            ->with(['pnpp' => fn ($q) => $q->withTrashed()->with('satker:id,nama')], 'poli:id,nama', 'dokter:id,nama')
             ->withExists('kunjungan as sudah_kunjungan')
             ->when($q, fn ($query) => $query->where(
                 fn ($sub) => $sub
@@ -72,7 +72,7 @@ class KunjunganDaftar
         $grupManual = Kunjungan::query()
             ->whereNull('reminder_id')
             ->tap($scopePoli)
-            ->with('pnpp.satker:id,nama', 'poli:id,nama')
+            ->with(['pnpp' => fn ($q) => $q->withTrashed()->with('satker:id,nama')], 'poli:id,nama')
             ->when($q, fn ($query) => $query->whereHas('pnpp', fn ($p) => $p
                 ->whereRaw('UPPER(nama) LIKE ?', ["%{$qAtas}%"])
                 ->orWhere('nip', 'like', "%{$q}%")))
@@ -164,7 +164,7 @@ class KunjunganDaftar
         $scopePoli = fn (Builder $t) => $t->when($batasiPoli, fn ($u) => $u->where('poli_id', $poliAktif));
 
         $grup = Kunjungan::query()
-            ->with('pnpp.satker:id,nama', 'poli:id,nama')
+            ->with(['pnpp' => fn ($q) => $q->withTrashed()->with('satker:id,nama')], 'poli:id,nama')
             ->tap($scopePoli)
             ->when($q, fn ($query) => $query->whereHas('pnpp', fn ($p) => $p
                 ->whereRaw('UPPER(nama) LIKE ?', ["%{$qAtas}%"])

@@ -114,6 +114,16 @@ Route::middleware('auth')->group(function () {
                 ->name('digital-reminder.force-destroy')
                 ->withTrashed();
 
+            // Tong sampah: penjadwalan soft-deleted untuk dipulihkan lagi.
+            Route::get('digital-reminder/tong-sampah', [DigitalReminderController::class, 'trash'])
+                ->name('digital-reminder.trash');
+
+            // Pulihkan penjadwalan yang dihapus (soft delete) — withTrashed()
+            // agar baris yang sudah dihapus tetap bisa di-resolve & dipulihkan.
+            Route::post('digital-reminder/{reminder}/restore', [DigitalReminderController::class, 'restore'])
+                ->name('digital-reminder.restore')
+                ->withTrashed();
+
             // Realisasi kunjungan dari sebuah penjadwalan → status selesai.
             Route::post('digital-reminder/{reminder}/kunjungan', [DigitalReminderController::class, 'catatKunjungan'])
                 ->name('digital-reminder.kunjungan');
@@ -244,6 +254,12 @@ Route::middleware('auth')->group(function () {
         // Data Master — tiap entitas terkunci permission fiturnya sendiri.
         Route::middleware('can:manage pnpp')->group(function () {
             Route::resource('pnpp', PnppController::class)->except('show');
+
+            // Hapus permanen (soft delete sudah ditangani route resource di
+            // atas) — khusus superadmin, rute harus resolve baris trashed.
+            Route::delete('pnpp/{pnpp}/hapus-permanen', [PnppController::class, 'forceDestroy'])
+                ->name('pnpp.force-destroy')
+                ->withTrashed();
         });
 
         Route::middleware('can:manage satker')->group(function () {

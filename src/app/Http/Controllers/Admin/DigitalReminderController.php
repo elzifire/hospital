@@ -31,11 +31,78 @@ class DigitalReminderController extends Controller
      */
     public function index(Request $request)
     {
-        return view('admin.digital-reminder.index', app(KunjunganDaftar::class)->data(
+        $data = app(KunjunganDaftar::class)->data(
             $request,
             $this->batasiPoli(),
             $this->poliAktif(),
-        ));
+        );
+
+        $data['totalTrashed'] = Reminder::query()
+            ->onlyTrashed()
+            ->when($this->batasiPoli(), fn ($q) => $q->where('poli_id', $this->poliAktif()))
+            ->count();
+
+        return view('admin.digital-reminder.index', $data);
+    }
+
+    /**
+     * Tong sampah — penjadwalan yang sudah dihapus (soft delete). Baris
+     * yang terhapus tetap tersimpan dan bisa dipulihkan ke daftar utama.
+     */
+    public function trash(Request $request)
+    {
+        $q = (string) $request->query('q', '');
+        $qAtas = strtoupper($q);
+        $status = (string) $request->query('status', '');
+        $poliId = (string) $request->query('poli', '');
+        $batasiPoli = $this->batasiPoli();
+
+        $items = Reminder::query()
+            ->onlyTrashed()
+            ->when($batasiPoli, fn ($query) => $query->where('poli_id', $this->poliAktif()))
+            ->with(['pnpp' => fn ($q2) => $q2->withTrashed()->with('satker:id,nama')], 'poli:id,nama', 'dokter:id,nama')
+            ->when($q, fn ($query) => $query->where(
+                fn ($sub) => $sub
+                    ->where('catatan', 'like', "%{$q}%")
+                    ->orWhereHas('pnpp', fn ($p) => $p
+                        ->whereRaw('UPPER(nama) LIKE ?', ["%{$qAtas}%"])
+                        ->orWhere('nip', 'like', "%{$q}%"))
+            ))
+            ->when($status, fn ($query) => $query->where('status', $status))
+            ->when($poliId && ! $batasiPoli, fn ($query) => $query->where('poli_id', $poliId))
+            ->orderByDesc('deleted_at')
+            ->paginate(10)
+            ->withQueryString();
+
+        $queryTrashed = fn ($sistem) => $sistem
+            ->when($batasiPoli, fn ($q2) => $q2->where('poli_id', $this->poliAktif()));
+
+        return view('admin.digital-reminder.trash', [
+            'items' => $items,
+            'totalTrashed' => Reminder::query()->tap($queryTrashed)->onlyTrashed()->count(),
+            'totalPasien' => Reminder::query()->tap($queryTrashed)->onlyTrashed()->distinct('pnpp_id')->count('pnpp_id'),
+            'polis' => $this->daftarPoliAktif(),
+            'batasiPoli' => $batasiPoli,
+            'filters' => ['q' => $q, 'status' => $status, 'poli' => $poliId],
+        ]);
+    }
+
+    /**
+     * Pulihkan penjadwalan yang dihapus (soft delete) ke daftar utama.
+     */
+    public function restore(Reminder $reminder)
+    {
+        $this->pastikanPoli($reminder);
+
+        $nama = $reminder->pnpp?->nama;
+
+        if ($reminder->trashed()) {
+            $reminder->restore();
+        }
+
+        return redirect()
+            ->route('admin.digital-reminder.trash')
+            ->with('success', 'Penjadwalan untuk "'.$nama.'" berhasil dipulihkan ke daftar sesi.');
     }
 
     /**

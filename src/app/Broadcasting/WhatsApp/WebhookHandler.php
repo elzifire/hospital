@@ -3,6 +3,7 @@
 namespace App\Broadcasting\WhatsApp;
 
 use App\Broadcasting\PhoneFormat;
+use App\Models\MessageLog;
 use App\Models\MessageReply;
 use App\Models\Pnpp;
 use App\Services\AutoReplyService;
@@ -21,9 +22,11 @@ use Illuminate\Support\Facades\Log;
  *       messages: [{ from, id, timestamp, type, text: { body }, ... }],
  *       statuses: [...] } }] } }
  *
- * Hanya event field 'messages' yang diproses; statuses/read-receipt
- * diabaikan. Nomor pengirim dinormalisasi ke format 62xx agar bisa
- * dicocokkan dengan data PNPP.
+ * Event field 'messages' berisi balasan pasien (disimpan ke
+ * MessageReply), sedangkan array statuses berisi status pengiriman pesan
+ * keluar (sent/delivered/failed) — dipakai memutakhirkan MessageLog
+ * supaya riwayat mencerminkan hasil sesungguhnya dari WhatsApp, bukan
+ * sekadar "accepted" saat request diterima Meta.
  */
 class WebhookHandler
 {
@@ -82,10 +85,90 @@ class WebhookHandler
                         $diproses++;
                     }
                 }
+
+                foreach ((array) ($nilai['statuses'] ?? []) as $status) {
+                    if ($this->catatStatus($status)) {
+                        $diproses++;
+                    }
+                }
             }
         }
 
         return $diproses;
+    }
+
+    /**
+     * Catat status pengiriman pesan keluar dari Meta: cocokkan wamid
+     * dengan provider_message_id di message_logs, lalu perbarui status
+     * sesuai fakta. "failed" menuliskan alasan dari Meta ke kolom error
+     * supaya riwayat tidak menyesatkan (HTTP accepted ≠ terkirim).
+     *
+     * @param  array<string, mixed>  $status
+     */
+    protected function catatStatus(array $status): bool
+    {
+        $id = trim((string) ($status['id'] ?? ''));
+        $keadaan = strtolower(trim((string) ($status['status'] ?? '')));
+
+        if ($id === '' || ! in_array($keadaan, ['sent', 'delivered', 'read', 'failed'], true)) {
+            return false;
+        }
+
+        $log = MessageLog::query()->where('provider_message_id', $id)->first();
+
+        if ($log === null) {
+            Log::channel('whatsapp')->warning('Webhook status pengiriman tanpa pesan terdaftar', [
+                'id' => $id,
+                'status' => $keadaan,
+                'recipient_id' => $status['recipient_id'] ?? null,
+            ]);
+
+            return false;
+        }
+
+        Log::channel('whatsapp')->info('Webhook status pengiriman', [
+            'id' => $id,
+            'log_id' => $log->id,
+            'status' => $keadaan,
+            'recipient_id' => $status['recipient_id'] ?? null,
+            'error' => $keadaan === 'failed' ? $this->galatStatus($status) : null,
+        ]);
+
+        if ($keadaan === 'failed') {
+            $log->update([
+                'status' => 'gagal',
+                'error' => $this->galatStatus($status),
+            ]);
+        } elseif ($keadaan !== 'read' && $log->status !== 'terkirim') {
+            // sent/delivered — konfirmasi sesungguhnya dari WhatsApp.
+            $log->update(['status' => 'terkirim', 'sent_at' => now()]);
+        }
+
+        return true;
+    }
+
+    /**
+     * Baca alasan kegagalan dari error array Meta.
+     *
+     * @param  array<string, mixed>  $status
+     */
+    protected function galatStatus(array $status): string
+    {
+        $galat = (array) ($status['errors'][0] ?? []);
+
+        return 'WhatsApp menolak pesan ('.$this->bacaStatus($status).'): '
+            .(string) ($galat['message'] ?? 'kendala di sisi Meta.')
+            .(isset($galat['code']) ? ' (kode '.$galat['code'].')' : '');
+    }
+
+    /**
+     * Label ringkas status Meta untuk pesan error.
+     *
+     * @param  array<string, mixed>  $status
+     */
+    protected function bacaStatus(array $status): string
+    {
+        return strtoupper((string) ($status['status'] ?? 'failed'));
     }
 
     /**

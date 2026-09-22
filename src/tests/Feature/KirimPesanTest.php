@@ -35,6 +35,7 @@ class KirimPesanTest extends TestCase
             'whatsapp.meta.base_url' => 'https://graph.facebook.com',
             'whatsapp.meta.version' => 'v25.0',
             'whatsapp.meta.timeout' => 15,
+            'whatsapp.test_target' => '',
         ]);
     }
 
@@ -74,6 +75,62 @@ class KirimPesanTest extends TestCase
             'template_params' => ['Budi Santoso'],
             ...($attrs['log'] ?? []),
         ]);
+    }
+
+    #[Test]
+    public function meta_sender_mengalihkan_ke_nomor_uji_coba_saat_test_target_terisi(): void
+    {
+        $log = $this->buatLog();
+
+        config(['whatsapp.test_target' => '089516236766']);
+
+        $url = config('whatsapp.meta.base_url')
+            .'/'.config('whatsapp.meta.version')
+            .'/'.config('whatsapp.meta.phone_number_id')
+            .'/messages';
+
+        Http::fake([
+            str_replace('https://', '', $url) => Http::response([
+                'messages' => [['id' => 'wamid.target1']],
+            ], 200),
+        ]);
+
+        $hasil = app(MetaSender::class)->kirim($log);
+
+        $this->assertTrue($hasil->ok);
+        $this->assertSame('wamid.target1', $hasil->messageId);
+
+        Http::assertSent(function ($request) {
+            $payload = $request->data();
+
+            return $payload['to'] === '6289516236766'
+                && ($payload['template']['name'] ?? null) === 'promo_h1';
+        });
+    }
+
+    #[Test]
+    public function meta_sender_biarkan_nomor_asli_saat_test_target_kosong(): void
+    {
+        $log = $this->buatLog();
+
+        config(['whatsapp.test_target' => '']);
+
+        $url = config('whatsapp.meta.base_url')
+            .'/'.config('whatsapp.meta.version')
+            .'/'.config('whatsapp.meta.phone_number_id')
+            .'/messages';
+
+        Http::fake([
+            str_replace('https://', '', $url) => Http::response([
+                'messages' => [['id' => 'wamid.asli1']],
+            ], 200),
+        ]);
+
+        app(MetaSender::class)->kirim($log);
+
+        Http::assertSent(function ($request) {
+            return $request->data()['to'] === '6281234567890';
+        });
     }
 
     #[Test]

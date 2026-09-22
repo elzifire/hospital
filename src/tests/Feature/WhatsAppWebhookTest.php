@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\MessageLog;
 use App\Models\MessageReply;
 use App\Models\Pnpp;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -234,5 +235,83 @@ class WhatsAppWebhookTest extends TestCase
             ->assertJson(['status' => 'ok', 'diproses' => 0]);
 
         $this->assertDatabaseCount('message_replies', 0);
+    }
+
+    #[Test]
+    public function status_pengiriman_failed_memperbarui_message_log(): void
+    {
+        MessageLog::create([
+            'jenis' => 'outreach',
+            'rule' => 'manual',
+            'penerima_nama' => 'Budi Santoso',
+            'penerima_no_hp' => '6289516236766',
+            'konten' => 'Test.',
+            'status' => 'terkirim',
+            'provider' => 'meta',
+            'provider_message_id' => 'wamid.STATUS1',
+        ]);
+
+        $payload = $this->balasanPayload();
+        $payload['entry'][0]['changes'][0]['value'] = [
+            'statuses' => [
+                [
+                    'id' => 'wamid.STATUS1',
+                    'status' => 'failed',
+                    'timestamp' => '1700000200',
+                    'recipient_id' => '6289516236766',
+                    'errors' => [
+                        ['code' => 131026, 'message' => 'Message failed to send because more than 24 hours have passed since the customer last replied.'],
+                    ],
+                ],
+            ],
+        ];
+
+        $body = json_encode($payload);
+        $signature = 'sha256='.hash_hmac('sha256', $body, 'rahasia_uji');
+
+        $this->postJson('/whatsapp/webhook', $payload, ['X-Hub-Signature-256' => $signature])
+            ->assertOk();
+
+        $log = MessageLog::where('provider_message_id', 'wamid.STATUS1')->first();
+        $this->assertSame('gagal', $log->status);
+        $this->assertStringContainsString('131026', (string) $log->error);
+        $this->assertStringContainsString('24 hours', (string) $log->error);
+    }
+
+    #[Test]
+    public function status_sent_memperbarui_message_log_menjadi_terkirim(): void
+    {
+        MessageLog::create([
+            'jenis' => 'outreach',
+            'rule' => 'manual',
+            'penerima_nama' => 'Budi Santoso',
+            'penerima_no_hp' => '6289516236766',
+            'konten' => 'Test.',
+            'status' => 'mengirim',
+            'provider' => 'meta',
+            'provider_message_id' => 'wamid.STATUS2',
+        ]);
+
+        $payload = $this->balasanPayload();
+        $payload['entry'][0]['changes'][0]['value'] = [
+            'statuses' => [
+                [
+                    'id' => 'wamid.STATUS2',
+                    'status' => 'sent',
+                    'timestamp' => '1700000200',
+                    'recipient_id' => '6289516236766',
+                ],
+            ],
+        ];
+
+        $body = json_encode($payload);
+        $signature = 'sha256='.hash_hmac('sha256', $body, 'rahasia_uji');
+
+        $this->postJson('/whatsapp/webhook', $payload, ['X-Hub-Signature-256' => $signature])
+            ->assertOk();
+
+        $log = MessageLog::where('provider_message_id', 'wamid.STATUS2')->first();
+        $this->assertSame('terkirim', $log->status);
+        $this->assertNotNull($log->sent_at);
     }
 }
