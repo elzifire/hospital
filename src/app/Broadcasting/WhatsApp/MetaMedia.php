@@ -62,6 +62,89 @@ class MetaMedia
     }
 
     /**
+     * Unduh media masuk yang dikirim pasien (balasan Respon) berdasarkan
+     * media id dari webhook Meta: pertama GET /{media-id} untuk mendapat
+     * URL unduhan sementara, lalu GET URL tersebut. Kembalikan [byte, mime]
+     * atau null bila gagal / konfigurasi belum siap.
+     *
+     * @return array{0: string, 1: string}|null
+     */
+    public function ambilMedia(string $mediaId): ?array
+    {
+        $config = (array) config('whatsapp.meta');
+
+        if ($this->konfigurasiBelumSiap($config)) {
+            Log::channel('whatsapp')->warning('MetaMedia: token / phone_number_id belum dikonfigurasi.', [
+                'media_id' => $mediaId,
+            ]);
+
+            return null;
+        }
+
+        $base = rtrim((string) ($config['base_url'] ?? 'https://graph.facebook.com'), '/');
+        $version = (string) ($config['version'] ?? 'v25.0');
+        $token = (string) ($config['token'] ?? '');
+        $timeout = (int) ($config['timeout'] ?? 15);
+
+        try {
+            $info = Http::withToken($token)->timeout($timeout)->get("{$base}/{$version}/{$mediaId}");
+        } catch (\Throwable $e) {
+            Log::channel('whatsapp')->warning('MetaMedia: gagal mengambil info media masuk.', [
+                'media_id' => $mediaId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+
+        if ($info->failed()) {
+            Log::channel('whatsapp')->warning('MetaMedia: info media masuk ditolak Meta.', [
+                'media_id' => $mediaId,
+                'status' => $info->status(),
+                'body' => Str::limit((string) $info->body(), 500),
+            ]);
+
+            return null;
+        }
+
+        $url = (string) ($info->json('url') ?? '');
+
+        if ($url === '') {
+            Log::channel('whatsapp')->warning('MetaMedia: info media masuk tanpa URL unduhan.', [
+                'media_id' => $mediaId,
+                'body' => Str::limit((string) $info->body(), 500),
+            ]);
+
+            return null;
+        }
+
+        $mime = strtolower((string) ($info->json('mime_type') ?? 'application/octet-stream'));
+
+        try {
+            $berkas = Http::withToken($token)->timeout(max(30, $timeout * 2))->get($url);
+        } catch (\Throwable $e) {
+            Log::channel('whatsapp')->warning('MetaMedia: gagal mengunduh media masuk.', [
+                'media_id' => $mediaId,
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+
+        if ($berkas->failed() || $berkas->body() === '') {
+            Log::channel('whatsapp')->warning('MetaMedia: media masuk tidak bisa diunduh.', [
+                'media_id' => $mediaId,
+                'status' => $berkas->status(),
+                'body' => Str::limit((string) $berkas->body(), 300),
+            ]);
+
+            return null;
+        }
+
+        return [$berkas->body(), $mime];
+    }
+
+    /**
      * Unggah byte mentah media chat (balasan Respon) ke WABA; kembalikan
      * media id, atau null bila gagal. Berbeda dari header template, media
      * obrolan menerima juga audio/video/document sehingga MIME tidak

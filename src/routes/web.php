@@ -184,6 +184,7 @@ Route::middleware('auth')->group(function () {
             // (event, tanpa websocket).
             Route::post('respon/{nomor}/balas', [ResponController::class, 'balas'])->name('respon.balas');
             Route::get('respon/{nomor}/timeline', [ResponController::class, 'timeline'])->name('respon.timeline');
+            Route::get('respon/{nomor}/media/{balasan}', [ResponController::class, 'media'])->name('respon.media');
         });
 
         // Bank data Auto Reply — aturan pencocokan pesan masuk → jawaban

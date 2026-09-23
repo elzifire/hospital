@@ -46,23 +46,42 @@
                 <div class="flex justify-end" title="{{ isset($t['status']) ? 'Status: '.ucfirst($t['status']).(isset($t['jenis']) ? ' · '.$t['jenis'] : '') : '' }}">
                     <div class="max-w-[82%] rounded-xl rounded-tr-sm bg-[#d9fdd3] px-4 py-2.5 shadow-sm">
                         @if ($media !== null)
-                            @if ($media['tipe'] === 'image')
-                                <img src="{{ asset('storage/'.$media['path']) }}" alt="{{ $media['caption'] ?? '' }}"
-                                     class="h-64 w-full rounded-lg object-cover">
-                            @else
-                                <div class="flex items-center gap-3 rounded-lg bg-white/70 px-3 py-2.5 ring-1 ring-black/5">
-                                    <span class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-sky-100 text-sky-600">
-                                        <svg class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $ikonMedia[$media['tipe']] ?? $ikonMedia['document'] }}"/></svg>
-                                    </span>
-                                    <div class="min-w-0">
-                                        <p class="truncate text-sm font-semibold text-slate-700">{{ $media['nama'] ?? 'Lampiran' }}</p>
-                                        <p class="text-[11px] text-slate-400">{{ strtoupper($media['tipe'] ?? '') }}</p>
+                            <div class="space-y-1.5">
+                                @if ($media['tipe'] === 'image')
+                                    <a href="{{ asset('storage/'.$media['path']) }}" target="_blank" rel="noopener noreferrer" title="Buka gambar di tab baru">
+                                        <img src="{{ asset('storage/'.$media['path']) }}" alt="{{ $media['caption'] ?? '' }}"
+                                             class="h-64 w-full rounded-lg object-cover">
+                                    </a>
+                                @else
+                                    <div class="flex items-center gap-3 rounded-lg bg-white/70 px-3 py-2.5 ring-1 ring-black/5">
+                                        <span class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-sky-100 text-sky-600">
+                                            <svg class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $ikonMedia[$media['tipe']] ?? $ikonMedia['document'] }}"/></svg>
+                                        </span>
+                                        <div class="min-w-0 flex-1">
+                                            <p class="truncate text-sm font-semibold text-slate-700">{{ $media['nama'] ?? 'Lampiran' }}</p>
+                                            <p class="text-[11px] text-slate-400">{{ strtoupper($media['tipe'] ?? '') }}</p>
+                                        </div>
+                                        <div class="flex shrink-0 items-center gap-1">
+                                            <a href="{{ asset('storage/'.$media['path']) }}" target="_blank" rel="noopener noreferrer"
+                                               class="rounded-lg bg-slate-100 px-2.5 py-1.5 text-[11px] font-bold text-slate-600 ring-1 ring-slate-200 transition hover:bg-slate-200">Buka</a>
+                                            <a href="{{ asset('storage/'.$media['path']) }}" download
+                                               class="rounded-lg bg-slate-100 px-2.5 py-1.5 text-[11px] font-bold text-slate-600 ring-1 ring-slate-200 transition hover:bg-slate-200">Unduh</a>
+                                        </div>
                                     </div>
-                                </div>
-                            @endif
-                            @if (filled($media['caption'] ?? null))
-                                <p class="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-slate-800">{{ $media['caption'] }}</p>
-                            @endif
+                                @endif
+                                @if (filled($media['caption'] ?? null))
+                                    <p class="whitespace-pre-wrap text-sm leading-relaxed text-slate-800">{{ $media['caption'] }}</p>
+                                @endif
+                                @if ($media['tipe'] === 'image')
+                                    <div class="flex justify-end">
+                                        <a href="{{ asset('storage/'.$media['path']) }}" download
+                                           class="inline-flex items-center gap-1 rounded-lg bg-white/70 px-2.5 py-1.5 text-[11px] font-bold text-slate-500 ring-1 ring-black/5 transition hover:bg-white">
+                                            <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+                                            Unduh gambar
+                                        </a>
+                                    </div>
+                                @endif
+                            </div>
                         @elseif ($interaktif !== null)
                             <p class="whitespace-pre-wrap text-sm leading-relaxed text-slate-800">{{ $interaktif['body'] ?? $t['isi'] }}</p>
                             @if (filled($interaktif['url'] ?? null))
@@ -97,7 +116,43 @@
                 @endphp
                 <div class="flex justify-start">
                     <div class="max-w-[82%] rounded-xl rounded-tl-sm bg-white px-4 py-2.5 shadow-sm ring-1 ring-slate-100">
-                        @if (filled($t['media_kind'] ?? null))
+                        @if (($min = $t['media_in'] ?? null) !== null)
+                            <div class="space-y-1.5">
+                                @if ($min['kind'] === 'image')
+                                    <a href="{{ $min['url'] }}" target="_blank" rel="noopener noreferrer" title="Buka gambar di tab baru">
+                                        <img src="{{ $min['url'] }}" alt="{{ $keterangan }}" class="h-64 w-full rounded-lg object-cover">
+                                    </a>
+                                @else
+                                    <div class="flex items-center gap-3 rounded-lg bg-emerald-50/60 px-3 py-2.5 ring-1 ring-emerald-100">
+                                        <span class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
+                                            <svg class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $ikonMedia[$min['kind']] ?? $ikonMedia['document'] }}"/></svg>
+                                        </span>
+                                        <div class="min-w-0 flex-1">
+                                            <p class="truncate text-sm font-semibold text-slate-700">{{ $min['nama'] }}</p>
+                                            <p class="text-[11px] text-slate-400">{{ strtoupper($min['kind']) }} dari {{ $t['nama'] ?? 'kontak' }}</p>
+                                        </div>
+                                        <div class="flex shrink-0 items-center gap-1">
+                                            <a href="{{ $min['url'] }}" target="_blank" rel="noopener noreferrer"
+                                               class="rounded-lg bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-600 ring-1 ring-emerald-200 transition hover:bg-emerald-50">Buka</a>
+                                            <a href="{{ $min['unduh'] }}" download
+                                               class="rounded-lg bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-600 ring-1 ring-emerald-200 transition hover:bg-emerald-50">Unduh</a>
+                                        </div>
+                                    </div>
+                                @endif
+                                @if ($keterangan !== '')
+                                    <p class="whitespace-pre-wrap text-sm leading-relaxed text-slate-800">{{ $keterangan }}</p>
+                                @endif
+                                @if ($min['kind'] === 'image')
+                                    <div class="flex justify-end">
+                                        <a href="{{ $min['unduh'] }}" download
+                                           class="inline-flex items-center gap-1 rounded-lg bg-emerald-50/60 px-2.5 py-1.5 text-[11px] font-bold text-emerald-700 ring-1 ring-emerald-100 transition hover:bg-emerald-50">
+                                            <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+                                            Unduh gambar
+                                        </a>
+                                    </div>
+                                @endif
+                            </div>
+                        @elseif (filled($t['media_kind'] ?? null))
                             <div class="flex items-center gap-3">
                                 <span class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
                                     <svg class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $ikonMedia[$t['media_kind']] ?? $ikonMedia['document'] }}"/></svg>

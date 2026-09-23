@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Broadcasting\PhoneFormat;
 use App\Broadcasting\WhatsApp\AntreanKirim;
+use App\Broadcasting\WhatsApp\MetaMedia;
 use App\Http\Controllers\Controller;
 use App\Jobs\ImportMasterJob;
 use App\Jobs\PreviewImportJob;
@@ -16,6 +17,7 @@ use App\Models\Satker;
 use App\Support\MasterRegistry;
 use App\Support\TextSanitizer;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -23,6 +25,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Symfony\Component\Mime\MimeTypes;
 
 class ResponController extends Controller
 {
@@ -78,7 +81,7 @@ class ResponController extends Controller
      */
     public function konten(Request $request)
     {
-        [$konversasi, ,] = $this->daftarKonversasi($request);
+        [$konversasi] = $this->daftarKonversasi($request);
 
         return response()->json([
             'html' => view('admin.respon._chatrows', ['konversasi' => $konversasi])->render(),
@@ -473,7 +476,7 @@ class ResponController extends Controller
             [
                 'pemicu' => ['daftar', 'pendaftaran', 'antrian', 'registrasi'],
                 'label' => 'Cara pendaftaran',
-                'teks' => 'Pendaftaran dapat dilakukan di loket rumah sakit dengan membawa identitas dan kartu berobat.',
+                'teks' => 'https://docs.google.com/forms/d/e/1FAIpQLSciyFxqTOXei_xLrHc2aE3jnlx6V8eaNHlQHulsi_UCeV6Zng/viewform?fbzx=9126598892601474435',
             ],
         ];
 
@@ -566,19 +569,19 @@ class ResponController extends Controller
                 'cta_footer' => ['nullable', 'string', 'max:60'],
             ],
             'image' => [
-                'media' => [...$file, 'mimes:jpeg,jpg,png,webp,gif'],
+                'media' => [...$file, 'mimes:jpeg,jpg,png,webp,gif', $this->cekMimeIsi('image')],
                 'caption' => ['nullable', 'string', 'max:1000'],
             ],
             'audio' => [
-                'media' => [...$file, 'mimes:mp3,m4a,aac,ogg,amr,wav'],
+                'media' => [...$file, 'mimes:mp3,m4a,aac,ogg,amr,wav', $this->cekMimeIsi('audio')],
                 'caption' => ['nullable', 'string', 'max:1000'],
             ],
             'video' => [
-                'media' => [...$file, 'mimes:mp4,mov,3gp'],
+                'media' => [...$file, 'mimes:mp4,mov,3gp', $this->cekMimeIsi('video')],
                 'caption' => ['nullable', 'string', 'max:1000'],
             ],
             'document' => [
-                'media' => [...$file, 'mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,txt'],
+                'media' => [...$file, 'mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,txt', $this->cekMimeIsi('document')],
                 'caption' => ['nullable', 'string', 'max:1000'],
             ],
             default => [],
@@ -614,7 +617,15 @@ class ResponController extends Controller
         }
 
         $file = $request->file('media');
-        $nama = (string) Str::random(24).'.'.($file->getClientOriginalExtension() ?: $file->extension());
+
+        if (! $file->isValid()) {
+            abort(422, 'Media yang diunggah tidak valid.');
+        }
+
+        // Nama tersimpan memakai ekstensi hasil deteksi server (sesuai
+        // MIME isi berkas), bukan ekstensi nama asli yang dikirim klien,
+        // agar berkas tidak bisa disimpan dengan ekstensi mencurigakan.
+        $nama = (string) Str::random(24).'.'.$this->ekstensiTerverifikasi($file, $tipe);
         $path = $file->storeAs('respon-media', $nama, 'public');
 
         if ($path === false) {
@@ -628,12 +639,166 @@ class ResponController extends Controller
             [
                 'kind' => 'media',
                 'tipe' => $tipe,
-                'nama' => (string) $file->getClientOriginalName(),
-                'mime' => (string) ($file->getMimeType() ?? 'application/octet-stream'),
+                'nama' => $this->santasiNamaFile((string) $file->getClientOriginalName()),
+                'mime' => $this->mimeKonten($file),
                 'path' => (string) $path,
                 'caption' => $caption,
             ],
         ];
+    }
+
+    /**
+     * MIME isi berkas hasil finfo (server) — bukan klaim klien. Dipakai
+     * untuk validasi isi dan penetapan ekstensi penyimpanan yang benar.
+     */
+    protected function mimeKonten(UploadedFile $file): string
+    {
+        $finfo = new \finfo(FILEINFO_MIME_TYPE);
+        $mime = $finfo->file($file->getPathname());
+
+        return $mime ? strtolower((string) $mime) : 'application/octet-stream';
+    }
+
+    /**
+     * Daftar MIME isi berkas (finfo) yang wajar untuk tiap tipe balasan.
+     */
+    protected function daftarMimeIsi(string $tipe): array
+    {
+        return match ($tipe) {
+            'image' => ['image/jpeg', 'image/pjpeg', 'image/png', 'image/webp', 'image/gif'],
+            'audio' => [
+                'audio/mpeg', 'audio/mp3', 'audio/mp4', 'audio/x-m4a', 'audio/aac',
+                'audio/x-hx-aac-adts', 'audio/ogg', 'application/ogg', 'audio/amr',
+                'audio/wav', 'audio/x-wav',
+            ],
+            'video' => ['video/mp4', 'video/quicktime', 'video/3gpp', 'video/3gpp2'],
+            'document' => [
+                'application/pdf', 'application/msword',
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'application/vnd.ms-excel',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'application/vnd.ms-powerpoint',
+                'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+                'text/plain', 'text/csv',
+            ],
+            default => [],
+        };
+    }
+
+    /**
+     * Rule validasi isi berkas: MIME terdeteksi (finfo) wajib masuk daftar
+     * wajar untuk tipe terpilih — menolak berkas "tipuan" (nama/ekstensi
+     * menyamar tapi isi berbeda) yang lolos validasi berbasis ekstensi.
+     */
+    protected function cekMimeIsi(string $tipe): \Closure
+    {
+        return function (string $attribute, mixed $value, \Closure $fail) use ($tipe): void {
+            if (! $value instanceof UploadedFile || ! $value->isValid()) {
+                $fail('Berkas yang diunggah tidak valid.');
+
+                return;
+            }
+
+            if (! in_array($this->mimeKonten($value), $this->daftarMimeIsi($tipe), true)) {
+                $fail('Isi berkas tidak sesuai dengan jenis yang dipilih ('.ucfirst($tipe).').');
+            }
+        };
+    }
+
+    /**
+     * Ekstensi kanonik untuk berkas media yang disimpan, diturunkan dari
+     * MIME isi berkas hasil deteksi server (finfo) — bukan dari ekstensi
+     * nama asli klien, agar berkas tidak bisa disimpan dengan ekstensi
+     * mencurigakan atau menyesatkan.
+     */
+    protected function ekstensiTerverifikasi(UploadedFile $file, string $tipe): string
+    {
+        $kanonik = [
+            'image' => [
+                'image/jpeg' => 'jpg',
+                'image/pjpeg' => 'jpg',
+                'image/png' => 'png',
+                'image/webp' => 'webp',
+                'image/gif' => 'gif',
+            ],
+            'audio' => [
+                'audio/mpeg' => 'mp3',
+                'audio/mp3' => 'mp3',
+                'audio/mp4' => 'm4a',
+                'audio/x-m4a' => 'm4a',
+                'audio/aac' => 'aac',
+                'audio/ogg' => 'ogg',
+                'application/ogg' => 'ogg',
+                'audio/amr' => 'amr',
+                'audio/wav' => 'wav',
+                'audio/x-wav' => 'wav',
+            ],
+            'video' => [
+                'video/mp4' => 'mp4',
+                'video/quicktime' => 'mov',
+                'video/3gpp' => '3gp',
+            ],
+            'document' => [
+                'application/pdf' => 'pdf',
+                'application/msword' => 'doc',
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
+                'application/vnd.ms-excel' => 'xls',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => 'xlsx',
+                'application/vnd.ms-powerpoint' => 'ppt',
+                'application/vnd.openxmlformats-officedocument.presentationml.presentation' => 'pptx',
+                'text/plain' => 'txt',
+                'text/csv' => 'csv',
+            ],
+        ];
+
+        $mime = $this->mimeKonten($file);
+
+        return $kanonik[$tipe][$mime]
+            ?? MimeTypes::getDefault()->getExtensions($mime)[0]
+            ?? 'bin';
+    }
+
+    /**
+     * Ekstensi tersimpan untuk import, dipetakan dari MIME hasil deteksi
+     * server terhadap isi berkas. CSV sengaja dipetakan ke 'csv' walau
+     * finfo acap melaporkan text/plain / vnd.ms-excel, supaya SheetHelper
+     * selalu memperlakukannya sebagai CSV.
+     */
+    protected function ekstensiImport(UploadedFile $file): string
+    {
+        $mime = $this->mimeKonten($file);
+
+        $peta = [
+            'text/csv' => 'csv',
+            'application/csv' => 'csv',
+            'text/comma-separated-values' => 'csv',
+            'text/plain' => 'csv',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => 'xlsx',
+            'application/vnd.ms-excel' => 'xls',
+        ];
+
+        if (isset($peta[$mime])) {
+            return $peta[$mime];
+        }
+
+        $tebak = strtolower((string) ($file->guessExtension() ?: ''));
+
+        return in_array($tebak, ['xlsx', 'xls', 'csv', 'txt'], true) ? $tebak : 'xlsx';
+    }
+
+    /**
+     * Nama berkas aman untuk display/unduhan & header multipart: buang
+     * jalur (path traversal), karakter kontrol, lalu batasi panjang.
+     */
+    protected function santasiNamaFile(string $nama): string
+    {
+        $nama = str_replace('\\', '/', $nama);
+        $nama = basename($nama);
+        $nama = (string) preg_replace('/[\x00-\x1F\x7F]/u', '', $nama);
+        $nama = ltrim($nama, '. ');
+        $nama = mb_substr($nama, 0, 120, 'UTF-8');
+
+        return $nama !== '' ? $nama : 'lampiran';
     }
 
     /**
@@ -659,7 +824,98 @@ class ResponController extends Controller
     }
 
     /**
-     * @return Collection<int, array{arah: string, isi: string, waktu: Carbon, status?: string, jenis?: string, nama?: string, meta_payload?: array<string, mixed>|null, media_kind?: string|null}>
+     * Sajikan media yang dikirim pasien (balasan masuk). Berkas diambil
+     * dari Meta WhatsApp API pada akses pertama lalu di-cache ke storage
+     * publik, sehingga akses berikutnya langsung dari disk. Query `unduh=1`
+     * memaksa Content-Disposition attachment.
+     */
+    public function media(Request $request, string $nomor, MessageReply $balasan)
+    {
+        $noHp = PhoneFormat::toWa($nomor) ?? $nomor;
+        $this->pastikanAksesNomor($request, $noHp);
+
+        // Balasan harus milik percakapan yang sedang dibuka.
+        abort_unless($balasan->no_hp === $noHp, 404);
+
+        $relatif = $this->ambilAtauCacheMedia($balasan);
+
+        if ($relatif === null) {
+            abort(404, 'Media tidak dapat diambil dari WhatsApp.');
+        }
+
+        $unduh = $request->boolean('unduh');
+
+        return Storage::disk('public')->response(
+            $relatif,
+            $this->namaMedia($balasan, $relatif),
+            ['Cache-Control' => 'private, max-age=86400'],
+            $unduh ? 'attachment' : 'inline',
+        );
+    }
+
+    /**
+     * Lokasi media masuk di storage publik: pakai cache bila sudah ada,
+     * selain itu unduh dari Meta lalu simpan dan catat path-nya di payload.
+     * Null bila media belum tersedia (mis. driver non-meta / media basi).
+     */
+    protected function ambilAtauCacheMedia(MessageReply $balasan): ?string
+    {
+        $payload = (array) $balasan->payload;
+        $relatif = (string) ($payload['media_lokal'] ?? '');
+
+        if ($relatif !== '' && Storage::disk('public')->exists($relatif)) {
+            return $relatif;
+        }
+
+        $pesan = (array) ($payload['pesan'] ?? []);
+        $mediaId = (string) ($pesan['id'] ?? '');
+
+        if ($mediaId === '') {
+            return null;
+        }
+
+        $berkas = app(MetaMedia::class)->ambilMedia($mediaId);
+
+        if ($berkas === null) {
+            return null;
+        }
+
+        [$bytes, $mime] = $berkas;
+        $ekstensi = MimeTypes::getDefault()->getExtensions($mime)[0] ?? 'bin';
+        $relatif = 'respon-media/masuk/'.sha1($mediaId).'.'.$ekstensi;
+
+        Storage::disk('public')->put($relatif, $bytes);
+
+        $balasan->update([
+            'payload' => array_replace_recursive($payload, [
+                'media_lokal' => $relatif,
+                'media_mime' => $mime,
+            ]),
+        ]);
+
+        return $relatif;
+    }
+
+    /**
+     * Nama file untuk unduhan: pakai nama asli dari payload bila ada,
+     * selain itu turunkan dari nama berkas tersimpan.
+     */
+    protected function namaMedia(MessageReply $balasan, string $relatif): string
+    {
+        $pesan = (array) ($balasan->payload['pesan'] ?? []);
+        $tipe = (string) ($pesan['type'] ?? 'media');
+        $objek = (array) ($pesan[$tipe] ?? []);
+        $nama = trim((string) ($objek['filename'] ?? ''));
+
+        if ($nama === '' && $tipe === 'document') {
+            $nama = trim((string) ($objek['caption'] ?? ''));
+        }
+
+        return $nama !== '' ? $this->santasiNamaFile($nama) : 'lampiran-'.basename($relatif);
+    }
+
+    /**
+     * @return Collection<int, array{arah: string, isi: string, waktu: Carbon, status?: string, jenis?: string, nama?: string, meta_payload?: array<string, mixed>|null, media_kind?: string|null, media_in?: array<string, mixed>|null}>
      */
     protected function timelineData(string $noHp): Collection
     {
@@ -686,12 +942,53 @@ class ResponController extends Controller
                 'waktu' => $b->waktu_masuk,
                 'nama' => $b->nama,
                 'media_kind' => $this->tipeMediaMasuk($b),
+                'media_in' => $this->rincianMediaMasuk($b, $noHp),
             ]);
 
         return $keluar->toBase()
             ->merge($masuk->toBase())
             ->sortBy(fn ($item) => $item['waktu']?->getTimestamp() ?? 0)
             ->values();
+    }
+
+    /**
+     * Rincian media yang ditampilkan di timeline untuk balasan masuk.
+     * Null bila bukan pesan media atau media id tidak tersedia.
+     *
+     * @return array<string, mixed>|null
+     */
+    protected function rincianMediaMasuk(MessageReply $balasan, string $noHp): ?array
+    {
+        $tipe = $this->tipeMediaMasuk($balasan);
+
+        if ($tipe === null) {
+            return null;
+        }
+
+        $pesan = (array) ($balasan->payload['pesan'] ?? []);
+        $id = (string) ($pesan['id'] ?? '');
+
+        if ($id === '') {
+            return null;
+        }
+
+        $objek = (array) ($pesan[$tipe] ?? []);
+        $nama = trim((string) ($objek['filename'] ?? ''));
+
+        if ($nama === '' && $tipe === 'document') {
+            $nama = trim((string) ($objek['caption'] ?? ''));
+        }
+
+        $url = route('admin.respon.media', ['nomor' => $noHp, 'balasan' => $balasan->id]);
+
+        return [
+            'kind' => $tipe,
+            'mime' => (string) ($pesan['mime_type'] ?? 'application/octet-stream'),
+            'nama' => $nama !== '' ? $nama : 'lampiran-'.$id,
+            'url' => $url,
+            'unduh' => $url.'?unduh=1',
+            'lokal' => filled($balasan->payload['media_lokal'] ?? null),
+        ];
     }
 
     /**
@@ -796,12 +1093,13 @@ class ResponController extends Controller
         ]);
 
         $token = (string) Str::uuid();
-        $ext = strtolower($request->file('file')->getClientOriginalExtension()) ?: 'xlsx';
+        $file = $request->file('file');
+        $ekstensi = $this->ekstensiImport($file);
 
-        $request->file('file')->storeAs('imports', "{$token}.{$ext}", 'local');
+        $file->storeAs('imports', "{$token}.{$ekstensi}", 'local');
 
         Cache::put(ImportMasterJob::cacheKey($token), ['status' => 'preview_pending'], now()->addHours(2));
-        PreviewImportJob::dispatch('respon', $token, $ext);
+        PreviewImportJob::dispatch('respon', $token, $ekstensi);
 
         session(['respon_import_token' => $token]);
 

@@ -168,6 +168,107 @@ class ResponBalasTest extends TestCase
     }
 
     #[Test]
+    public function nama_tersimpan_memakai_ekstensi_deteksi_server_bukan_klien(): void
+    {
+        extract($this->pasangan());
+        Storage::fake('public');
+
+        $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', true);
+        $path = tempnam(sys_get_temp_dir(), 'respon');
+        file_put_contents($path, $png);
+        $file = new UploadedFile($path, '../foto.jpg', 'image/jpeg', null, true);
+
+        $this->actingAs($this->superadmin())
+            ->postJson(route('admin.respon.balas', '6281234567890'), [
+                'tipe' => 'image',
+                'media' => $file,
+                'caption' => 'Hasil pemeriksaan.',
+            ])
+            ->assertOk()
+            ->assertJsonPath('ok', true);
+
+        $log = MessageLog::where('penerima_no_hp', '6281234567890')->firstOrFail();
+        $tersimpan = (string) ($log->meta_payload['path'] ?? '');
+
+        $this->assertStringStartsWith('respon-media/', $tersimpan);
+        $this->assertMatchesRegularExpression('/\.png$/i', $tersimpan, 'Ekstensi harus mengikuti isi berkas (PNG), bukan ekstensi klien (.jpg).');
+        $this->assertStringNotContainsString('.jpg', $tersimpan);
+        // Nama asli tersimpan untuk display, tapi jalur direktori sudah
+        // dibuang (path traversal).
+        $this->assertSame('foto.jpg', $log->meta_payload['nama'] ?? null);
+        // MIME dicatat dari isi berkas, bukan klaim klien.
+        $this->assertSame('image/png', $log->meta_payload['mime'] ?? null);
+        Storage::disk('public')->assertExists($tersimpan);
+    }
+
+    #[Test]
+    public function berkas_berekstensi_php_ditolak_walaupun_isi_gambar(): void
+    {
+        extract($this->pasangan());
+
+        $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', true);
+        $path = tempnam(sys_get_temp_dir(), 'respon');
+        file_put_contents($path, $png);
+        $file = new UploadedFile($path, 'serangan.php', 'image/png', null, true);
+
+        $this->actingAs($this->superadmin())
+            ->postJson(route('admin.respon.balas', '6281234567890'), [
+                'tipe' => 'image',
+                'media' => $file,
+            ])
+            ->assertUnprocessable();
+    }
+
+    #[Test]
+    public function berkas_dengan_ekstensi_tipuan_disimpan_menurut_isi_sebenarnya(): void
+    {
+        extract($this->pasangan());
+        Storage::fake('public');
+
+        $pdf = "%PDF-1.4\n1 0 obj<</Pages 1 0 R>>\nendobj\ntrailer<</Root 1 0 R>>\n%%EOF";
+        $path = tempnam(sys_get_temp_dir(), 'respon');
+        file_put_contents($path, $pdf);
+        $file = new UploadedFile($path, 'resep.pdf.png', 'image/png', null, true);
+
+        $this->actingAs($this->superadmin())
+            ->postJson(route('admin.respon.balas', '6281234567890'), [
+                'tipe' => 'document',
+                'media' => $file,
+                'caption' => 'Resep dokter.',
+            ])
+            ->assertOk()
+            ->assertJsonPath('ok', true);
+
+        $log = MessageLog::where('penerima_no_hp', '6281234567890')->firstOrFail();
+        $tersimpan = (string) ($log->meta_payload['path'] ?? '');
+
+        $this->assertMatchesRegularExpression('/\.pdf$/i', $tersimpan);
+        $this->assertSame('application/pdf', $log->meta_payload['mime'] ?? null);
+        $this->assertSame('resep.pdf.png', $log->meta_payload['nama'] ?? null);
+        Storage::disk('public')->assertExists($tersimpan);
+    }
+
+    #[Test]
+    public function berkas_dengan_isi_tidak_cocok_tipe_ditolak(): void
+    {
+        extract($this->pasangan());
+
+        // Nama & klaim MIME klien "pdf", tapi isi sebenarnya PNG.
+        $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', true);
+        $path = tempnam(sys_get_temp_dir(), 'respon');
+        file_put_contents($path, $png);
+        $file = new UploadedFile($path, 'surat.pdf', 'application/pdf', null, true);
+
+        $this->actingAs($this->superadmin())
+            ->postJson(route('admin.respon.balas', '6281234567890'), [
+                'tipe' => 'document',
+                'media' => $file,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('media');
+    }
+
+    #[Test]
     public function admin_mengirim_tombol_cta_url(): void
     {
         extract($this->pasangan());
