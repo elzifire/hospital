@@ -64,16 +64,6 @@
         </div>
 
         <div class="px-8 py-6">
-            @if (session('success'))
-                <div class="mb-6 flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-800">
-                    <svg class="mt-0.5 h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
-                    <div class="text-sm leading-relaxed">
-                        <p class="font-bold">Pendaftaran berhasil dikirim.</p>
-                        <p class="mt-0.5 text-emerald-700">Data Anda akan diverifikasi petugas. Status persetujuan akan diinformasikan ke nomor HP yang didaftarkan. Silakan tunggu konfirmasi dari pihak rumah sakit.</p>
-                    </div>
-                </div>
-            @endif
-
             @if ($errors->any())
                 <div class="mb-6 flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-800">
                     <svg class="mt-0.5 h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" /></svg>

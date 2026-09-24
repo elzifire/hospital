@@ -13,15 +13,15 @@
 
     <style>
         [x-cloak]{display:none !important;}
-       
     </style>
 </head>
-<body class="h-full bg-gradient-to-br from-slate-900 via-slate-800 to-sky-900 font-sans antialiased">
+<body class="h-full bg-slate-50 font-sans antialiased">
 
-    <div class="flex min-h-full items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
+    {{-- No forced centering/padding here anymore — the login view
+         defines its own full-height, two-column layout below. --}}
+    <div class="flex min-h-full">
         @yield('content')
     </div>
 
 </body>
 </html>
-

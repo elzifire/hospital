@@ -59,6 +59,18 @@ Route::middleware('guest')->group(function () {
     // dibatasi per IP. 429 akan dikembalikan otomatis bila terlewati.
     Route::get('register-pnpp', [RegisterPnppController::class, 'create'])->name('register-pnpp.create')->middleware('throttle:60,1');
     Route::post('register-pnpp', [RegisterPnppController::class, 'store'])->name('register-pnpp.store')->middleware('throttle:20,1');
+
+    // Halaman sukses setelah pendaftaran terkirim — ringkasan data pendaftar
+    // (nama, satker, poli tujuan, rencana kunjungan). Mengambil data langsung
+    // dari database agar selalu akurat, tanpa perlu kirim ulang lewat form.
+    Route::get('register-pnpp/sukses', [RegisterPnppController::class, 'success'])->name('register-pnpp.success')->middleware('throttle:60,1');
+
+    // Konfirmasi setelah pendaftaran terkirim — halaman sukses terpisah
+    // (bukan sekadar banner di form). Menampilkan ringkasan data yang
+    // dikirim + apa yang terjadi selanjutnya.
+    Route::get('register-pnpp/sukses', [RegisterPnppController::class, 'success'])
+        ->name('register-pnpp.success')
+        ->middleware('throttle:60,1');
 });
 
 // Webhook WhatsApp lama (WAHA) dihapus — fokus pengiriman pesan.

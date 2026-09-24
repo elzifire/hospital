@@ -115,7 +115,24 @@ class RegisterPnppController extends Controller
         });
 
         return redirect()
-            ->route('register-pnpp.create')
-            ->with('success', 'Pendaftaran berhasil dikirim. Data Anda akan diverifikasi petugas dan status persetujuan akan diinformasikan ke nomor HP yang didaftarkan.');
+            ->route('register-pnpp.success')
+            ->with('success_register_id', $register->id);
+    }
+
+    /**
+     * Halaman sukses yang berdiri sendiri — ditampilkan setelah pendaftaran
+     * terkirim. Menampilkan ringkasan data yang tadi dikirim (diambil ulang
+     * dari database lewat id yang disimpan ke session, bukan dari input form).
+     */
+    public function success(): View|RedirectResponse
+    {
+        $register = RegisterPnpp::with(['satker', 'polis', 'tujuanKunjungans'])
+            ->find((int) session('success_register_id', 0));
+
+        if (! $register) {
+            return redirect()->route('register-pnpp.create');
+        }
+
+        return view('register-pnpp.index', ['register' => $register]);
     }
 }
