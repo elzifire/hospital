@@ -90,7 +90,10 @@ class RegisterPnppController extends Controller
             )->id;
         }
 
-        DB::transaction(function () use ($data, $satkerId): void {
+        // PENTING: closure DB::transaction() punya scope sendiri — variabel yang
+        // dibuat di dalamnya (mis. $register) tidak otomatis tersedia di luar.
+        // Jadi model yang dibuat di dalam harus di-return, lalu ditangkap di sini.
+        $register = DB::transaction(function () use ($data, $satkerId): RegisterPnpp {
             $register = RegisterPnpp::create([
                 'nama' => $data['nama'],
                 'nik' => ! blank($data['nik'] ?? null) ? MasterRegistry::normalizeDigits($data['nik']) : null,
@@ -112,6 +115,8 @@ class RegisterPnppController extends Controller
             if (! empty($data['tujuan_kunjungan'])) {
                 $register->tujuanKunjungans()->sync($data['tujuan_kunjungan']);
             }
+
+            return $register;
         });
 
         return redirect()
