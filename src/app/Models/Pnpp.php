@@ -12,6 +12,7 @@ class Pnpp extends Model
 
     protected $fillable = [
         'nama',
+        'nik',
         'nip',
         'status_kepegawaian',
         'pangkat',

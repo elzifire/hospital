@@ -35,6 +35,7 @@ class Reminder extends Model
         'created_by',
         'catatan',
         'vars_kustom',
+        'register_pnpp_id',
     ];
 
     protected function casts(): array
@@ -74,6 +75,15 @@ class Reminder extends Model
     public function pembuat(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /**
+     * Pendaftaran PNPP yang menjadi sumber reminder otomatis (jika ada) —
+     * dipakai saat membatalkan persetujuan untuk menghapus reminder-nya.
+     */
+    public function asalPendaftaran(): BelongsTo
+    {
+        return $this->belongsTo(RegisterPnpp::class, 'register_pnpp_id');
     }
 
     /**

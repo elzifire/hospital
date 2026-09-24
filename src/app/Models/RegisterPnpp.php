@@ -57,7 +57,20 @@ class RegisterPnpp extends Model
 
     public function polis(): BelongsToMany
     {
-        return $this->belongsToMany(Poli::class, 'register_pnpp_poli');
+        return $this->belongsToMany(Poli::class, 'register_pnpp_poli')
+            ->withPivot('approved_at', 'approved_by')
+            ->orderBy('polis.nama');
+    }
+
+    /**
+     * Poli tujuan yang sudah disetujui (approved_at terisi).
+     */
+    public function approvedPolis(): BelongsToMany
+    {
+        return $this->belongsToMany(Poli::class, 'register_pnpp_poli')
+            ->withPivot('approved_at', 'approved_by')
+            ->wherePivotNotNull('approved_at')
+            ->orderBy('polis.nama');
     }
 
     public function tujuanKunjungans(): BelongsToMany
