@@ -6,11 +6,11 @@
 <div class="w-full max-w-md">
     {{-- Logo & Title --}}
     <div class="mb-8 text-center">
-        <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl backdrop-blur-sm">
+        <div class="mx-auto flex h-20 w-30 items-center justify-center rounded-2xl backdrop-blur-sm">
             
-            <img src="{{ asset('image/RSB.png') }}" alt="Logo" class="h-16 w-16 rounded-2xl object-cover">
+            <img src="{{ asset('image/logo-proaktif.jpeg') }}" alt="Logo" class="object-cover">
         </div>
-        <h2 class="mt-4 text-2xl font-bold text-white"><span>RUMAH SAKIT BHAYANGKARA BOGOR</span></h2>
+        <h2 class="mt-8 text-2xl font-bold text-white"><span>RUMAH SAKIT BHAYANGKARA BOGOR</span></h2>
         <p class="mt-1 text-sm text-slate-400">Silakan login untuk melanjutkan</p>
     </div>
 

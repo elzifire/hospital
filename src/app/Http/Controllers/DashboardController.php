@@ -2,104 +2,110 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Kunjungan;
+use App\Models\MessageLog;
+use App\Models\MessageReply;
+use App\Models\Poli;
 use App\Models\Pnpp;
+use App\Models\Reminder;
+use App\Models\ResponManual;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 
 class DashboardController extends Controller
 {
     /**
-     * Tampilkan halaman dashboard.
+     * Bulan pendek bahasa Indonesia untuk judul grafik trend.
+     */
+    protected const BULAN = [
+        1 => 'Jan', 2 => 'Feb', 3 => 'Mar', 4 => 'Apr', 5 => 'Mei', 6 => 'Jun',
+        7 => 'Jul', 8 => 'Agu', 9 => 'Sep', 10 => 'Okt', 11 => 'Nov', 12 => 'Des',
+    ];
+
+    /**
+     * Tampilkan halaman dashboard — seluruh angka dihitung dari database.
      */
     public function index(Request $request)
     {
         $user = $request->user();
 
-        $pnppCount = Pnpp::count();
-        // ============================================================
-        // DATA DUMMY DASHBOARD — PROAKTIF RS BHAYANGKARA BOGOR
-        // ============================================================
+        $targetPnpp = (int) config('dashboard.target_pnpp', 1025);
+        $targetMon = (array) config('dashboard.monitoring', []);
 
-        // Statistik kartu teratas
+        // ===================== PONDASI ANGKA =====================
+        $totalPnpp = Pnpp::count();
+        $kunjungan = Kunjungan::count();
+        $respon = ResponManual::count() + MessageReply::count();
+
+        $outreachTerkirim = MessageLog::jenis('outreach')->status('terkirim');
+        $followupTerkirim = MessageLog::jenis('follow_up')->status('terkirim');
+
+        $totalOutreach = (clone $outreachTerkirim)->count();
+        $pnppDiOutreach = (clone $outreachTerkirim)->whereNotNull('pnpp_id')->distinct()->count('pnpp_id');
+
+        $totalFollowupTerkirim = (clone $followupTerkirim)->count();
+
+        // ===================== STATISTIK KARTU ATAS =====================
         $stats = [
-            ['label' => 'PNPP DALAM DATABASE',  'value' => $pnppCount, 'note' => '100% dari target data',      'color' => 'blue',   'icon' => 'users'],
-            ['label' => 'TARGET PNPP',          'value' => '1.025', 'note' => 'Target data PNPP 2024',       'color' => 'gray',   'icon' => 'target'],
-            ['label' => 'DIGITAL REMINDER',        'value' => '565',   'note' => '55,2% dari target',          'color' => 'yellow', 'icon' => 'bell'],
-            ['label' => 'PNPP DI-OUTREACH',     'value' => '650',   'note' => '63,4% dari target',          'color' => 'green',  'icon' => 'send'],
-            ['label' => 'RESPON PNPP',           'value' => '390',   'note' => '60,0% dari outreach',        'color' => 'orange', 'icon' => 'chat'],
-            ['label' => 'FOLLOW-UP',             'value' => '350',   'note' => '89,7% dari respons',         'color' => 'cyan',   'icon' => 'refresh'],
-            ['label' => 'KUNJUNGAN PNPP',        'value' => '120',   'note' => '>15% dari baseline',         'color' => 'purple', 'icon' => 'hospital'],
-            ['label' => 'CONVERSION RATE',       'value' => '18,5%', 'note' => 'Dari outreach ke kunjungan', 'color' => 'red',    'icon' => 'trending'],
+            ['label' => 'PNPP DALAM DATABASE',  'value' => $totalPnpp,
+             'note' => $this->persen($totalPnpp / max(1, $targetPnpp) * 100).' dari target data',
+             'color' => 'blue', 'icon' => 'users'],
+            ['label' => 'TARGET PNPP',          'value' => number_format($targetPnpp, 0, ',', '.'),
+             'note' => 'Target data PNPP', 'color' => 'gray', 'icon' => 'target'],
+            ['label' => 'DIGITAL REMINDER',     'value' => $totalFollowupTerkirim,
+             'note' => $this->persen($totalFollowupTerkirim / max(1, $totalPnpp) * 100).' dari target',
+             'color' => 'yellow', 'icon' => 'bell'],
+            ['label' => 'PNPP DI-OUTREACH',     'value' => $pnppDiOutreach,
+             'note' => $this->persen($pnppDiOutreach / max(1, $targetPnpp) * 100).' dari target',
+             'color' => 'green', 'icon' => 'send'],
+            ['label' => 'RESPON PNPP',          'value' => $respon,
+             'note' => $this->persen($respon / max(1, $totalOutreach) * 100).' dari outreach',
+             'color' => 'orange', 'icon' => 'chat'],
+            ['label' => 'FOLLOW-UP',            'value' => $totalFollowupTerkirim,
+             'note' => $this->persen($totalFollowupTerkirim / max(1, $respon) * 100).' dari respons',
+             'color' => 'cyan', 'icon' => 'refresh'],
+            ['label' => 'KUNJUNGAN PNPP',       'value' => $kunjungan,
+             'note' => 'dari baseline '.$this->persen($kunjungan / max(1, $totalPnpp) * 100),
+             'color' => 'purple', 'icon' => 'hospital'],
+            ['label' => 'CONVERSION RATE',      'value' => $this->persen($kunjungan / max(1, $totalOutreach) * 100),
+             'note' => 'Dari outreach ke kunjungan',
+             'color' => 'red', 'icon' => 'trending'],
         ];
 
-        // Tren kunjungan 6 bulan terakhir (line chart)
-        $trend = [
-            'months' => ['Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu'],
-            'series' => [
-                ['name' => 'IGD',         'color' => '#ef4444', 'data' => [40, 30, 35, 45, 50, 65]],
-                ['name' => 'Rawat Jalan', 'color' => '#3b82f6', 'data' => [40, 55, 45, 60, 60, 60]],
-                ['name' => 'Rawat Inap',  'color' => '#16a34a', 'data' => [15, 10, 15, 20, 12, 15]],
-            ],
-        ];
+        // ===================== TREND KUNJUNGAN 6 BULAN =====================
+        $trend = $this->trendKunjungan();
 
-        // Outreach per satker
-        $outreach = [
-            ['name' => 'Polresta Bogor',       'value' => 220, 'percent' => '72%',  'color' => 'navy'],
-            ['name' => 'Polsek Bogor Barat',   'value' => 120, 'percent' => '60%',  'color' => 'green'],
-            ['name' => 'Polsek Bogor Timur',   'value' => 110, 'percent' => '55%',  'color' => 'orange'],
-            ['name' => 'Polsek Tanah Sareal',  'value' => 90,  'percent' => '45%',  'color' => 'yellow'],
-            ['name' => 'Polsek Bogor Selatan', 'value' => 70,  'percent' => '35%',  'color' => 'cyan'],
-            ['name' => 'Polsek Bogor Utara',   'value' => 40,  'percent' => '20%',  'color' => 'pink'],
-        ];
+        // ===================== OUTREACH PER SATKER =====================
+        $outreach = $this->outreachPerSatker();
 
-        // Status follow-up (donut)
-        $followup = [
-            'total' => 350,
-            'series' => [
-                ['name' => 'Selesai',     'value' => 220, 'percent' => '62,9%', 'color' => '#22c55e'],
-                ['name' => 'Proses',      'value' => 90,  'percent' => '25,7%', 'color' => '#f59e0b'],
-                ['name' => 'Terlambat',   'value' => 40,  'percent' => '11,4%', 'color' => '#ef4444'],
-            ],
-        ];
+        // ===================== STATUS FOLLOW-UP (DONUT) =====================
+        $followup = $this->statusFollowUp();
 
-        // Follow-up hari ini
+        // ===================== FOLLOW-UP HARI INI =====================
         $followupToday = [
-            'count' => 13,
+            'count' => Reminder::query()->status('terjadwal')
+                ->whereDate('tanggal', today()->toDateString())->count(),
             'note' => 'PNPP perlu ditindaklanjuti',
         ];
 
-        // Aktivitas terkini
-        $activities = [
-            ['title' => 'Outreach ke PNPP',   'name' => 'Aiptu Dedi Kurniawan',   'satker' => 'Polsek Bogor Barat',  'time' => '09:12', 'color' => 'green',  'icon' => 'phone'],
-            ['title' => 'Respon PNPP',         'name' => 'Brigadir Rizky Safiet',  'satker' => 'Polresta Bogor',      'time' => '08:45', 'color' => 'orange', 'icon' => 'chat'],
-            ['title' => 'Reminder Terkirim',   'name' => 'Aipda Martha Gumanti',   'satker' => 'Polsek Bogor Utara',  'time' => '08:30', 'color' => 'yellow', 'icon' => 'bell'],
-            ['title' => 'Follow-up Selesai',   'name' => 'Brigadir Andi Saputra',  'satker' => 'Polsek Bogor Timur',  'time' => '07:15', 'color' => 'blue',   'icon' => 'check'],
-            ['title' => 'Kunjungan PNPP',      'name' => 'Brigadir Siti Nurhaliza', 'satker' => 'Polsek Bogor Selatan', 'time' => '07:00', 'color' => 'purple', 'icon' => 'visit'],
-        ];
+        // ===================== AKTIVITAS TERKINI =====================
+        $activities = $this->aktivitasTerkini();
 
-        // Monitoring target 60 hari
-        $monitoring = [
-            ['name' => 'PNPP ditubung',     'target' => '≥ 65%', 'kunjungan' => '63,4%', 'capaian' => '',  'status' => 'On Track'],
-            ['name' => 'Respon ke PNPP',     'target' => '≥ 53%', 'kunjungan' => '60,0%', 'capaian' => '',  'status' => 'On Track'],
-            ['name' => 'Digital Reminder',   'target' => '≥ 52%', 'kunjungan' => '55,2%', 'capaian' => '',  'status' => 'On Track'],
-            ['name' => 'Follow-up',          'target' => '≥ 92%', 'kunjungan' => '89,7%', 'capaian' => '',  'status' => 'Perlu Perhatian'],
-            ['name' => 'Kunjungan PNPP',     'target' => '≥ 15%', 'kunjungan' => '↑13%',  'capaian' => '',  'status' => 'On Track'],
-        ];
+        // ===================== MONITORING TARGET 60 HARI =====================
+        $monitoring = $this->monitoring($totalPnpp, $pnppDiOutreach, $respon, $totalOutreach,
+            $totalFollowupTerkirim, $kunjungan, $targetMon);
 
-        // Kunjungan PNPP hari ini
-        $kunjunganToday = [
-            'total' => 8,
-            'items' => [
-                ['label' => 'IGD',         'value' => 2, 'color' => 'blue'],
-                ['label' => 'Rawat Jalan', 'value' => 6, 'color' => 'cyan'],
-                ['label' => 'Rawat Inap',  'value' => 0, 'color' => 'gray'],
-            ],
-        ];
+        // ===================== KUNJUNGAN PNPP HARI INI =====================
+        $kunjunganToday = $this->kunjunganHariIni();
 
-        // Alert & notifikasi
+        // ===================== ALERT & NOTIFIKASI =====================
         $alerts = [
-            ['title' => 'Follow-up Terlambat',    'count' => 5, 'color' => 'red'],
-            ['title' => 'Data Tidak Lengkap',      'count' => 8, 'color' => 'yellow'],
-            ['title' => 'Reminder Gagal Terkirim', 'count' => 3, 'color' => 'orange'],
+            ['title' => 'Follow-up Terlambat',
+             'count' => Reminder::query()->terlambatTanpaKunjungan()->count(), 'color' => 'red'],
+            ['title' => 'Data Tidak Lengkap',
+             'count' => Pnpp::query()->whereNull('no_hp')->orWhereNull('tanggal_lahir')->count(), 'color' => 'yellow'],
+            ['title' => 'Reminder Gagal Terkirim',
+             'count' => MessageLog::query()->status('gagal')->count(), 'color' => 'orange'],
         ];
 
         return view('dashboard', [
@@ -116,5 +122,258 @@ class DashboardController extends Controller
             'kunjunganToday' => $kunjunganToday,
             'alerts' => $alerts,
         ]);
+    }
+
+    /**
+     * Tren kunjungan 6 bulan terakhir (IGD / Rawat Jalan / Rawat Inap).
+     *
+     * Kategori dipetakan dari poli tempat kunjungan tercatat; kunjungan
+     * tanpa poli diperlakukan sebagai Rawat Jalan (default).
+     *
+     * @return array{months: string[], series: array<int, array{name: string, color: string, data: int[]}>}
+     */
+    protected function trendKunjungan(): array
+    {
+        $bulan = [];
+        $mulai = now()->startOfMonth()->subMonths(5)->toDateString();
+
+        foreach (range(5, 0) as $geser) {
+            $bulan[now()->startOfMonth()->subMonths($geser)->format('Y-m')] = now()->startOfMonth()->subMonths($geser);
+        }
+
+        $seriesAsal = [
+            'IGD' => ['label' => 'IGD', 'color' => '#ef4444'],
+            'Rawat Jalan' => ['label' => 'Rawat Jalan', 'color' => '#3b82f6'],
+            'Rawat Inap' => ['label' => 'Rawat Inap', 'color' => '#16a34a'],
+        ];
+        $series = array_map(fn ($s) => ['name' => $s['label'], 'color' => $s['color'], 'data' => array_fill(0, 6, 0)], $seriesAsal);
+
+        $kunjungans = Kunjungan::query()
+            ->with('poli:id,kode,nama')
+            ->whereDate('tanggal_kunjungan', '>=', $mulai)
+            ->get(['poli_id', 'tanggal_kunjungan']);
+
+        foreach ($kunjungans as $k) {
+            $key = $k->tanggal_kunjungan->format('Y-m');
+            if (! isset($bulan[$key])) {
+                continue;
+            }
+            $idx = array_search($key, array_keys($bulan), true);
+            $series[$this->kategoriPoli($k->poli)]['data'][$idx]++;
+        }
+
+        return [
+            'months' => array_map(fn (Carbon $d) => self::BULAN[(int) $d->format('n')], array_values($bulan)),
+            'series' => array_values($series),
+        ];
+    }
+
+    /**
+     * Outreach per satker — pesan outreach terkirim dikelompokkan per satker PNPP.
+     *
+     * @return array<int, array{name: string, value: int, percent: string, color: string}>
+     */
+    protected function outreachPerSatker(): array
+    {
+        $colors = ['navy', 'green', 'orange', 'yellow', 'cyan', 'pink'];
+
+        $logs = MessageLog::query()->jenis('outreach')->status('terkirim')
+            ->with('pnpp.satker:id,nama')
+            ->get(['pnpp_id']);
+
+        $perSatker = [];
+        foreach ($logs as $log) {
+            $nama = $log->pnpp?->satker?->nama ?? 'Tanpa Satker';
+            $perSatker[$nama] = ($perSatker[$nama] ?? 0) + 1;
+        }
+        arsort($perSatker);
+
+        $total = (int) array_sum($perSatker);
+        $outreach = [];
+        $i = 0;
+        foreach (array_slice($perSatker, 0, 6, true) as $nama => $jumlah) {
+            $outreach[] = [
+                'name' => $nama,
+                'value' => $jumlah,
+                'percent' => $this->persen($jumlah / max(1, $total) * 100),
+                'color' => $colors[$i % count($colors)],
+            ];
+            $i++;
+        }
+
+        return $outreach;
+    }
+
+    /**
+     * Status follow-up menjadi donut Selesai / Proses / Terlambat.
+     *
+     * @return array{total: int, series: array<int, array{name: string, value: int, percent: string, color: string}>}
+     */
+    protected function statusFollowUp(): array
+    {
+        $base = MessageLog::query()->jenis('follow_up');
+        $selesai = (clone $base)->status('terkirim')->count();
+        $proses = (clone $base)->whereIn('status', ['menunggu', 'mengirim'])->count();
+        $terlambat = (clone $base)->status('gagal')->count();
+        $total = $selesai + $proses + $terlambat;
+
+        $seri = fn (string $nama, int $nilai, string $warna) => [
+            'name' => $nama,
+            'value' => $nilai,
+            'percent' => $this->persen($nilai / max(1, $total) * 100),
+            'color' => $warna,
+        ];
+
+        return [
+            'total' => $total,
+            'series' => [
+                $seri('Selesai', $selesai, '#22c55e'),
+                $seri('Proses', $proses, '#f59e0b'),
+                $seri('Terlambat', $terlambat, '#ef4444'),
+            ],
+        ];
+    }
+
+    /**
+     * Lima aktivitas terakhir dari outbox pesan (terkirim/gagal/antrean).
+     *
+     * @return array<int, array{title: string, name: string, satker: string, time: string, color: string, icon: string}>
+     */
+    protected function aktivitasTerkini(): array
+    {
+        $warna = [
+            'terkirim' => 'green',
+            'gagal' => 'red',
+            'menunggu' => 'yellow',
+            'mengirim' => 'cyan',
+            'dibatalkan' => 'gray',
+        ];
+
+        $logs = MessageLog::query()
+            ->with('pnpp.satker:id,nama')
+            ->latest('id')
+            ->limit(5)
+            ->get(['id', 'jenis', 'status', 'pnpp_id', 'penerima_nama', 'sent_at', 'created_at']);
+
+        return $logs->map(function (MessageLog $log) use ($warna) {
+            $jenis = $log->jenis === 'outreach' ? 'Outreach ke PNPP' : 'Follow-up PNPP';
+            $waktu = $log->sent_at?->format('H:i') ?? $log->created_at->format('H:i');
+
+            return [
+                'title' => $jenis,
+                'name' => $log->pnpp?->nama ?? $log->penerima_nama,
+                'satker' => $log->pnpp?->satker?->nama ?? 'Tanpa Satker',
+                'time' => $waktu,
+                'color' => $warna[$log->status] ?? 'gray',
+                'icon' => $log->jenis === 'outreach' ? 'phone' : 'chat',
+            ];
+        })->all();
+    }
+
+    /**
+     * Monitoring target 60 hari — capaian dihitung dari data aktual.
+     *
+     * @return array<int, array{name: string, target: string, kunjungan: string, capaian: string, status: string}>
+     */
+    protected function monitoring(int $totalPnpp, int $pnppDiOutreach, int $respon, int $totalOutreach,
+        int $followupTerkirim, int $kunjungan, array $targetMon): array
+    {
+        $followupSemua = MessageLog::query()->jenis('follow_up')
+            ->whereIn('status', ['terkirim', 'gagal'])->count();
+
+        $indikator = [
+            ['name' => 'PNPP di-outreach',
+             'aktual' => $pnppDiOutreach / max(1, $totalPnpp) * 100,
+             'target' => $targetMon['outreach'] ?? 65],
+            ['name' => 'Respon ke PNPP',
+             'aktual' => $respon / max(1, $totalOutreach) * 100,
+             'target' => $targetMon['respon'] ?? 53],
+            ['name' => 'Digital Reminder',
+             'aktual' => $followupTerkirim / max(1, $totalPnpp) * 100,
+             'target' => $targetMon['digital_reminder'] ?? 52],
+            ['name' => 'Follow-up',
+             'aktual' => $followupTerkirim / max(1, $followupSemua) * 100,
+             'target' => $targetMon['followup'] ?? 92],
+            ['name' => 'Kunjungan PNPP',
+             'aktual' => $kunjungan / max(1, $totalPnpp) * 100,
+             'target' => $targetMon['kunjungan'] ?? 15],
+        ];
+
+        return array_map(function ($row) {
+            $tercapai = $row['aktual'] >= $row['target'];
+
+            return [
+                'name' => $row['name'],
+                'target' => '≥ '.$row['target'].'%',
+                'kunjungan' => $this->persen($row['aktual']),
+                'capaian' => '',
+                'status' => $tercapai ? 'On Track' : 'Perlu Perhatian',
+            ];
+        }, $indikator);
+    }
+
+    /**
+     * Kunjungan hari ini dikelompokkan per kategori poli.
+     *
+     * @return array{total: int, items: array<int, array{label: string, value: int, color: string}>}
+     */
+    protected function kunjunganHariIni(): array
+    {
+        $items = [
+            'IGD' => ['label' => 'IGD', 'value' => 0, 'color' => 'blue'],
+            'Rawat Jalan' => ['label' => 'Rawat Jalan', 'value' => 0, 'color' => 'cyan'],
+            'Rawat Inap' => ['label' => 'Rawat Inap', 'value' => 0, 'color' => 'gray'],
+        ];
+
+        $kunjungans = Kunjungan::query()
+            ->with('poli:id,kode,nama')
+            ->whereDate('tanggal_kunjungan', today()->toDateString())
+            ->get(['poli_id']);
+
+        $total = $kunjungans->count();
+        foreach ($kunjungans as $k) {
+            $items[$this->kategoriPoli($k->poli)]['value']++;
+        }
+
+        return ['total' => $total, 'items' => array_values($items)];
+    }
+
+    /**
+     * Klasifikasi kategori grafik kunjungan dari poli.
+     */
+    protected function kategoriPoli(?Poli $poli): string
+    {
+        if (! $poli) {
+            return 'Rawat Jalan';
+        }
+
+        $kode = strtoupper((string) $poli->kode);
+        $nama = strtolower((string) $poli->nama);
+
+        if (str_contains($kode, 'IGD') || str_contains($nama, 'darurat')) {
+            return 'IGD';
+        }
+
+        if (str_contains($nama, 'rawat inap') || str_contains($kode, 'RANAP') || str_contains($kode, 'INAP')) {
+            return 'Rawat Inap';
+        }
+
+        return 'Rawat Jalan';
+    }
+
+    /**
+     * Format persen ala Indonesia: bilangan bulat tampil tanpa desimal,
+     * sisanya dengan satu angka desimal (koma sebagai pemisah desimal).
+     */
+    protected function persen(float $angka): string
+    {
+        $bulat = round($angka);
+
+        return number_format(
+            abs($angka - $bulat) < 0.05 ? $bulat : $angka,
+            abs($angka - $bulat) < 0.05 ? 0 : 1,
+            ',',
+            '.'
+        ).'%';
     }
 }

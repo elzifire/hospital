@@ -8,7 +8,7 @@
     <title>@yield('title', 'Dashboard') — {{ config('app.name', 'RS BHAYANGKARA BOGOR') }}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
@@ -16,8 +16,11 @@
 
     [x-cloak]{display:none !important;}
         *, *::before, *::after ,body{
-            font-family: 'Montserrat', sans-serif;
-            
+            font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        }
+        h1, h2, h3, h4, h5, h6, .font-display{
+            font-family: 'Montserrat', ui-sans-serif, system-ui, sans-serif;
+            letter-spacing: -0.015em;
         }
         /* Animasi hamburger -> X */
         #sidebar-toggle.open .bar-1{ transform: translateY(7px) rotate(45deg); }
@@ -281,8 +284,8 @@
             {{-- Logo / Brand + tombol tutup (mobile) --}}
             <div class="flex h-16 flex-shrink-0 items-center justify-between border-b border-slate-700/70 px-5">
                 <div class="flex items-center gap-3">
-                    <img src="{{ asset('image/RSB.png') }}" alt="Logo" class="h-10 w-10 rounded-2xl object-cover" />
-                    <span class="text-base font-bold">RS BHAYANGKARA BOGOR</span>
+                    <img src="{{ asset('image/logo-proaktif.jpeg') }}" alt="Logo" class="h-10 w-10 rounded-2xl object-cover" />
+                    <span class="font-display text-base font-bold">PROAKTIF</span>
                 </div>
                 <button type="button" onclick="closeSidebar()" title="Tutup menu" aria-label="Tutup menu"
                         class="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-800 hover:text-white lg:hidden">

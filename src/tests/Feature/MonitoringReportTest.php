@@ -457,4 +457,47 @@ class MonitoringReportTest extends TestCase
         $hub->assertDontSee(route('admin.monitoring.report.show', 'respon'));
         $hub->assertDontSee(route('admin.monitoring.report.show', 'kunjungan'));
     }
+
+    #[Test]
+    public function laporan_kunjungan_monitoring_sama_dengan_menu_kunjungan()
+    {
+        $this->actingAs($this->superadmin());
+
+        $satker = Satker::create(['kode' => 'GRUP', 'nama' => 'Satker Uji']);
+        $poliA = Poli::create(['kode' => 'GRUP-A', 'nama' => 'Poli Alpha']);
+        $poliB = Poli::create(['kode' => 'GRUP-B', 'nama' => 'Poli Beta']);
+
+        $pasien = Pnpp::create(['nama' => 'Doni Grup', 'nip' => '8811', 'satker_id' => $satker->id]);
+
+        // Satu pasien, satu tanggal, dua poli → satu "kunjungan" (2 baris poli).
+        Kunjungan::create(['pnpp_id' => $pasien->id, 'poli_id' => $poliA->id, 'tanggal_kunjungan' => '2026-09-20', 'keluhan' => 'Pusing']);
+        Kunjungan::create(['pnpp_id' => $pasien->id, 'poli_id' => $poliB->id, 'tanggal_kunjungan' => '2026-09-20', 'diagnosa' => 'Vertigo']);
+
+        // Menu Kunjungan: satu baris grup (dua poli dalam satu kunjungan).
+        $menu = $this->get(route('admin.kunjungan.index'));
+        $menu->assertOk();
+        $menu->assertSee('Doni Grup');
+        $menu->assertSee('Poli Alpha');
+        $menu->assertSee('Poli Beta');
+        $this->assertSame(1, substr_count($menu->getContent(), 'Doni Grup'));
+
+        // Laporan monitoring kunjungan: jumlah mengikuti definisi grup yang
+        // sama (bukan jumlah baris poli), berikut statistiknya.
+        $report = $this->get(route('admin.monitoring.report.show', 'kunjungan'));
+        $report->assertOk();
+        $report->assertSee('Total Kunjungan');
+        $report->assertSee('Baris Poli');
+        $report->assertSee('Doni Grup');
+        $report->assertSee('Poli Alpha');
+        $report->assertSee('Poli Beta');
+        $this->assertSame(1, substr_count($report->getContent(), 'Doni Grup'));
+
+        // Filter home=1 hanya menyaring home visit — kunjungan ini RS → kosong.
+        $this->get(route('admin.monitoring.report.show', ['kunjungan', 'home' => '1']))
+            ->assertOk()
+            ->assertDontSee('Doni Grup');
+
+        // Export mengikuti grup yang sama (baris = kunjungan, bukan baris poli).
+        $this->get(route('admin.monitoring.report.export', 'kunjungan'))->assertOk();
+    }
 }

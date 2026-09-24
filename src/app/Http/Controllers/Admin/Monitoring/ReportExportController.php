@@ -21,10 +21,18 @@ class ReportExportController extends Controller
 
         $format = $request->query('format') === 'csv' ? 'csv' : 'xlsx';
 
-        $rows = $this->reportQuery($config, $request)
-            ->get()
-            ->map($config['export']['toRow'])
-            ->all();
+        // Entitas berbasis dataset (kunjungan): export memakai semua baris
+        // grup yang dihasilkan sumber data modul asalnya.
+        if (! empty($config['datasetAll'])) {
+            $rows = ($config['datasetAll'])($request)
+                ->map($config['export']['toRow'])
+                ->all();
+        } else {
+            $rows = $this->reportQuery($config, $request)
+                ->get()
+                ->map($config['export']['toRow'])
+                ->all();
+        }
 
         $content = SheetHelper::content($rows, $config['export']['headers'], $format);
         $filename = 'laporan_'.$entity.'_'.date('Ymd_His');

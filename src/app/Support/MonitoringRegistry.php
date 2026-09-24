@@ -14,7 +14,10 @@ use App\Models\Pnpp;
 use App\Models\Poli;
 use App\Models\Reminder;
 use App\Models\Satker;
+use App\Services\KunjunganDaftar;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 
 /**
  * Registri konfigurasi laporan untuk modul Monitoring.
@@ -117,6 +120,24 @@ class MonitoringRegistry
                 $query->where('poli_id', $poliId);
             }
         };
+
+        // Laporan "kunjungan" berbagi definisi & query dengan menu Kunjungan
+        // lewat KunjunganDaftar (1 kunjungan = 1 pasien + 1 tanggal, bisa
+        // beberapa poli) supaya angkanya selalu sama. Parameter laporan
+        // (search/from/to) dipetakan ke parameter service (q/dari/sampai).
+        $petaKunjungan = function (Request $request): Request {
+            $mapped = Request::create($request->fullUrl(), 'GET');
+            $mapped->query->set('q', (string) $request->query('search', ''));
+            $mapped->query->set('dari', (string) $request->query('from', ''));
+            $mapped->query->set('sampai', (string) $request->query('to', ''));
+
+            return $mapped;
+        };
+        $urutanKunjungan = fn (Request $request): string => (string) $request->query('sort') === 'terlama' ? 'asc' : 'desc';
+        $daftarKunjungan = fn (Request $request): array => [
+            auth()->user()?->poliId() !== null,
+            auth()->user()?->poliId(),
+        ];
 
         // Pembatasan serupa untuk pesan keluar (MessageLog): pesan tidak
         // menyimpan poli_id — scope lewat reminder pembentuknya
@@ -723,27 +744,51 @@ class MonitoringRegistry
                 'label' => 'Kunjungan',
                 'group' => 'broadcasting',
                 'permission' => 'manage kunjungan',
-                'description' => 'Riwayat kunjungan PNPP ke rumah sakit beserta keluhan dan diagnosa.',
+                'description' => 'Riwayat kunjungan PNPP — satu baris = satu pasien + tanggal (bisa mencakup beberapa poli), sama dengan daftar menu Kunjungan.',
                 'icon' => $iconPin,
                 'tone' => 'rose',
                 'available' => true,
-                'count' => fn () => Kunjungan::query()->tap($scopePoli)->count(),
-                'model' => Kunjungan::class,
-                'eager' => ['pnpp.satker', 'poli'],
-                'withCount' => [],
-                'poliScope' => $scopePoli,
-                'searchHint' => 'Cari nama/NIP pasien, keluhan, atau diagnosa...',
-                'search' => function (Builder $q, string $t) {
-                    $tAtas = strtoupper($t);
+                'count' => fn () => (new KunjunganDaftar())->jumlahKunjungan(auth()->user()?->poliId()),
+                'dataset' => function (Request $request) use ($petaKunjungan, $urutanKunjungan, $daftarKunjungan, $iconPin, $iconUsers, $iconClip, $iconCheck, $iconTap) {
+                    [$batasiPoli, $poliAktif] = $daftarKunjungan($request);
 
-                    return $q->where(fn ($w) => $w
-                        ->where('keluhan', 'like', "%{$t}%")
-                        ->orWhere('diagnosa', 'like', "%{$t}%")
-                        ->orWhereHas('pnpp', fn ($p) => $p
-                            ->whereRaw('UPPER(nama) LIKE ?', ["%{$tAtas}%"])
-                            ->orWhere('nip', 'like', "%{$t}%")));
+                    $d = (new KunjunganDaftar())->dataKunjungan(
+                        $petaKunjungan($request),
+                        $batasiPoli,
+                        $poliAktif,
+                        $urutanKunjungan($request),
+                    );
+
+                    return [
+                        'rows' => $d['items'],
+                        'stats' => [
+                            ['label' => 'Total Kunjungan', 'value' => $d['total'], 'icon' => $iconPin, 'tone' => 'rose'],
+                            ['label' => 'Pasien', 'value' => $d['pasien'], 'icon' => $iconUsers, 'tone' => 'violet'],
+                            ['label' => 'Baris Poli', 'value' => $d['barisPoli'], 'icon' => $iconClip, 'tone' => 'emerald'],
+                            ['label' => 'Realisasi Reminder', 'value' => $d['realisasi'], 'icon' => $iconCheck, 'tone' => 'teal'],
+                            ['label' => 'Manual', 'value' => $d['manual'], 'icon' => $iconTap, 'tone' => 'amber'],
+                        ],
+                    ];
                 },
+                'datasetAll' => function (Request $request) use ($petaKunjungan, $urutanKunjungan, $daftarKunjungan) {
+                    [$batasiPoli, $poliAktif] = $daftarKunjungan($request);
+
+                    return (new KunjunganDaftar())->kunjunganBerkelompok(
+                        $petaKunjungan($request),
+                        $batasiPoli,
+                        $poliAktif,
+                        $urutanKunjungan($request),
+                    );
+                },
+                'searchHint' => 'Cari nama/NIP pasien, keluhan, atau diagnosa...',
                 'filters' => [
+                    [
+                        'key' => 'home',
+                        'label' => 'Semua Jenis',
+                        'type' => 'select',
+                        'options' => fn () => ['1' => 'Home Visit', '0' => 'Kunjungan RS'],
+                        'apply' => fn (Builder $q, string $v) => $q->where('home_visit', (bool) $v),
+                    ],
                     [
                         'key' => 'from',
                         'label' => 'Dari Tanggal',
@@ -778,30 +823,28 @@ class MonitoringRegistry
                     'terlama' => ['label' => 'Terlama', 'apply' => fn (Builder $q) => $q->orderBy('tanggal_kunjungan')],
                 ],
                 'defaultSort' => 'terbaru',
-                'stats' => fn () => [
-                    ['label' => 'Total Kunjungan', 'value' => Kunjungan::query()->tap($scopePoli)->count(),                                                                            'icon' => $iconPin,   'tone' => 'rose'],
-                    ['label' => 'Bulan Ini',       'value' => Kunjungan::whereYear('tanggal_kunjungan', now()->year)->whereMonth('tanggal_kunjungan', now()->month)->tap($scopePoli)->count(), 'icon' => $iconCal,   'tone' => 'violet'],
-                    ['label' => 'Tahun Ini',       'value' => Kunjungan::whereYear('tanggal_kunjungan', now()->year)->tap($scopePoli)->count(), 'icon' => $iconClock, 'tone' => 'sky'],
-                    ['label' => 'PNPP Dilayani',   'value' => Kunjungan::query()->tap($scopePoli)->distinct()->count('pnpp_id'),                   'icon' => $iconUsers, 'tone' => 'emerald'],
-                ],
                 'columns' => [
-                    ['label' => 'Tanggal', 'type' => 'strong',                     'value' => fn ($m) => $m->tanggal_kunjungan?->translatedFormat('d M Y')],
-                    ['label' => 'Pasien',  'type' => 'profile', 'tone' => 'rose',  'value' => fn ($m) => [$m->pnpp?->nama ?? '—', $m->pnpp?->nip]],
-                    ['label' => 'Satker',  'type' => 'text',                       'value' => fn ($m) => $m->pnpp?->satker?->nama],
-                    ['label' => 'Poli',    'type' => 'badge',   'tone' => 'sky',    'value' => fn ($m) => $m->poli ? [$m->poli->nama, 'sky'] : null],
-                    ['label' => 'Keluhan', 'type' => 'text',                       'value' => fn ($m) => $m->keluhan],
-                    ['label' => 'Diagnosa', 'type' => 'text',                       'value' => fn ($m) => $m->diagnosa],
+                    ['label' => 'Tanggal',  'type' => 'strong',  'value' => fn ($b) => ($b['tanggal'] ?? null)?->translatedFormat('d M Y')],
+                    ['label' => 'Pasien',   'type' => 'profile', 'tone' => 'rose', 'value' => fn ($b) => [$b['pasien']?->nama ?? '—', $b['pasien']?->nip]],
+                    ['label' => 'Satker',   'type' => 'text',                        'value' => fn ($b) => $b['pasien']?->satker?->nama],
+                    ['label' => 'Poli',     'type' => 'tags',   'tone' => 'sky',    'value' => fn ($b) => $b['poliBadges'] ?? []],
+                    ['label' => 'Jenis',    'type' => 'badge',                      'value' => fn ($b) => ($b['homeVisit'] ?? false) ? ['Home Visit', 'teal'] : ['Kunjungan RS', 'sky']],
+                    ['label' => 'Sumber',   'type' => 'badge',                      'value' => fn ($b) => [$b['sumberLabel'] ?? '', ($b['sumber'] ?? '') === 'realisasi' ? 'emerald' : 'teal']],
+                    ['label' => 'Keluhan',  'type' => 'text',                       'value' => fn ($b) => $b['keluhan']],
+                    ['label' => 'Diagnosa', 'type' => 'text',                       'value' => fn ($b) => $b['diagnosa']],
                 ],
                 'export' => [
-                    'headers' => ['Tanggal', 'Pasien', 'NIP/NRP', 'Satker', 'Poli', 'Keluhan', 'Diagnosa'],
-                    'toRow' => fn ($m) => [
-                        $m->tanggal_kunjungan?->format('Y-m-d') ?? '',
-                        $m->pnpp?->nama ?? '',
-                        $m->pnpp?->nip ?? '',
-                        $m->pnpp?->satker?->nama ?? '',
-                        $m->poli?->nama ?? '',
-                        $m->keluhan ?? '',
-                        $m->diagnosa ?? '',
+                    'headers' => ['Tanggal', 'Pasien', 'NIP/NRP', 'Satker', 'Poli', 'Jenis', 'Sumber', 'Keluhan', 'Diagnosa'],
+                    'toRow' => fn ($b) => [
+                        $b['tanggal']?->format('Y-m-d') ?? '',
+                        $b['pasien']?->nama ?? '',
+                        $b['pasien']?->nip ?? '',
+                        $b['pasien']?->satker?->nama ?? '',
+                        implode(', ', $b['poliBadges'] ?? []),
+                        ($b['homeVisit'] ?? false) ? 'Home Visit' : 'Kunjungan RS',
+                        $b['sumberLabel'] ?? '',
+                        $b['keluhan'] ?? '',
+                        $b['diagnosa'] ?? '',
                     ],
                 ],
             ],
