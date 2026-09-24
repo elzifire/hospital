@@ -257,7 +257,6 @@
                                     
                                     <td class="px-5 py-3">
                                         <p class="text-xs font-medium text-slate-600">{{ $r['poliNama'] ?? '—' }}</p>
-                                        <p class="text-xs text-slate-400">{{ $r['dokter'] ?? 'Dokter belum ditentukan' }}</p>
                                     </td>
                                     <td class="px-5 py-3">
                                         <span class="rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ring-inset {{ $r['homeVisit'] ? 'bg-teal-50 text-teal-700 ring-teal-200/70' : 'bg-slate-100 text-slate-500 ring-slate-200/70' }}">
