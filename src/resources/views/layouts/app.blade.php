@@ -475,11 +475,11 @@
         </div>
     </div>
 
-    {{-- SweetAlert2 --}}
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    {{-- Asset dilayani lokal (aplikasi dipakai di LAN RS tanpa internet) --}}
+    <script src="{{ asset('vendor/sweetalert2/sweetalert2.min.js') }}"></script>
 
-    {{-- Alpine.js CDN --}}
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    {{-- Alpine.js --}}
+    <script defer src="{{ asset('vendor/alpinejs/alpine.min.js') }}"></script>
 
     {{-- Form global untuk aksi konfirmasi (dipakai semua halaman admin) --}}
     <form id="delete-form" method="POST" class="hidden">

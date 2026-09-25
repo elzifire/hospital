@@ -22,28 +22,11 @@ class ReportController extends Controller
     {
         $config = $this->resolveReport($entity);
 
-        $stats = [];
-
-        // Entitas berbasis dataset (mis. kunjungan): baris & statistik
-        // dihasilkan dari sumber data yang sama dengan modul asalnya,
-        // bukan query model generik.
-        if (! empty($config['dataset'])) {
-            $data = ($config['dataset'])($request);
-            $rows = $data['rows'];
-            $stats = $data['stats'] ?? [];
-
-            return view('admin.monitoring.report', [
-                'entity' => $entity,
-                'config' => $config,
-                'rows' => $rows,
-                'stats' => $stats,
-                'filterOptions' => $this->reportFilterOptions($config),
-            ]);
-        }
-
         $rows = $this->reportQuery($config, $request)
             ->paginate($this->reportPerPage($request))
             ->withQueryString();
+
+        $stats = [];
 
         if (! empty($config['stats'])) {
             $stats = ($config['stats'])();

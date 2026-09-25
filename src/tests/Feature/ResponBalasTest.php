@@ -6,6 +6,7 @@ use App\Models\MessageLog;
 use App\Models\MessageReply;
 use App\Models\Pnpp;
 use App\Models\Poli;
+use App\Models\Reminder;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -387,5 +388,127 @@ class ResponBalasTest extends TestCase
             ->assertForbidden();
         $this->actingAs($user)->get(route('admin.respon.show', '6281234567890'))
             ->assertForbidden();
+    }
+
+    /**
+     * Pasien yang diblast "rencana kunjungan" ke suatu poli (senantara belum
+     * punya Kunjungan di poli itu) tetap boleh dilihat & dibalas petugas poli
+     * tujuan — balasan pasien yang masuk harus tampil di modul Respon.
+     */
+    #[Test]
+    public function poli_tujuan_blast_melihat_pasien_yang_belum_punya_kunjungan(): void
+    {
+        extract($this->pasangan());
+
+        // Pasien tanpa Kunjungan sama sekali — hanya dikenal dari blast.
+        $andi = Pnpp::create(['nama' => 'Andi Pratama', 'no_hp' => '081377778888']);
+        MessageReply::create([
+            'pnpp_id' => $andi->id, 'no_hp' => '6281377778888', 'nama' => 'Andi Pratama',
+            'isi_pesan' => 'Boleh confirm jadwal besok?', 'waktu_masuk' => now(), 'driver' => 'waha',
+        ]);
+
+        $jadwal = $this->buatJadwal($andi, $poliUmum, today()->addDay()->format('Y-m-d'));
+        $this->buatBlast($jadwal, $andi, '6281377778888');
+
+        $petugasUmum = $this->petugasPoli($poliUmum->id, 'petugas-blast-umum@test.dev');
+        $petugasGigi = $this->petugasPoli($poliGigi->id, 'petugas-blast-gigi@test.dev');
+
+        // Poli tujuan blast → nomor ikut tampil di chat list.
+        $this->actingAs($petugasUmum)
+            ->get(route('admin.respon.index'))
+            ->assertOk()
+            ->assertSee('Andi Pratama');
+
+        // Boleh membuka & membalas.
+        $this->actingAs($petugasUmum)
+            ->get(route('admin.respon.show', '6281377778888'))
+            ->assertOk();
+        $this->actingAs($petugasUmum)
+            ->getJson(route('admin.respon.timeline', '6281377778888'))
+            ->assertOk();
+        $this->actingAs($petugasUmum)
+            ->postJson(route('admin.respon.balas', '6281377778888'), ['isi' => 'Jadwal besok pukul 09:00 ya.'])
+            ->assertOk()
+            ->assertJsonPath('ok', true);
+
+        // Poli lain tetap tertutup walau pasien sama.
+        $this->actingAs($petugasGigi)
+            ->get(route('admin.respon.index'))
+            ->assertOk()
+            ->assertDontSee('Andi Pratama');
+        $this->actingAs($petugasGigi)
+            ->get(route('admin.respon.show', '6281377778888'))
+            ->assertForbidden();
+        $this->actingAs($petugasGigi)
+            ->postJson(route('admin.respon.balas', '6281377778888'), ['isi' => 'Halo.'])
+            ->assertForbidden();
+    }
+
+    /**
+     * Blast yang dibatalkan (tidak pernah terkirim) tidak memberi hak akses
+     * ke poli tujuan — tidak ada rencana kunjungan yang sampai ke pasien.
+     */
+    #[Test]
+    public function blast_dibatalkan_tidak_memberi_akses_poli(): void
+    {
+        extract($this->pasangan());
+
+        $sari = Pnpp::create(['nama' => 'Sari Wulandari', 'no_hp' => '081388887777']);
+        MessageReply::create([
+            'pnpp_id' => $sari->id, 'no_hp' => '6281388887777', 'nama' => 'Sari Wulandari',
+            'isi_pesan' => 'Jadwalnya masih ya?', 'waktu_masuk' => now(), 'driver' => 'waha',
+        ]);
+
+        $jadwal = $this->buatJadwal($sari, $poliUmum, today()->addDay()->format('Y-m-d'));
+        $this->buatBlast($jadwal, $sari, '6281388887777', 'dibatalkan');
+
+        $petugasUmum = $this->petugasPoli($poliUmum->id, 'petugas-batal-umum@test.dev');
+
+        $this->actingAs($petugasUmum)
+            ->get(route('admin.respon.index'))
+            ->assertOk()
+            ->assertDontSee('Sari Wulandari');
+        $this->actingAs($petugasUmum)
+            ->get(route('admin.respon.show', '6281388887777'))
+            ->assertForbidden();
+    }
+
+    protected function petugasPoli(int $poliId, string $email): User
+    {
+        $user = User::create([
+            'name' => 'Petugas Poli',
+            'email' => $email,
+            'password' => 'rahasia',
+        ]);
+        $user->assignRole('poli');
+        $user->userDetail()->updateOrCreate([], ['poli_id' => $poliId]);
+
+        return $user;
+    }
+
+    protected function buatJadwal(Pnpp $pasien, Poli $poli, string $tanggal): Reminder
+    {
+        return Reminder::create([
+            'pnpp_id' => $pasien->id,
+            'poli_id' => $poli->id,
+            'tanggal' => $tanggal,
+            'jam' => '09:00',
+            'status' => 'terjadwal',
+        ]);
+    }
+
+    protected function buatBlast(Reminder $reminder, Pnpp $pasien, string $noHp, string $status = 'terkirim'): MessageLog
+    {
+        return MessageLog::create([
+            'jenis' => 'outreach',
+            'rule' => 'h-7',
+            'reminder_id' => $reminder->id,
+            'pnpp_id' => $pasien->id,
+            'penerima_nama' => $pasien->nama,
+            'penerima_no_hp' => $noHp,
+            'konten' => 'Jadwal kunjungan Anda besok pukul 09:00.',
+            'status' => $status,
+            'sent_at' => $status === 'terkirim' ? now() : null,
+        ]);
     }
 }

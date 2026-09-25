@@ -27,7 +27,7 @@
         <p class="mt-0.5 text-sm text-slate-500">Tentukan nama role dan pilih permission yang bisa diakses.</p>
     </div>
 
-    <form action="{{ route('admin.roles.store') }}" method="POST" @submit="saving = true" x-cloak>
+    <form action="{{ route('admin.roles.store') }}" method="POST" @submit="saving = true">
         @csrf
 
         <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -92,17 +92,17 @@
 
                     <div class="divide-y divide-slate-100">
                         @foreach ($groups as $groupName => $groupPerms)
-                            <div class="p-6" x-show="groupVisible('{{ strtolower($groupName) }}')" x-cloak>
+                            <div class="p-6" x-show="groupVisible('{{ strtolower($groupName) }}')">
                                 <div class="mb-4 flex items-center justify-between">
                                     <div class="flex items-center gap-2.5">
                                         <span class="rounded-lg bg-slate-800 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest text-white">{{ $groupName }}</span>
                                         <span class="text-[11px] font-medium tabular-nums text-slate-400">
-                                            <span x-text="groupSelectedCount('{{ strtolower($groupName) }}')"></span>/{{ count($groupPerms) }} dipilih
+                                            <span x-text="groupSelectedCount('{{ strtolower($groupName) }}')">0</span>/{{ count($groupPerms) }} dipilih
                                         </span>
                                     </div>
                                     <button type="button" @click="toggleGroup('{{ strtolower($groupName) }}')"
                                             class="text-[11px] font-bold text-sky-600 transition hover:text-sky-700"
-                                            x-text="groupAllSelected('{{ strtolower($groupName) }}') ? 'Batalkan grup' : 'Pilih grup'"></button>
+                                            x-text="groupAllSelected('{{ strtolower($groupName) }}') ? 'Batalkan grup' : 'Pilih grup'">Pilih grup</button>
                                 </div>
 
                                 <div class="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
@@ -116,6 +116,7 @@
                                                x-show="matchesSearch({{ strtolower($groupName) }}, @js($permission->name))">
                                             <div class="flex h-5 items-center pt-0.5">
                                                 <input type="checkbox" name="permissions[]" value="{{ $permission->name }}" x-model="selected"
+                                                       @checked(in_array($permission->name, old('permissions', []), true))
                                                        class="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500 transition-colors">
                                             </div>
                                             <div class="min-w-0">
@@ -149,7 +150,7 @@
                             </div>
                             <div class="min-w-0">
                                 <p class="truncate text-base font-bold capitalize text-slate-900" x-text="name || 'nama-role'"></p>
-                                <p class="text-xs text-slate-400"><span class="font-bold tabular-nums text-sky-600" x-text="selected.length"></span> dari {{ $permissions->count() }} permission</p>
+                                <p class="text-xs text-slate-400"><span class="font-bold tabular-nums text-sky-600" x-text="selected.length">0</span> dari {{ $permissions->count() }} permission</p>
                             </div>
                         </div>
                         <div class="px-5 pb-4">
@@ -184,7 +185,7 @@
                                 class="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-6 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-sky-700 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
                             <svg x-show="!saving" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
                             <svg x-show="saving" x-cloak class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                            <span x-text="saving ? 'Menyimpan...' : 'Simpan Role'"></span>
+                            <span x-text="saving ? 'Menyimpan...' : 'Simpan Role'">Simpan Role</span>
                         </button>
                     </div>
                 </div>

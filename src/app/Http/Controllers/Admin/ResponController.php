@@ -16,6 +16,7 @@ use App\Models\ResponManual;
 use App\Models\Satker;
 use App\Support\MasterRegistry;
 use App\Support\TextSanitizer;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -123,10 +124,7 @@ class ResponController extends Controller
 
         $scopePoli = fn ($query) => $query->when(
             $poliId !== null,
-            fn ($sub) => $sub->whereHas(
-                'pnpp',
-                fn ($pnpp) => $pnpp->whereHas('kunjungans', fn ($kunjungan) => $kunjungan->where('poli_id', $poliId))
-            ),
+            fn ($sub) => $this->batasiNomorPoli($sub, $poliId),
         );
 
         $konversasi = MessageReply::query()
@@ -1012,7 +1010,47 @@ class ResponController extends Controller
     }
 
     /**
-     * Akun poli hanya boleh melihat & membalas nomor pasien polinya.
+     * Batasi query percakapan ke nomor yang urusan poli tertentu. Nomor
+     * diakui milik poli bila pasien punya Kunjungan di poli itu, ATAU poli
+     * itu pernah menjadi sasaran blast: pesan keluar di `message_logs`
+     * yang menunjuk poli lewat `reminder_id` → `reminders.poli_id`.
+     * Jalur kedua membuat poli tujuan blast langsung melihat percakapan
+     * pasiennya walau Kunjungan belum tercatat (pasien membalas dulu).
+     */
+    protected function batasiNomorPoli(Builder $query, int $poliId): Builder
+    {
+        return $query->where(function (Builder $scoped) use ($poliId) {
+            $scoped->whereHas(
+                'pnpp',
+                fn ($pnpp) => $pnpp->whereHas(
+                    'kunjungans',
+                    fn ($kunjungan) => $kunjungan->where('poli_id', $poliId)
+                )
+            )->orWhereIn('no_hp', $this->nomorBlastPoli($poliId));
+        });
+    }
+
+    /**
+     * Nomor WhatsApp yang pernah ditembak blast milik poli tertentu.
+     * Pesan "dibatalkan" tidak dihitung karena tidak pernah terkirim.
+     *
+     * @return array<int, string>
+     */
+    protected function nomorBlastPoli(int $poliId): array
+    {
+        return MessageLog::query()
+            ->whereNotNull('reminder_id')
+            ->where('status', '!=', 'dibatalkan')
+            ->whereHas('reminder', fn ($reminder) => $reminder->where('poli_id', $poliId))
+            ->distinct()
+            ->pluck('penerima_no_hp')
+            ->all();
+    }
+
+    /**
+     * Akun poli hanya boleh melihat & membalas nomor pasien polinya,
+     * termasuk pasien yang dikenal lewat blast rencana kunjungan yang
+     * ditujukan ke poli tersebut (lihat batasiNomorPoli).
      */
     protected function pastikanAksesNomor(Request $request, string $noHp): void
     {
@@ -1022,10 +1060,10 @@ class ResponController extends Controller
             return;
         }
 
-        $punya = MessageReply::query()
-            ->where('no_hp', $noHp)
-            ->whereHas('pnpp', fn ($pnpp) => $pnpp->whereHas('kunjungans', fn ($kunjungan) => $kunjungan->where('poli_id', $poliId)))
-            ->exists();
+        $punya = $this->batasiNomorPoli(
+            MessageReply::query()->where('no_hp', $noHp),
+            $poliId
+        )->exists();
 
         abort_unless($punya, 403, 'Nomor ini bukan pasien poli Anda.');
     }

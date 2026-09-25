@@ -9,7 +9,6 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 
 /**
  * Dataset index gabungan "Digital Reminder & Kunjungan": satu tabel berisi
@@ -106,7 +105,7 @@ class KunjunganDaftar
 
         $semua = $semua->all();
 
-        $perPage = 10;
+        $perPage = 20;
         $halaman = max(1, (int) $request->query('page', 1));
         $items = new LengthAwarePaginator(
             array_slice($semua, ($halaman - 1) * $perPage, $perPage),
@@ -142,13 +141,13 @@ class KunjunganDaftar
 
     /**
      * Grup kunjungan (1 grup = 1 pasien + 1 tanggal, bisa beberapa poli) —
-     * sumber data bersama untuk menu Kunjungan dan laporan Monitoring
-     * "kunjungan" agar angkanya sama. Filter q/satker/rentang dikenakan di
-     * level baris; poli & home visit disaring per grup.
+     * dipakai tabel detail menu Kunjungan ("1 orang ke poli mana saja dalam
+     * 1 hari kunjungan"). Filter q/satker/rentang dikenakan di level baris;
+     * poli & home visit disaring per grup.
      *
      * @return Collection<int, array>
      */
-    public function kunjunganBerkelompok(Request $request, bool $batasiPoli, ?int $poliAktif, string $urutan = 'desc'): Collection
+    public function kunjunganBerkelompok(Request $request, bool $batasiPoli, ?int $poliAktif): Collection
     {
         $q = (string) $request->query('q', '');
         $qAtas = strtoupper($q);
@@ -195,42 +194,19 @@ class KunjunganDaftar
         }
 
         return $grup
-            ->when(
-                $urutan === 'asc',
-                fn (Collection $g) => $g->sortBy(fn (Collection $b) => $b->first()->tanggal_kunjungan?->timestamp ?? 0),
-                fn (Collection $g) => $g->sortByDesc(fn (Collection $b) => $b->first()->tanggal_kunjungan?->timestamp ?? 0),
-            )
+            ->sortByDesc(fn (Collection $b) => $b->first()->tanggal_kunjungan?->timestamp ?? 0)
             ->values()
             ->map(fn (Collection $blok) => $this->barisKunjungan($blok));
     }
 
     /**
-     * Jumlah "kunjungan" versi grup (pasien + tanggal unik) — bukan jumlah
-     * baris poli. Dipakai kartu monitoring agar sama dengan Total Kunjungan
-     * di menu Kunjungan.
+     * Dataset index Kunjungan (halaman tersendiri): statistik dihitung PER
+     * BARIS kunjungan (tiap baris poli dihitung = Total Kunjungan akurat),
+     * sedangkan tabel di bawahnya tetap detail grup pasien + tanggal.
      */
-    public function jumlahKunjungan(?int $poliAktif): int
+    public function dataKunjungan(Request $request, bool $batasiPoli, ?int $poliAktif): array
     {
-        $sub = Kunjungan::query()
-            ->when($poliAktif, fn ($q) => $q->where('poli_id', $poliAktif))
-            ->toBase()
-            ->selectRaw('pnpp_id, tanggal_kunjungan')
-            ->distinct();
-
-        return DB::table(DB::raw('('.$sub->toSql().') as k'))
-            ->mergeBindings($sub)
-            ->count();
-    }
-
-    /**
-     * Dataset index Kunjungan (halaman tersendiri): hanya kunjungan yang
-     * benar-benar tercatat — manual maupun realisasi dari penjadwalan —
-     * dikelompokkan per pasien + tanggal. Berbeda dari data() gabungan
-     * dengan Digital Reminder agar tujuan tiap modul tidak tercampur.
-     */
-    public function dataKunjungan(Request $request, bool $batasiPoli, ?int $poliAktif, string $urutan = 'desc'): array
-    {
-        $baris = $this->kunjunganBerkelompok($request, $batasiPoli, $poliAktif, $urutan);
+        $baris = $this->kunjunganBerkelompok($request, $batasiPoli, $poliAktif);
 
         $perPage = (int) $request->query('per_page', 10);
         if (! in_array($perPage, [10, 25, 50, 100], true)) {
@@ -248,11 +224,10 @@ class KunjunganDaftar
 
         return [
             'items' => $items,
-            'total' => $baris->count(),
+            'total' => $baris->sum('jumlahBaris'),
             'pasien' => $baris->pluck('pnpp_id')->unique()->count(),
-            'barisPoli' => $baris->sum('jumlahBaris'),
-            'realisasi' => $baris->where('sumber', 'realisasi')->count(),
-            'manual' => $baris->where('sumber', 'manual')->count(),
+            'realisasi' => $baris->sum('jumlahRealisasi'),
+            'manual' => $baris->sum('jumlahManual'),
             'polis' => $this->daftarPoliAktif($batasiPoli, $poliAktif),
             'batasiPoli' => $batasiPoli,
             'filters' => [
@@ -284,6 +259,8 @@ class KunjunganDaftar
             'poliBadges' => $grup->filter(fn ($k) => $k->poli)->pluck('poli.nama')->unique()->values()->all(),
             'homeVisit' => $homeVisit,
             'jumlahBaris' => $grup->count(),
+            'jumlahRealisasi' => $grup->filter(fn ($k) => filled($k->reminder_id))->count(),
+            'jumlahManual' => $grup->reject(fn ($k) => filled($k->reminder_id))->count(),
             'keluhan' => $grup->filter(fn ($k) => $k->keluhan)->pluck('keluhan')->implode(' · '),
             'diagnosa' => $grup->filter(fn ($k) => $k->diagnosa)->pluck('diagnosa')->implode(' · '),
             'jumlahPoli' => $grup->pluck('poli_id')->unique()->filter()->count(),

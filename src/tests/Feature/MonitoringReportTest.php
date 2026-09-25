@@ -469,35 +469,43 @@ class MonitoringReportTest extends TestCase
 
         $pasien = Pnpp::create(['nama' => 'Doni Grup', 'nip' => '8811', 'satker_id' => $satker->id]);
 
-        // Satu pasien, satu tanggal, dua poli → satu "kunjungan" (2 baris poli).
+        // Satu pasien, satu tanggal, dua poli → 2 kunjungan (per baris poli),
+        // tetapi 1 baris grup di tabel detail menu Kunjungan.
         Kunjungan::create(['pnpp_id' => $pasien->id, 'poli_id' => $poliA->id, 'tanggal_kunjungan' => '2026-09-20', 'keluhan' => 'Pusing']);
         Kunjungan::create(['pnpp_id' => $pasien->id, 'poli_id' => $poliB->id, 'tanggal_kunjungan' => '2026-09-20', 'diagnosa' => 'Vertigo']);
 
-        // Menu Kunjungan: satu baris grup (dua poli dalam satu kunjungan).
+        // Menu Kunjungan: kartu Total Kunjungan per baris (dengan 4 kartu),
+        // tabel detail menampilkan 1 baris grup dua poli.
         $menu = $this->get(route('admin.kunjungan.index'));
         $menu->assertOk();
+        $menu->assertSee('Total Kunjungan');
+        $menu->assertSee('Realisasi Reminder');
+        $menu->assertSee('Manual');
+        $menu->assertDontSee('Baris Poli');
         $menu->assertSee('Doni Grup');
         $menu->assertSee('Poli Alpha');
         $menu->assertSee('Poli Beta');
         $this->assertSame(1, substr_count($menu->getContent(), 'Doni Grup'));
 
-        // Laporan monitoring kunjungan: jumlah mengikuti definisi grup yang
-        // sama (bukan jumlah baris poli), berikut statistiknya.
+        // Laporan monitoring kunjungan: per baris poli (Doni tampil 2 kali),
+        // dengan kartu statistik yang konsisten dengan menu Kunjungan.
         $report = $this->get(route('admin.monitoring.report.show', 'kunjungan'));
         $report->assertOk();
         $report->assertSee('Total Kunjungan');
-        $report->assertSee('Baris Poli');
+        $report->assertSee('Realisasi Reminder');
+        $report->assertSee('Manual');
+        $report->assertDontSee('Baris Poli');
         $report->assertSee('Doni Grup');
         $report->assertSee('Poli Alpha');
         $report->assertSee('Poli Beta');
-        $this->assertSame(1, substr_count($report->getContent(), 'Doni Grup'));
+        $this->assertSame(2, substr_count($report->getContent(), 'Doni Grup'));
 
         // Filter home=1 hanya menyaring home visit — kunjungan ini RS → kosong.
         $this->get(route('admin.monitoring.report.show', ['kunjungan', 'home' => '1']))
             ->assertOk()
             ->assertDontSee('Doni Grup');
 
-        // Export mengikuti grup yang sama (baris = kunjungan, bukan baris poli).
+        // Export per baris poli.
         $this->get(route('admin.monitoring.report.export', 'kunjungan'))->assertOk();
     }
 }
