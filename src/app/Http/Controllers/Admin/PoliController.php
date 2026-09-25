@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Poli;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class PoliController extends Controller
 {
@@ -26,7 +27,11 @@ class PoliController extends Controller
         $data = $request->validate([
             'kode' => ['nullable', 'string', 'max:50', 'unique:polis,kode'],
             'nama' => ['required', 'string', 'max:255'],
+            'jam_buka' => ['nullable', 'date_format:H:i', 'required_with:jam_tutup'],
+            'jam_tutup' => ['nullable', 'date_format:H:i', 'required_with:jam_buka'],
         ]);
+
+        $this->pastikanJamValid($request);
 
         $poli = DB::transaction(fn () => Poli::create($data));
 
@@ -44,7 +49,11 @@ class PoliController extends Controller
         $data = $request->validate([
             'kode' => ['nullable', 'string', 'max:50', 'unique:polis,kode,'.$poli->id],
             'nama' => ['required', 'string', 'max:255'],
+            'jam_buka' => ['nullable', 'date_format:H:i', 'required_with:jam_tutup'],
+            'jam_tutup' => ['nullable', 'date_format:H:i', 'required_with:jam_buka'],
         ]);
+
+        $this->pastikanJamValid($request);
 
         DB::transaction(fn () => $poli->update($data));
 
@@ -64,5 +73,20 @@ class PoliController extends Controller
 
         return redirect()->route('admin.poli.index')
             ->with('success', "Poli \"{$nama}\" berhasil dihapus.");
+    }
+
+    /**
+     * Jam buka harus lebih awal dari jam tutup (bila keduanya diisi).
+     */
+    protected function pastikanJamValid(Request $request): void
+    {
+        $buka = $request->input('jam_buka');
+        $tutup = $request->input('jam_tutup');
+
+        if ($buka && $tutup && $tutup <= $buka) {
+            throw ValidationException::withMessages([
+                'jam_tutup' => 'Jam tutup harus setelah jam buka.',
+            ]);
+        }
     }
 }

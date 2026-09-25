@@ -39,6 +39,22 @@
                            class="block w-full rounded-xl border-0 py-2.5 px-3.5 text-sm text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-sky-500 transition @error('nama') ring-rose-300 focus:ring-rose-500 @enderror">
                     @error('nama')<p class="mt-1.5 text-xs font-medium text-rose-600">{{ $message }}</p>@enderror
                 </div>
+                <div>
+                    <label class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Jam Layanan</label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <input type="time" name="jam_buka" id="jam_buka" value="{{ old('jam_buka') }}"
+                                   class="block w-full rounded-xl border-0 py-2.5 px-3.5 text-sm text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-inset focus:ring-sky-500 transition @error('jam_buka') ring-rose-300 focus:ring-rose-500 @enderror">
+                            @error('jam_buka')<p class="mt-1.5 text-xs font-medium text-rose-600">{{ $message }}</p>@enderror
+                        </div>
+                        <div>
+                            <input type="time" name="jam_tutup" id="jam_tutup" value="{{ old('jam_tutup') }}"
+                                   class="block w-full rounded-xl border-0 py-2.5 px-3.5 text-sm text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 focus:ring-2 focus:ring-inset focus:ring-sky-500 transition @error('jam_tutup') ring-rose-300 focus:ring-rose-500 @enderror">
+                            @error('jam_tutup')<p class="mt-1.5 text-xs font-medium text-rose-600">{{ $message }}</p>@enderror
+                        </div>
+                    </div>
+                    <p class="mt-1.5 text-xs text-slate-400">Kosongkan keduanya jika poli buka 24 jam.</p>
+                </div>
             </div>
 
             <div class="flex items-center justify-end gap-3 rounded-b-2xl border-t border-slate-100 bg-slate-50/70 p-4">

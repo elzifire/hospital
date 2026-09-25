@@ -46,6 +46,13 @@
                 'attrs' => 'inputmode="tel"', 'hint' => 'Untuk konfirmasi status persetujuan.'],
             ['name' => 'alamat', 'label' => 'Alamat', 'required' => true, 'span' => 2, 'type' => 'textarea'],
         ];
+
+        // ---- Map poli -> jam layanan, dipakai untuk cek jam live di Alpine ----
+        $poliJadwal = $polis->mapWithKeys(fn ($p) => [$p->id => [
+            'nama' => $p->nama,
+            'buka' => $p->jam_buka?->format('H:i'),
+            'tutup' => $p->jam_tutup?->format('H:i'),
+        ]])->all();
     @endphp
 
     <div class="w-full max-w-4xl overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-slate-900/5">
@@ -177,6 +184,30 @@
                         Rencana Kunjungan
                     </h2>
 
+                    {{-- 3a. Poli tujuan dulu — jam layanan tiap poli ditampilkan
+                         agar pasien bisa menyesuaikan jam/tanggal kunjungan. --}}
+                    <div class="mb-5">
+                        <label class="mb-2 block text-sm font-semibold text-slate-700">
+                            Poli Tujuan {!! $requiredMark !!}
+                            <span class="text-[11px] font-normal text-slate-400">(boleh pilih lebih dari satu)</span>
+                        </label>
+                        <div class="grid gap-2 sm:grid-cols-2">
+                            @foreach ($polis as $poli)
+                                <label class="{{ $checkboxItemClass }}">
+                                    <input type="checkbox" name="poli_dituju[]" value="{{ $poli->id }}"
+                                           x-model="poliDituju" @change="cekJam()"
+                                           @checked(in_array($poli->id, old('poli_dituju', [])))
+                                           class="{{ $checkboxInputClass }}">
+                                    <span class="flex items-center justify-between gap-2">
+                                        <span class="text-sm font-medium text-slate-700">{{ $poli->nama }}</span>
+                                        <span class="rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums {{ $poli->buka24Jam() ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' : 'bg-sky-50 text-sky-700 ring-1 ring-sky-200' }}">{{ $poli->jamLayanan() }}</span>
+                                    </span>
+                                </label>
+                            @endforeach
+                        </div>
+                        @error('poli_dituju')<p class="{{ $errorClass }}">{{ $message }}</p>@enderror
+                    </div>
+
                     <div class="grid gap-4 sm:grid-cols-2">
                         <div>
                             <label for="rencana_tanggal_kunjungan" class="{{ $labelClass }}">Tanggal Kunjungan {!! $requiredMark !!}</label>
@@ -187,27 +218,14 @@
                         <div>
                             <label for="rencana_jam_kunjungan" class="{{ $labelClass }}">Jam Kunjungan {!! $requiredMark !!}</label>
                             <input type="time" id="rencana_jam_kunjungan" name="rencana_jam_kunjungan" value="{{ old('rencana_jam_kunjungan') }}" required
-                                   class="{{ $inputClass }}">
+                                   x-model="jam" @change="cekJam()" class="{{ $inputClass }}">
                             @error('rencana_jam_kunjungan')<p class="{{ $errorClass }}">{{ $message }}</p>@enderror
                         </div>
                     </div>
 
-                    <div class="mt-5">
-                        <label class="mb-2 block text-sm font-semibold text-slate-700">
-                            Poli Tujuan {!! $requiredMark !!}
-                            <span class="text-[11px] font-normal text-slate-400">(boleh pilih lebih dari satu)</span>
-                        </label>
-                        <div class="grid gap-2 sm:grid-cols-2">
-                            @foreach ($polis as $poli)
-                                <label class="{{ $checkboxItemClass }}">
-                                    <input type="checkbox" name="poli_dituju[]" value="{{ $poli->id }}"
-                                           @checked(in_array($poli->id, old('poli_dituju', [])))
-                                           class="{{ $checkboxInputClass }}">
-                                    <span class="text-sm font-medium text-slate-700">{{ $poli->nama }}</span>
-                                </label>
-                            @endforeach
-                        </div>
-                        @error('poli_dituju')<p class="{{ $errorClass }}">{{ $message }}</p>@enderror
+                    {{-- Peringatan live: jam di luar jam layanan poli yang dipilih --}}
+                    <div x-show="pesanJam" x-cloak x-transition class="mt-3">
+                        <p class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs font-medium leading-relaxed text-amber-800" x-text="pesanJam"></p>
                     </div>
 
                     <div class="mt-5">
@@ -259,9 +277,32 @@
             satkerMode: 'list',
             lainnya: false,
             lainnyaText: @js(old('tujuan_lainnya', '')),
+            poliDituju: @js(old('poli_dituju', [])),
+            jam: @js(old('rencana_jam_kunjungan', '')),
+            poliJadwal: @js($poliJadwal),
+            pesanJam: '',
 
             init() {
                 if (this.lainnyaText) this.lainnya = true;
+                this.cekJam();
+            },
+
+            // Cek live: jam kunjungan harus dalam jam layanan SEMUA poli terpilih.
+            cekJam() {
+                const jam = this.jam;
+                if (!jam) { this.pesanJam = ''; return; }
+
+                const diluar = [];
+                for (const id of this.poliDituju) {
+                    const p = this.poliJadwal[id];
+                    if (p && p.buka && p.tutup && (jam < p.buka || jam > p.tutup)) {
+                        diluar.push(`${p.nama} (${p.buka}–${p.tutup})`);
+                    }
+                }
+
+                this.pesanJam = diluar.length
+                    ? `Jam ${jam} berada di luar jam layanan: ${diluar.join(', ')}. Silakan sesuaikan jam atau pilihan poli.`
+                    : '';
             }
         }));
     });

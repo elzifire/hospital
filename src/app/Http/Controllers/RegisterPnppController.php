@@ -80,6 +80,30 @@ class RegisterPnppController extends Controller
             ]);
         }
 
+        // Jam kunjungan harus berada dalam jam layanan setiap poli tujuan
+        // (poli tanpa jam buka/tutup dianggap buka 24 jam).
+        $jamKunjungan = $data['rencana_jam_kunjungan'];
+        $diLuarJam = [];
+
+        foreach (Poli::whereIn('id', $data['poli_dituju'])->get() as $poli) {
+            if ($poli->buka24Jam()) {
+                continue;
+            }
+
+            $buka = $poli->jam_buka->format('H:i');
+            $tutup = $poli->jam_tutup->format('H:i');
+
+            if ($jamKunjungan < $buka || $jamKunjungan > $tutup) {
+                $diLuarJam[] = "{$poli->nama} ({$buka}–{$tutup})";
+            }
+        }
+
+        if ($diLuarJam !== []) {
+            throw ValidationException::withMessages([
+                'rencana_jam_kunjungan' => "Jam {$jamKunjungan} berada di luar jam layanan: ".implode(', ', $diLuarJam).'.',
+            ]);
+        }
+
         // Satker baru tidak ada di daftar → dibuatkan otomatis di tabel satkers.
         $satkerId = $data['satker_id'] ?? null;
         $satkerBaru = trim((string) ($data['satker_baru'] ?? ''));

@@ -91,7 +91,7 @@
                     <tr class="border-b border-slate-100 text-[11px] uppercase tracking-wider text-slate-400">
                         <th class="px-6 py-3.5 font-semibold">Poli</th>
                         <th class="px-6 py-3.5 font-semibold">Kode</th>
-                        {{-- <th class="px-6 py-3.5 font-semibold">Jumlah Dokter</th> --}}
+                        <th class="px-6 py-3.5 font-semibold">Jam Layanan</th>
                         <th class="px-6 py-3.5 text-right font-semibold">Aksi</th>
                     </tr>
                 </thead>
@@ -114,12 +114,17 @@
                                     <span class="text-xs italic text-slate-400">—</span>
                                 </template>
                             </td>
-                            {{-- <td class="whitespace-nowrap px-6 py-4">
-                                <span class="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-bold tabular-nums text-slate-600">
-                                    <span x-text="p.doktersCount"></span>
-                                    <span class="text-[10px] font-medium text-slate-400">dokter</span>
-                                </span>
-                            </td> --}}
+                            <td class="whitespace-nowrap px-6 py-4">
+                                <template x-if="p.buka24Jam">
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200">
+                                        <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                                        24 Jam
+                                    </span>
+                                </template>
+                                <template x-if="!p.buka24Jam">
+                                    <span class="inline-flex items-center gap-1.5 rounded-full bg-sky-50 px-3 py-1 text-xs font-bold tabular-nums text-sky-700 ring-1 ring-sky-200" x-text="p.jamLayanan"></span>
+                                </template>
+                            </td>
                             <td class="whitespace-nowrap px-6 py-4 text-right">
                                 <div class="flex items-center justify-end gap-1.5 opacity-60 transition-opacity group-hover:opacity-100 lg:opacity-0">
                                     <a :href="p.editUrl" title="Edit Poli"
@@ -188,6 +193,8 @@
                     id: {{ $p->id }},
                     nama: @js($p->nama),
                     kode: @js($p->kode),
+                    jamLayanan: @js($p->jamLayanan()),
+                    buka24Jam: {{ $p->buka24Jam() ? 'true' : 'false' }},
                     doktersCount: {{ $p->dokters_count }},
                     editUrl: "{{ route('admin.poli.edit', $p->id) }}",
                     deleteUrl: "{{ route('admin.poli.destroy', $p->id) }}",
