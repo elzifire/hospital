@@ -47,12 +47,24 @@
             ['name' => 'alamat', 'label' => 'Alamat', 'required' => true, 'span' => 2, 'type' => 'textarea'],
         ];
 
-        // ---- Map poli -> jam layanan, dipakai untuk cek jam live di Alpine ----
+// ---- Map poli -> jadwal utuh (hari + jam), dipakai untuk cek hidup
+//      tanggal & jam kunjungan di Alpine. ----
         $poliJadwal = $polis->mapWithKeys(fn ($p) => [$p->id => [
             'nama' => $p->nama,
             'buka' => $p->jam_buka?->format('H:i'),
             'tutup' => $p->jam_tutup?->format('H:i'),
+            'hari' => $p->hariTercentang(),
+            'bukaSetiapHari' => $p->bukaSetiapHari(),
+            'jadwal' => $p->jadwalRingkas(),
         ]])->all();
+
+        // ---- Daftar hari libur untuk cek tanggal live: umum (poli null)
+        //      maupun khusus poli tertentu. ----
+        $hariLiburData = $hariLibur->map(fn ($h) => [
+            'tanggal' => $h->tanggal->format('Y-m-d'),
+            'nama' => $h->nama,
+            'poli' => $h->poli_id,
+        ])->values()->all();
     @endphp
 
     <div class="w-full max-w-4xl overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-slate-900/5">
@@ -195,12 +207,14 @@
                             @foreach ($polis as $poli)
                                 <label class="{{ $checkboxItemClass }}">
                                     <input type="checkbox" name="poli_dituju[]" value="{{ $poli->id }}"
-                                           x-model="poliDituju" @change="cekJam()"
+                                           x-model="poliDituju" @change="cekJam(); cekHari();"
                                            @checked(in_array($poli->id, old('poli_dituju', [])))
                                            class="{{ $checkboxInputClass }}">
-                                    <span class="flex items-center justify-between gap-2">
-                                        <span class="text-sm font-medium text-slate-700">{{ $poli->nama }}</span>
-                                        <span class="rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums {{ $poli->buka24Jam() ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' : 'bg-sky-50 text-sky-700 ring-1 ring-sky-200' }}">{{ $poli->jamLayanan() }}</span>
+                                    <span class="flex min-w-0 flex-1 items-center justify-between gap-2">
+                                        <span class="min-w-0">
+                                            <span class="block truncate text-sm font-medium text-slate-700">{{ $poli->nama }}</span>
+                                            <span class="mt-0.5 block truncate text-[11px] font-semibold text-slate-500">{{ $poli->jadwalRingkas() }}</span>
+                                        </span>
                                     </span>
                                 </label>
                             @endforeach
@@ -211,8 +225,12 @@
                     <div class="grid gap-4 sm:grid-cols-2">
                         <div>
                             <label for="rencana_tanggal_kunjungan" class="{{ $labelClass }}">Tanggal Kunjungan {!! $requiredMark !!}</label>
-                            <input type="date" id="rencana_tanggal_kunjungan" name="rencana_tanggal_kunjungan" value="{{ old('rencana_tanggal_kunjungan') }}" required min="{{ date('Y-m-d') }}"
+                            <input type="date" id="rencana_tanggal_kunjungan" name="rencana_tanggal_kunjungan" required min="{{ date('Y-m-d') }}"
+                                   x-model="tanggal" @change="cekHari()"
                                    class="{{ $inputClass }}">
+                            <p class="{{ $hintClass }}" x-show="tanggal" x-cloak>
+                                <span x-text="namaHari(tanggal)"></span>, <span x-text="formatTanggal(tanggal)"></span>
+                            </p>
                             @error('rencana_tanggal_kunjungan')<p class="{{ $errorClass }}">{{ $message }}</p>@enderror
                         </div>
                         <div>
@@ -226,6 +244,16 @@
                     {{-- Peringatan live: jam di luar jam layanan poli yang dipilih --}}
                     <div x-show="pesanJam" x-cloak x-transition class="mt-3">
                         <p class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs font-medium leading-relaxed text-amber-800" x-text="pesanJam"></p>
+                    </div>
+
+                    {{-- Peringatan live: tanggal di luar hari layanan poli yang dipilih --}}
+                    <div x-show="pesanHari" x-cloak x-transition class="mt-3">
+                        <p class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs font-medium leading-relaxed text-amber-800" x-text="pesanHari"></p>
+                    </div>
+
+                    {{-- Peringatan live: tanggal jatuh pada hari libur --}}
+                    <div x-show="pesanLibur" x-cloak x-transition class="mt-3">
+                        <p class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-medium leading-relaxed text-rose-800" x-text="pesanLibur"></p>
                     </div>
 
                     <div class="mt-5">
@@ -279,12 +307,32 @@
             lainnyaText: @js(old('tujuan_lainnya', '')),
             poliDituju: @js(old('poli_dituju', [])),
             jam: @js(old('rencana_jam_kunjungan', '')),
+            tanggal: @js(old('rencana_tanggal_kunjungan', '')),
             poliJadwal: @js($poliJadwal),
+            hariLibur: @js($hariLiburData),
             pesanJam: '',
+            pesanHari: '',
+            pesanLibur: '',
+
+            dayNames: ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'],
 
             init() {
                 if (this.lainnyaText) this.lainnya = true;
                 this.cekJam();
+                this.cekHari();
+            },
+
+            // Nama hari Indonesia dari string tanggal 'YYYY-MM-DD'.
+            namaHari(t) {
+                if (!t) return '';
+                return this.dayNames[new Date(`${t}T00:00:00`).getDay()];
+            },
+
+            // Konversi 'YYYY-MM-DD' ke 'DD-MM-YYYY' untuk tampilan.
+            formatTanggal(t) {
+                if (!t) return '';
+                const [y, m, d] = t.split('-');
+                return `${d}-${m}-${y}`;
             },
 
             // Cek live: jam kunjungan harus dalam jam layanan SEMUA poli terpilih.
@@ -303,6 +351,35 @@
                 this.pesanJam = diluar.length
                     ? `Jam ${jam} berada di luar jam layanan: ${diluar.join(', ')}. Silakan sesuaikan jam atau pilihan poli.`
                     : '';
+            },
+
+            // Cek live: tanggal kunjungan harus dalam rentang hari buka SEMUA
+            // poli terpilih dan tidak jatuh pada hari libur (umum/khusus poli).
+            cekHari() {
+                const t = this.tanggal;
+                this.pesanHari = '';
+                this.pesanLibur = '';
+                if (!t) return;
+
+                const nama = this.namaHari(t);
+                const idTerpilih = this.poliDituju.map(String);
+
+                const tutup = [];
+                for (const id of idTerpilih) {
+                    const p = this.poliJadwal[id];
+                    if (!p || p.bukaSetiapHari || p.hari.includes(nama)) continue;
+                    tutup.push(`${p.nama} (${p.hari.join(', ')})`);
+                }
+
+                if (tutup.length) {
+                    this.pesanHari = `${nama}, ${this.formatTanggal(t)} berada di luar hari layanan: ${tutup.join(', ')}. Silakan pilih tanggal lain.`;
+                }
+
+                const libur = this.hariLibur.filter(h =>
+                    h.tanggal === t && (!h.poli || idTerpilih.includes(String(h.poli))));
+                if (libur.length) {
+                    this.pesanLibur = `${nama}, ${this.formatTanggal(t)} adalah hari libur (${libur.map(x => x.nama).join(', ')}). Silakan pilih tanggal lain.`;
+                }
             }
         }));
     });

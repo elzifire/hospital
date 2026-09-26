@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\HariLibur;
 use App\Models\Poli;
 use App\Models\RegisterPnpp;
 use App\Models\Satker;
@@ -10,6 +11,7 @@ use App\Support\MasterRegistry;
 use App\Support\TextSanitizer;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -25,6 +27,7 @@ class RegisterPnppController extends Controller
             'satkers' => Satker::orderBy('nama')->get(),
             'polis' => Poli::orderBy('nama')->get(),
             'tujuanKunjungans' => TujuanKunjungan::orderBy('nama')->get(),
+            'hariLibur' => HariLibur::orderBy('tanggal')->get(),
         ]);
     }
 
@@ -80,12 +83,15 @@ class RegisterPnppController extends Controller
             ]);
         }
 
+        // Poli tujuan dipakai untuk cek jam, rentang hari, dan hari libur.
+        $poliTujuan = Poli::whereIn('id', $data['poli_dituju'])->get();
+
         // Jam kunjungan harus berada dalam jam layanan setiap poli tujuan
         // (poli tanpa jam buka/tutup dianggap buka 24 jam).
         $jamKunjungan = $data['rencana_jam_kunjungan'];
         $diLuarJam = [];
 
-        foreach (Poli::whereIn('id', $data['poli_dituju'])->get() as $poli) {
+        foreach ($poliTujuan as $poli) {
             if ($poli->buka24Jam()) {
                 continue;
             }
@@ -101,6 +107,38 @@ class RegisterPnppController extends Controller
         if ($diLuarJam !== []) {
             throw ValidationException::withMessages([
                 'rencana_jam_kunjungan' => "Jam {$jamKunjungan} berada di luar jam layanan: ".implode(', ', $diLuarJam).'.',
+            ]);
+        }
+
+        // Tanggal kunjungan harus masuk hari buka setiap poli tujuan
+        // (poli tanpa hari diceklis dianggap buka setiap hari).
+        $tanggal = $data['rencana_tanggal_kunjungan'];
+        $tanggalKunjungan = Carbon::parse($tanggal);
+        $diLuarHari = [];
+
+        foreach ($poliTujuan as $poli) {
+            if (! $poli->hariBuka($tanggalKunjungan)) {
+                $diLuarHari[] = "{$poli->nama} ({$poli->hariLayanan()})";
+            }
+        }
+
+        if ($diLuarHari !== []) {
+            throw ValidationException::withMessages([
+                'rencana_tanggal_kunjungan' => "Tanggal {$tanggal} berada di luar hari layanan: ".implode(', ', $diLuarHari).'.',
+            ]);
+        }
+
+        // Tanggal kunjungan tidak boleh jatuh pada hari libur — hari libur
+        // umum (poli_id null) maupun khusus poli tujuan.
+        $libur = HariLibur::where('tanggal', $tanggal)
+            ->where(fn ($q) => $q->whereNull('poli_id')->orWhereIn('poli_id', $data['poli_dituju']))
+            ->first();
+
+        if ($libur !== null) {
+            $cakupan = $libur->poli_id !== null ? ' khusus poli tujuan' : '';
+
+            throw ValidationException::withMessages([
+                'rencana_tanggal_kunjungan' => "Tanggal {$tanggal} adalah hari libur: {$libur->nama}{$cakupan}. Silakan pilih tanggal lain.",
             ]);
         }
 

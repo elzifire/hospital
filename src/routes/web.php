@@ -5,13 +5,22 @@ use App\Http\Controllers\Admin\BroadcastLogController;
 use App\Http\Controllers\Admin\DigitalReminderController;
 use App\Http\Controllers\Admin\DokterController;
 use App\Http\Controllers\Admin\FollowUpController;
+use App\Http\Controllers\Admin\HariLiburController;
 use App\Http\Controllers\Admin\JadwalController;
 use App\Http\Controllers\Admin\KunjunganController;
 use App\Http\Controllers\Admin\MasterExportController;
 use App\Http\Controllers\Admin\MasterImportController;
+use App\Http\Controllers\Admin\Monitoring\DigitalReminder\DigitalReminderController as MonitoringDigitalReminderController;
+use App\Http\Controllers\Admin\Monitoring\FollowUp\FollowUpController as MonitoringFollowUpController;
+use App\Http\Controllers\Admin\Monitoring\Kunjungan\KunjunganController as MonitoringKunjunganController;
 use App\Http\Controllers\Admin\Monitoring\MonitoringController;
-use App\Http\Controllers\Admin\Monitoring\ReportController;
-use App\Http\Controllers\Admin\Monitoring\ReportExportController;
+use App\Http\Controllers\Admin\Monitoring\Outreach\OutreachController as MonitoringOutreachController;
+use App\Http\Controllers\Admin\Monitoring\Penyakit\PenyakitController as MonitoringPenyakitController;
+use App\Http\Controllers\Admin\Monitoring\PenyakitMenahun\PenyakitMenahunController as MonitoringPenyakitMenahunController;
+use App\Http\Controllers\Admin\Monitoring\Pnpp\PnppController as MonitoringPnppController;
+use App\Http\Controllers\Admin\Monitoring\Poli\PoliController as MonitoringPoliController;
+use App\Http\Controllers\Admin\Monitoring\Respon\ResponController as MonitoringResponController;
+use App\Http\Controllers\Admin\Monitoring\Satker\SatkerController as MonitoringSatkerController;
 use App\Http\Controllers\Admin\OutreachController;
 use App\Http\Controllers\Admin\PenyakitKronisController;
 use App\Http\Controllers\Admin\PenyakitMenahunController;
@@ -102,14 +111,54 @@ Route::middleware('auth')->group(function () {
             Route::delete('pnpp/{pnpp}/kunjungan/{kunjungan}', [KunjunganController::class, 'destroy'])->name('pnpp.kunjungan.destroy');
         });
 
-        // Modul Monitoring (laporan): hub kartu + detail laporan per entitas.
-        // Detail & export mendukung pagination sisi server, filter, search,
-        // dan unduhan xlsx/csv yang mengikuti filter aktif. Tiap laporan
-        // terkunci permission fiturnya (lihat MonitoringRegistry).
+        // Modul Monitoring (laporan): hub kartu + satu fitur laporan per entitas.
+        // Tiap laporan punya controller & view sendiri (admin/monitoring/{fitur}),
+        // terkunci permission fiturnya, dan mendukung pencarian/filter/sort
+        // sisi server + unduhan xlsx/csv yang mengikuti filter aktif.
         Route::prefix('monitoring')->name('monitoring.')->group(function () {
             Route::get('/', [MonitoringController::class, 'index'])->name('index');
-            Route::get('report/{entity}', [ReportController::class, 'show'])->name('report.show');
-            Route::get('report/{entity}/export', [ReportExportController::class, 'download'])->name('report.export');
+
+            // ===== Data Master =====
+            Route::middleware('can:manage pnpp')->group(function () {
+                Route::get('pnpp', [MonitoringPnppController::class, 'index'])->name('pnpp');
+                Route::get('pnpp/export', [MonitoringPnppController::class, 'export'])->name('pnpp.export');
+            });
+            Route::middleware('can:manage satker')->group(function () {
+                Route::get('satker', [MonitoringSatkerController::class, 'index'])->name('satker');
+                Route::get('satker/export', [MonitoringSatkerController::class, 'export'])->name('satker.export');
+            });
+            Route::middleware('can:manage penyakit')->group(function () {
+                Route::get('penyakit', [MonitoringPenyakitController::class, 'index'])->name('penyakit');
+                Route::get('penyakit/export', [MonitoringPenyakitController::class, 'export'])->name('penyakit.export');
+                Route::get('penyakit-menahun', [MonitoringPenyakitMenahunController::class, 'index'])->name('penyakit-menahun');
+                Route::get('penyakit-menahun/export', [MonitoringPenyakitMenahunController::class, 'export'])->name('penyakit-menahun.export');
+            });
+            Route::middleware('can:manage poli')->group(function () {
+                Route::get('poli', [MonitoringPoliController::class, 'index'])->name('poli');
+                Route::get('poli/export', [MonitoringPoliController::class, 'export'])->name('poli.export');
+            });
+
+            // ===== Broadcasting =====
+            Route::middleware('can:manage kunjungan')->group(function () {
+                Route::get('kunjungan', [MonitoringKunjunganController::class, 'index'])->name('kunjungan');
+                Route::get('kunjungan/export', [MonitoringKunjunganController::class, 'export'])->name('kunjungan.export');
+            });
+            Route::middleware('can:manage digital-reminder')->group(function () {
+                Route::get('digital-reminder', [MonitoringDigitalReminderController::class, 'index'])->name('digital-reminder');
+                Route::get('digital-reminder/export', [MonitoringDigitalReminderController::class, 'export'])->name('digital-reminder.export');
+            });
+            Route::middleware('can:manage outreach')->group(function () {
+                Route::get('outreach', [MonitoringOutreachController::class, 'index'])->name('outreach');
+                Route::get('outreach/export', [MonitoringOutreachController::class, 'export'])->name('outreach.export');
+            });
+            Route::middleware('can:manage respon')->group(function () {
+                Route::get('respon', [MonitoringResponController::class, 'index'])->name('respon');
+                Route::get('respon/export', [MonitoringResponController::class, 'export'])->name('respon.export');
+            });
+            Route::middleware('can:manage follow-up')->group(function () {
+                Route::get('follow-up', [MonitoringFollowUpController::class, 'index'])->name('follow-up');
+                Route::get('follow-up/export', [MonitoringFollowUpController::class, 'export'])->name('follow-up.export');
+            });
         });
 
         // Modul broadcast — tiap modul terkunci permission fiturnya sendiri.
@@ -288,6 +337,14 @@ Route::middleware('auth')->group(function () {
 
         Route::middleware('can:manage poli')->group(function () {
             Route::resource('poli', PoliController::class)->except('show');
+        });
+
+        Route::middleware('can:manage hari-libur')->group(function () {
+            Route::resource('hari-libur', HariLiburController::class)
+                ->except('show')
+                ->parameters(['hari-libur' => 'hariLibur']);
+            Route::post('hari-libur/sinkronkan', [HariLiburController::class, 'sync'])
+                ->name('hari-libur.sync');
         });
 
         // Registrasi PNPP: verifikasi pendaftaran publik & persetujuan per poli

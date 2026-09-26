@@ -55,6 +55,20 @@
                     </div>
                     <p class="mt-1.5 text-xs text-slate-400">Kosongkan keduanya jika poli buka 24 jam.</p>
                 </div>
+                <div>
+                    <label class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">Hari Layanan</label>
+                    <div class="flex flex-wrap gap-2">
+                        @foreach (\App\Models\Poli::DAFTAR_HARI as $i => $nama)
+                            @php $kolom = 'hari_'.strtolower($nama); @endphp
+                            <label class="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-sky-300 hover:bg-sky-50/50 has-[:checked]:border-sky-500 has-[:checked]:bg-sky-50 has-[:checked]:text-sky-700">
+                                <input type="checkbox" name="{{ $kolom }}" value="1" @checked((bool) old($kolom, false)) class="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500">
+                                {{ $nama }}
+                            </label>
+                        @endforeach
+                    </div>
+                    @error('hari_senin')<p class="mt-1.5 text-xs font-medium text-rose-600">{{ $message }}</p>@enderror
+                    <p class="mt-1.5 text-xs text-slate-400">Ceklis hari tempat poli buka. Kosongkan semua jika buka setiap hari.</p>
+                </div>
             </div>
 
             <div class="flex items-center justify-end gap-3 rounded-b-2xl border-t border-slate-100 bg-slate-50/70 p-4">

@@ -24,14 +24,10 @@ class PoliController extends Controller
 
     public function store(Request $request)
     {
-        $data = $request->validate([
-            'kode' => ['nullable', 'string', 'max:50', 'unique:polis,kode'],
-            'nama' => ['required', 'string', 'max:255'],
-            'jam_buka' => ['nullable', 'date_format:H:i', 'required_with:jam_tutup'],
-            'jam_tutup' => ['nullable', 'date_format:H:i', 'required_with:jam_buka'],
-        ]);
+        $data = $request->validate($this->aturanValidasi());
 
         $this->pastikanJamValid($request);
+        $data = array_merge($data, $this->hariDiceklis($request));
 
         $poli = DB::transaction(fn () => Poli::create($data));
 
@@ -46,14 +42,13 @@ class PoliController extends Controller
 
     public function update(Request $request, Poli $poli)
     {
-        $data = $request->validate([
-            'kode' => ['nullable', 'string', 'max:50', 'unique:polis,kode,'.$poli->id],
-            'nama' => ['required', 'string', 'max:255'],
-            'jam_buka' => ['nullable', 'date_format:H:i', 'required_with:jam_tutup'],
-            'jam_tutup' => ['nullable', 'date_format:H:i', 'required_with:jam_buka'],
-        ]);
+        $aturan = $this->aturanValidasi();
+        $aturan['kode'] = ['nullable', 'string', 'max:50', 'unique:polis,kode,'.$poli->id];
+
+        $data = $request->validate($aturan);
 
         $this->pastikanJamValid($request);
+        $data = array_merge($data, $this->hariDiceklis($request));
 
         DB::transaction(fn () => $poli->update($data));
 
@@ -73,6 +68,42 @@ class PoliController extends Controller
 
         return redirect()->route('admin.poli.index')
             ->with('success', "Poli \"{$nama}\" berhasil dihapus.");
+    }
+
+    /**
+     * Aturan validasi umum (kode/unique ditimpa tersendiri di update).
+     */
+    protected function aturanValidasi(): array
+    {
+        $aturan = [
+            'kode' => ['nullable', 'string', 'max:50', 'unique:polis,kode'],
+            'nama' => ['required', 'string', 'max:255'],
+            'jam_buka' => ['nullable', 'date_format:H:i', 'required_with:jam_tutup'],
+            'jam_tutup' => ['nullable', 'date_format:H:i', 'required_with:jam_buka'],
+        ];
+
+        // Checklist hari buka: semua default false bila tidak diceklis.
+        foreach (Poli::KOLOM_HARI as $nama => $kolom) {
+            $aturan[$kolom] = ['nullable', 'boolean'];
+        }
+
+        return $aturan;
+    }
+
+    /**
+     * Normalisasi checkbox hari buka: hanya yang terkirim yang true.
+     *
+     * @return array<string, bool>
+     */
+    protected function hariDiceklis(Request $request): array
+    {
+        $data = [];
+
+        foreach (Poli::KOLOM_HARI as $nama => $kolom) {
+            $data[$kolom] = $request->boolean($kolom);
+        }
+
+        return $data;
     }
 
     /**

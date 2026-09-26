@@ -2,49 +2,25 @@
 
 namespace App\Http\Controllers\Admin\Monitoring\Concerns;
 
-use App\Support\MonitoringRegistry;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
 /**
- * Shared antara ReportController & ReportExportController:
- * resolusi entitas + hak akses + pembentukan query (search, filter, sort).
+ * Shared antar halaman & export laporan (dipakai seluruh fitur lewat
+ * ReportController): pembentukan query (search, filter, sort) dan
+ * pagination sisi server dari spec milik masing-masing fitur.
  */
 trait BuildsReportQuery
 {
     /**
-     * Resolve entitas laporan; abort 404/403 bila tidak valid.
+     * Query dasar yang terbangun dari pencarian + filter + pembatas scope
+     * (tanpa eager load, withCount, maupun sort). Dipakai bersama halaman
+     * (lalu ditambah eager/withCount/sort) dan data grafik supaya grafik
+     * selalu sejalan dengan filter yang sedang aktif di layar.
      */
-    protected function resolveReport(string $entity): array
+    protected function reportFilteredQuery(array $config, Request $request): Builder
     {
-        abort_unless(MonitoringRegistry::has($entity), 404);
-
-        $config = MonitoringRegistry::config($entity);
-
-        abort_unless($config['available'] ?? true, 404);
-
-        // Entitas yang disembunyikan sementara (belum dipakai) tetap tertutup.
-        abort_if($config['hidden'] ?? false, 404);
-
-        // Entitas berpermission: hanya pemegang permission fiturnya boleh masuk.
-        if (! empty($config['permission'])
-            && ! auth()->user()?->can($config['permission'])) {
-            abort(403, 'Anda tidak memiliki akses ke laporan ini.');
-        }
-
-        return $config;
-    }
-
-    /**
-     * Query dasar: eager loading + withCount + pencarian + filter + sort.
-     */
-    protected function reportQuery(array $config, Request $request): Builder
-    {
-        $query = $config['model']::query()->with($config['eager'] ?? []);
-
-        foreach ($config['withCount'] ?? [] as $relation) {
-            $query->withCount($relation);
-        }
+        $query = $config['model']::query();
 
         // Pembatasan dasar query (mis. laporan pesan per jenis broadcast).
         if (! empty($config['query'])) {
@@ -67,6 +43,21 @@ trait BuildsReportQuery
             if ($value !== '') {
                 ($filter['apply'])($query, $value);
             }
+        }
+
+        return $query;
+    }
+
+    /**
+     * Query laporan lengkap: dasar + eager loading + withCount + sort.
+     * Spec disuplai oleh fitur laporan masing-masing.
+     */
+    protected function reportQuery(array $config, Request $request): Builder
+    {
+        $query = $this->reportFilteredQuery($config, $request)->with($config['eager'] ?? []);
+
+        foreach ($config['withCount'] ?? [] as $relation) {
+            $query->withCount($relation);
         }
 
         $sorts = $config['sorts'] ?? [];

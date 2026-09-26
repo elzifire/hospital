@@ -31,6 +31,7 @@ class FeaturePermissionSeeder extends Seeder
             'manage satker',
             'manage penyakit',
             'manage poli',
+            'manage hari-libur',
             'manage dokter',
             'manage jadwal',
 

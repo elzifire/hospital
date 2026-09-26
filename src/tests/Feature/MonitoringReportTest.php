@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\Admin\Monitoring\ReportController;
 use App\Models\Dokter;
 use App\Models\Jadwal;
 use App\Models\Kunjungan;
@@ -15,7 +16,6 @@ use App\Models\Poli;
 use App\Models\Reminder;
 use App\Models\Satker;
 use App\Models\User;
-use App\Support\MonitoringRegistry;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
@@ -168,6 +168,16 @@ class MonitoringReportTest extends TestCase
         ]);
     }
 
+    /**
+     * Daftar fitur laporan yang benar-benar aktif (available).
+     */
+    private function activeFeatures(): array
+    {
+        return collect(ReportController::features())
+            ->filter(fn ($class) => ($class::meta()['available'] ?? true))
+            ->all();
+    }
+
     private function superadmin(): User
     {
         return User::where('email', 'superadmin@gmail.com')->firstOrFail();
@@ -200,15 +210,11 @@ class MonitoringReportTest extends TestCase
     {
         $this->actingAs($this->superadmin());
 
-        foreach (MonitoringRegistry::configs() as $entity => $config) {
-            if (! ($config['available'] ?? false) || ($config['hidden'] ?? false)) {
-                continue;
-            }
-
-            $response = $this->get(route('admin.monitoring.report.show', $entity));
+        foreach ($this->activeFeatures() as $slug => $class) {
+            $response = $this->get(route('admin.monitoring.'.$slug));
 
             $response->assertOk();
-            $response->assertSee('Laporan '.$config['label']);
+            $response->assertSee('Laporan '.$class::meta()['label']);
         }
     }
 
@@ -217,20 +223,17 @@ class MonitoringReportTest extends TestCase
     {
         $this->actingAs($this->superadmin());
 
-        foreach (MonitoringRegistry::configs() as $entity => $config) {
-            if (! ($config['available'] ?? false) || ($config['hidden'] ?? false)) {
-                continue;
-            }
-
-            $base = route('admin.monitoring.report.show', $entity);
+        foreach ($this->activeFeatures() as $slug => $class) {
+            $spec = $class::spec();
+            $base = route('admin.monitoring.'.$slug);
 
             // Semua opsi sort
-            foreach ($config['sorts'] ?? [] as $key => $sort) {
+            foreach ($spec['sorts'] ?? [] as $key => $sort) {
                 $this->get($base.'?sort='.$key)->assertOk();
             }
 
             // Semua filter (pilih opsi pertama yang valid)
-            foreach ($config['filters'] ?? [] as $filter) {
+            foreach ($spec['filters'] ?? [] as $filter) {
                 $value = ($filter['type'] ?? 'select') === 'date'
                     ? '2026-08-01'
                     : array_key_first(($filter['options'])());
@@ -244,8 +247,8 @@ class MonitoringReportTest extends TestCase
         }
 
         // Entitas yang datanya menyimpan nama pasien: pencarian menemukan hasil
-        $this->get(route('admin.monitoring.report.show', ['pnpp', 'search' => 'Budi']))->assertOk()->assertSee('Budi Santoso');
-        $this->get(route('admin.monitoring.report.show', ['kunjungan', 'search' => 'Siti']))->assertOk()->assertSee('Siti Aminah');
+        $this->get(route('admin.monitoring.pnpp', ['search' => 'Budi']))->assertOk()->assertSee('Budi Santoso');
+        $this->get(route('admin.monitoring.kunjungan', ['search' => 'Siti']))->assertOk()->assertSee('Siti Aminah');
     }
 
     #[Test]
@@ -253,13 +256,13 @@ class MonitoringReportTest extends TestCase
     {
         $this->actingAs($this->superadmin());
 
-        $response = $this->get(route('admin.monitoring.report.show', ['kunjungan', 'per_page' => 1, 'page' => 2]));
+        $response = $this->get(route('admin.monitoring.kunjungan', ['per_page' => 1, 'page' => 2]));
 
         $response->assertOk();
         $response->assertSee('Menampilkan');
 
         // per_page di luar daftar valid otomatis fallback ke 10
-        $this->get(route('admin.monitoring.report.show', ['kunjungan', 'per_page' => 7]))->assertOk();
+        $this->get(route('admin.monitoring.kunjungan', ['per_page' => 7]))->assertOk();
     }
 
     #[Test]
@@ -268,7 +271,7 @@ class MonitoringReportTest extends TestCase
         $this->actingAs($this->superadmin());
 
         foreach (['xlsx', 'csv'] as $format) {
-            $response = $this->get(route('admin.monitoring.report.export', ['kunjungan', 'format' => $format, 'from' => '2026-08-01', 'to' => '2026-08-31']));
+            $response = $this->get(route('admin.monitoring.kunjungan.export', ['format' => $format, 'from' => '2026-08-01', 'to' => '2026-08-31']));
 
             $response->assertOk();
             $this->assertSame(
@@ -279,12 +282,8 @@ class MonitoringReportTest extends TestCase
         }
 
         // Semua entitas tersedia bisa di-export (mengeksekusi toRow tiap baris)
-        foreach (MonitoringRegistry::configs() as $entity => $config) {
-            if (! ($config['available'] ?? false) || ($config['hidden'] ?? false)) {
-                continue;
-            }
-
-            $this->get(route('admin.monitoring.report.export', $entity))->assertOk();
+        foreach ($this->activeFeatures() as $slug => $class) {
+            $this->get(route('admin.monitoring.'.$slug.'.export'))->assertOk();
         }
     }
 
@@ -293,8 +292,8 @@ class MonitoringReportTest extends TestCase
     {
         $this->actingAs($this->superadmin());
 
-        $this->get(route('admin.monitoring.report.show', 'entitas-aneh'))->assertNotFound();
-        $this->get(route('admin.monitoring.report.export', 'entitas-aneh'))->assertNotFound();
+        $this->get('/admin/monitoring/entitas-aneh')->assertNotFound();
+        $this->get('/admin/monitoring/entitas-aneh/export')->assertNotFound();
     }
 
     #[Test]
@@ -302,18 +301,18 @@ class MonitoringReportTest extends TestCase
     {
         $this->actingAs($this->superadmin());
 
-        // Kartu tidak muncul di hub (cek via URL laporan yang tidak dirender)
+        // Kartu tidak muncul di hub (cek lewat URL laporan yang tak ada rutenya)
         $hub = $this->get('/admin/monitoring');
         $hub->assertOk();
-        $hub->assertDontSee(route('admin.monitoring.report.show', 'dokter'));
-        $hub->assertDontSee(route('admin.monitoring.report.show', 'jadwal'));
+        $hub->assertDontSee('/admin/monitoring/dokter');
+        $hub->assertDontSee('/admin/monitoring/jadwal');
         $hub->assertSee('5/5 laporan'); // grup master tanpa dokter & jadwal
 
-        // Akses langsung laporan & export tetap tertutup
-        $this->get(route('admin.monitoring.report.show', 'dokter'))->assertNotFound();
-        $this->get(route('admin.monitoring.report.show', 'jadwal'))->assertNotFound();
-        $this->get(route('admin.monitoring.report.export', 'dokter'))->assertNotFound();
-        $this->get(route('admin.monitoring.report.export', 'jadwal'))->assertNotFound();
+        // Akses langsung laporan & export tetap tertutup (tiada rute/controller)
+        $this->get('/admin/monitoring/dokter')->assertNotFound();
+        $this->get('/admin/monitoring/jadwal')->assertNotFound();
+        $this->get('/admin/monitoring/dokter/export')->assertNotFound();
+        $this->get('/admin/monitoring/jadwal/export')->assertNotFound();
     }
 
     #[Test]
@@ -323,8 +322,8 @@ class MonitoringReportTest extends TestCase
         $this->assertFalse($user->can('manage pnpp'));
 
         // Laporan master ditolak
-        $this->actingAs($user)->get(route('admin.monitoring.report.show', 'pnpp'))->assertForbidden();
-        $this->actingAs($user)->get(route('admin.monitoring.report.export', 'pnpp'))->assertForbidden();
+        $this->actingAs($user)->get(route('admin.monitoring.pnpp'))->assertForbidden();
+        $this->actingAs($user)->get(route('admin.monitoring.pnpp.export'))->assertForbidden();
 
         // Hub tetap terbuka, tetapi tanpa grup Data Master maupun Broadcasting
         // (user biasa tidak memegang permission fitur apa pun — "Broadcasting"
@@ -336,7 +335,7 @@ class MonitoringReportTest extends TestCase
         $hub->assertSee('0 laporan aktif');
 
         // Laporan kunjungan ikut terkunci (butuh permission manage kunjungan)
-        $this->actingAs($user)->get(route('admin.monitoring.report.show', 'kunjungan'))->assertForbidden();
+        $this->actingAs($user)->get(route('admin.monitoring.kunjungan'))->assertForbidden();
     }
 
     #[Test]
@@ -345,7 +344,7 @@ class MonitoringReportTest extends TestCase
         $this->actingAs($this->superadmin());
 
         // Laporan outreach: baris terkirim & gagal tampil + badge aturan
-        $outreach = $this->get(route('admin.monitoring.report.show', 'outreach'));
+        $outreach = $this->get(route('admin.monitoring.outreach'));
         $outreach->assertOk();
         $outreach->assertSee('Budi Santoso');
         $outreach->assertSee('Siti Aminah');
@@ -353,26 +352,26 @@ class MonitoringReportTest extends TestCase
         $outreach->assertSee('H-7');
 
         // Filter status: hanya baris gagal
-        $gagal = $this->get(route('admin.monitoring.report.show', ['outreach', 'status' => 'gagal']));
+        $gagal = $this->get(route('admin.monitoring.outreach', ['status' => 'gagal']));
         $gagal->assertOk();
         $gagal->assertSee('Siti Aminah');
         $gagal->assertDontSee('Budi Santoso');
 
         // Laporan digital reminder: berbasis tabel reminders (bukan pesan)
-        $reminder = $this->get(route('admin.monitoring.report.show', 'digital-reminder'));
+        $reminder = $this->get(route('admin.monitoring.digital-reminder'));
         $reminder->assertOk();
         $reminder->assertSee('Budi Santoso');
         $reminder->assertSee('Home Visit');
         $reminder->assertDontSee('Siti Aminah');
 
         // Laporan follow up: badge aturan rule tidak datang
-        $followUp = $this->get(route('admin.monitoring.report.show', 'follow-up'));
+        $followUp = $this->get(route('admin.monitoring.follow-up'));
         $followUp->assertOk();
         $followUp->assertSee('Budi Santoso');
         $followUp->assertSee('Tidak Datang');
 
         // Laporan respon: balasan pasien terdaftar & nomor tak dikenal
-        $respon = $this->get(route('admin.monitoring.report.show', 'respon'));
+        $respon = $this->get(route('admin.monitoring.respon'));
         $respon->assertOk();
         $respon->assertSee('Baik, saya sudah terima. Terima kasih.');
         $respon->assertSee('Tidak Terdaftar');
@@ -380,20 +379,20 @@ class MonitoringReportTest extends TestCase
         $respon->assertSee('Tombol'); // kolom Sumber
 
         // Filter respon: hanya nomor tak dikenal
-        $takDikenal = $this->get(route('admin.monitoring.report.show', ['respon', 'terdaftar' => 'no']));
+        $takDikenal = $this->get(route('admin.monitoring.respon', ['terdaftar' => 'no']));
         $takDikenal->assertOk();
         $takDikenal->assertSee('Stop broadcast');
         $takDikenal->assertDontSee('Baik, saya sudah terima');
 
         // Filter respon: hanya pilihan tombol (payload type button/interactive)
-        $tombol = $this->get(route('admin.monitoring.report.show', ['respon', 'jenis' => 'tombol']));
+        $tombol = $this->get(route('admin.monitoring.respon', ['jenis' => 'tombol']));
         $tombol->assertOk();
         $tombol->assertSee('HADIR');
         $tombol->assertDontSee('Stop broadcast');
         $tombol->assertDontSee('Baik, saya sudah terima');
 
         // Filter respon: hanya teks biasa (bukan dari tombol)
-        $teks = $this->get(route('admin.monitoring.report.show', ['respon', 'jenis' => 'teks']));
+        $teks = $this->get(route('admin.monitoring.respon', ['jenis' => 'teks']));
         $teks->assertOk();
         $teks->assertSee('Stop broadcast');
         $teks->assertSee('Baik, saya sudah terima');
@@ -426,13 +425,13 @@ class MonitoringReportTest extends TestCase
         ]);
 
         // Tanpa filter: kedua baris tampil.
-        $this->get(route('admin.monitoring.report.show', 'outreach'))
+        $this->get(route('admin.monitoring.outreach'))
             ->assertOk()
             ->assertSee('Budi Santoso')
             ->assertSee('Cici via Alternatif');
 
         // Filter template: hanya baris dengan template terpilih.
-        $this->get(route('admin.monitoring.report.show', ['outreach', 'template' => $templateLain->id]))
+        $this->get(route('admin.monitoring.outreach', ['template' => $templateLain->id]))
             ->assertOk()
             ->assertSee('Cici via Alternatif')
             ->assertDontSee('Budi Santoso');
@@ -445,17 +444,17 @@ class MonitoringReportTest extends TestCase
         $this->assertFalse($user->can('manage outreach'));
 
         // Laporan pesan & balasan ditolak (show + export)
-        foreach (['outreach', 'digital-reminder', 'respon', 'follow-up'] as $entity) {
-            $this->actingAs($user)->get(route('admin.monitoring.report.show', $entity))->assertForbidden();
-            $this->actingAs($user)->get(route('admin.monitoring.report.export', $entity))->assertForbidden();
+        foreach (['outreach', 'digital-reminder', 'respon', 'follow-up'] as $slug) {
+            $this->actingAs($user)->get(route('admin.monitoring.'.$slug))->assertForbidden();
+            $this->actingAs($user)->get(route('admin.monitoring.'.$slug.'.export'))->assertForbidden();
         }
 
         // Hub: semua kartu laporan (termasuk kunjungan) tersembunyi untuk user biasa
         $hub = $this->actingAs($user)->get('/admin/monitoring');
         $hub->assertOk();
-        $hub->assertDontSee(route('admin.monitoring.report.show', 'outreach'));
-        $hub->assertDontSee(route('admin.monitoring.report.show', 'respon'));
-        $hub->assertDontSee(route('admin.monitoring.report.show', 'kunjungan'));
+        $hub->assertDontSee(route('admin.monitoring.outreach'));
+        $hub->assertDontSee(route('admin.monitoring.respon'));
+        $hub->assertDontSee(route('admin.monitoring.kunjungan'));
     }
 
     #[Test]
@@ -489,7 +488,7 @@ class MonitoringReportTest extends TestCase
 
         // Laporan monitoring kunjungan: per baris poli (Doni tampil 2 kali),
         // dengan kartu statistik yang konsisten dengan menu Kunjungan.
-        $report = $this->get(route('admin.monitoring.report.show', 'kunjungan'));
+        $report = $this->get(route('admin.monitoring.kunjungan'));
         $report->assertOk();
         $report->assertSee('Total Kunjungan');
         $report->assertSee('Realisasi Reminder');
@@ -501,11 +500,42 @@ class MonitoringReportTest extends TestCase
         $this->assertSame(2, substr_count($report->getContent(), 'Doni Grup'));
 
         // Filter home=1 hanya menyaring home visit — kunjungan ini RS → kosong.
-        $this->get(route('admin.monitoring.report.show', ['kunjungan', 'home' => '1']))
+        $this->get(route('admin.monitoring.kunjungan', ['home' => '1']))
             ->assertOk()
             ->assertDontSee('Doni Grup');
 
         // Export per baris poli.
-        $this->get(route('admin.monitoring.report.export', 'kunjungan'))->assertOk();
+        $this->get(route('admin.monitoring.kunjungan.export'))->assertOk();
+    }
+
+    #[Test]
+    public function laporan_kunjungan_dan_digital_reminder_memiliki_tab_grafik()
+    {
+        $this->actingAs($this->superadmin());
+
+        // Tab Grafik + titik tanam chart tersedia; chart dirender Highcharts
+        // (lewat Alpine monMonitoring) saat pengguna membuka tab.
+        $kunjungan = $this->get(route('admin.monitoring.kunjungan'));
+        $kunjungan->assertOk();
+        $kunjungan->assertSee('Grafik');
+        $kunjungan->assertSee('monMonitoring');
+        $kunjungan->assertSee('monChart-trend');
+        $kunjungan->assertSee('Tren Kunjungan per Minggu');
+
+        $reminder = $this->get(route('admin.monitoring.digital-reminder'));
+        $reminder->assertOk();
+        $reminder->assertSee('Grafik');
+        $reminder->assertSee('monChart-trend');
+        $reminder->assertSee('Status Jadwal');
+
+        // Rentang tanggal di luar data → grafik menampilkan state kosong.
+        $kosong = $this->get(route('admin.monitoring.kunjungan', ['from' => '2020-01-01', 'to' => '2020-02-29']));
+        $kosong->assertOk();
+        $kosong->assertSee('Belum ada data grafik');
+
+        // Fitur tanpa dukungan grafik tidak memuat tab maupun titik tanam chart.
+        $this->get(route('admin.monitoring.pnpp'))
+            ->assertOk()
+            ->assertDontSee('monChart-trend');
     }
 }

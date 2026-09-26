@@ -3,13 +3,13 @@
 namespace App\Http\Controllers\Admin\Monitoring;
 
 use App\Http\Controllers\Controller;
-use App\Support\MonitoringRegistry;
 
 class MonitoringController extends Controller
 {
     /**
      * Hub Monitoring: kartu pilihan laporan yang dikelompokkan
      * seperti grouping sidebar (Data Master, Broadcasting, dst.).
+     * Daftar fitur laporan diambil dari ReportController::features().
      */
     public function index()
     {
@@ -17,19 +17,19 @@ class MonitoringController extends Controller
 
         $groups = [];
 
-        foreach (MonitoringRegistry::groups() as $key => $label) {
-            $cards = collect(MonitoringRegistry::configs())
-                ->filter(fn ($c) => ($c['group'] ?? null) === $key)
-                ->reject(fn ($c) => $c['hidden'] ?? false)
+        foreach (self::groups() as $key => $label) {
+            $cards = collect(ReportController::features())
+                ->map(fn ($class, $entity) => ['entity' => $entity] + $class::meta())
+                ->where('group', $key)
                 ->reject(fn ($c) => ! empty($c['permission']) && ! $user->can($c['permission']))
-                ->map(fn ($c, $entity) => [
-                    'entity' => $entity,
+                ->map(fn ($c) => [
+                    'entity' => $c['entity'],
                     'label' => $c['label'],
                     'description' => $c['description'],
                     'icon' => $c['icon'],
                     'tone' => $c['tone'],
                     'available' => $c['available'] ?? true,
-                    'count' => ! empty($c['count']) ? ($c['count'])() : null,
+                    'count' => ($c['count'])(),
                 ])
                 ->values();
 
@@ -51,5 +51,16 @@ class MonitoringController extends Controller
         ];
 
         return view('admin.monitoring.index', compact('groups', 'summary'));
+    }
+
+    /**
+     * Grup laporan (urutan & label mengikuti grouping sidebar).
+     */
+    public static function groups(): array
+    {
+        return [
+            'master' => 'Data Master',
+            'broadcasting' => 'Broadcasting',
+        ];
     }
 }

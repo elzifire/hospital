@@ -5,7 +5,7 @@
 
 @section('content')
 @php
-    // Peta warna untuk ubin ikon kartu (mengikuti tone entitas di MonitoringRegistry).
+    // Peta warna untuk ubin ikon kartu (mengikuti tone entitas di tiap fitur laporan).
     $tileTone = [
         'sky'     => 'bg-sky-50 text-sky-600',
         'emerald' => 'bg-emerald-50 text-emerald-600',
@@ -83,7 +83,7 @@
                     @endphp
 
                     @if ($card['available'])
-                        <a href="{{ route('admin.monitoring.report.show', $card['entity']) }}"
+                        <a href="{{ route('admin.monitoring.'.$card['entity']) }}"
                            title="Lihat laporan {{ $card['label'] }}"
                            class="group relative flex flex-col gap-3 rounded-2xl bg-white p-5 shadow-xs ring-1 ring-slate-200 transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:ring-slate-300 focus:outline-none focus:ring-2 focus:ring-sky-500">
                             <div class="flex items-start justify-between">

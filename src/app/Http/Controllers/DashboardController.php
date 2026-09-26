@@ -125,20 +125,56 @@ class DashboardController extends Controller
     }
 
     /**
-     * Tren kunjungan 6 bulan terakhir (IGD / Rawat Jalan / Rawat Inap).
+     * ⚠️ DATA HARDCODE — BUKAN ANGKA ASLI DARI DATABASE ⚠️
      *
-     * Kategori dipetakan dari poli tempat kunjungan tercatat; kunjungan
-     * tanpa poli diperlakukan sebagai Rawat Jalan (default).
+     * Data kunjungan Jan–Jun 2026 per kategori (IGD / Rawat Jalan / Rawat
+     * Inap) untuk mengisi grafik tren kunjungan. Angka di bawah ini adalah
+     * DATA CONTOH, bukan hasil hitungan tabel `kunjungans`.
      *
-     * @return array{months: string[], series: array<int, array{name: string, color: string, data: int[]}>}
+     * Kenapa perlu diganti: grafik ini menampilkan angka operasional RS.
+     * Selagi data contoh masih terpasang, angka di dashboard tidak boleh
+     * dipakai untuk laporan, keputusan, atau Indikator KPI.
+     *
+     * Cara menggantinya (pilih salah satu):
+     * 1. REAL: kosongkan konstanta ini `[]` → grafik otomatis kembali
+     *    100% dari query `kunjungans` (tidak ada kode lain yang diubah).
+     * 2. REAL: isi ulang dengan angka asli dari database per bulan.
+     *
+     * Ingat: hanya bulan ber-key '2026-01' s/d '2026-06' yang terpengaruh;
+     * bulan lain tetap dihitung dari database.
+     *
+     * Key = bulan (Y-m), isi = jumlah kunjungan per kategori sesuai urutan
+     * $seriesAsal: [IGD, Rawat Jalan, Rawat Inap].
+     */
+    protected const TREND_HARDCODE = [
+        '2026-01' => [0, 70, 0],
+        '2026-02' => [0, 88, 0],
+        '2026-03' => [0, 87, 0],
+        '2026-04' => [0, 122, 0],
+        '2026-05' => [0, 93, 0],
+        '2026-06' => [0, 49, 0],
+    ];
+
+    /**
+     * Tren kunjungan 1 tahun (Januari sampai bulan berjalan) per kategori (IGD / Rawat Jalan / Rawat Inap).
+     *
+     * Angka bulan Jan–Jun 2026 memakai data hardcode (TREND_HARDCODE);
+     * bulan lain dihitung dari tabel kunjungan. Kategori dipetakan dari
+     * poli tempat kunjungan tercatat; kunjungan tanpa poli diperlakukan
+     * sebagai Rawat Jalan (default).
+     *
+     * @return array{year: int, months: string[], series: array<int, array{name: string, color: string, data: int[]}>}
      */
     protected function trendKunjungan(): array
     {
+        $currentYear = (int) now()->format('Y');
+        $currentMonth = (int) now()->format('n');
         $bulan = [];
-        $mulai = now()->startOfMonth()->subMonths(5)->toDateString();
+        $mulai = Carbon::createFromDate($currentYear, 1, 1)->startOfDay()->toDateString();
 
-        foreach (range(5, 0) as $geser) {
-            $bulan[now()->startOfMonth()->subMonths($geser)->format('Y-m')] = now()->startOfMonth()->subMonths($geser);
+        for ($m = 1; $m <= $currentMonth; $m++) {
+            $date = Carbon::createFromDate($currentYear, $m, 1)->startOfMonth();
+            $bulan[$date->format('Y-m')] = $date;
         }
 
         $seriesAsal = [
@@ -146,11 +182,13 @@ class DashboardController extends Controller
             'Rawat Jalan' => ['label' => 'Rawat Jalan', 'color' => '#3b82f6'],
             'Rawat Inap' => ['label' => 'Rawat Inap', 'color' => '#16a34a'],
         ];
-        $series = array_map(fn ($s) => ['name' => $s['label'], 'color' => $s['color'], 'data' => array_fill(0, 6, 0)], $seriesAsal);
+        $totalMonths = count($bulan);
+        $series = array_map(fn ($s) => ['name' => $s['label'], 'color' => $s['color'], 'data' => array_fill(0, $totalMonths, 0)], $seriesAsal);
 
         $kunjungans = Kunjungan::query()
             ->with('poli:id,kode,nama')
             ->whereDate('tanggal_kunjungan', '>=', $mulai)
+            ->whereDate('tanggal_kunjungan', '<=', now()->endOfMonth()->toDateString())
             ->get(['poli_id', 'tanggal_kunjungan']);
 
         foreach ($kunjungans as $k) {
@@ -162,7 +200,20 @@ class DashboardController extends Controller
             $series[$this->kategoriPoli($k->poli)]['data'][$idx]++;
         }
 
+        // Terapkan angka hardcode (Jan–Jun 2026) pada posisi masing-masing;
+        // bulan di luar rentang itu tetap memakai hasil hitungan database.
+        foreach (self::TREND_HARDCODE as $key => $perKategori) {
+            $idx = array_search($key, array_keys($bulan), true);
+            if ($idx === false) {
+                continue;
+            }
+            foreach (array_keys($seriesAsal) as $i => $kategori) {
+                $series[$kategori]['data'][$idx] = $perKategori[$i];
+            }
+        }
+
         return [
+            'year' => $currentYear,
             'months' => array_map(fn (Carbon $d) => self::BULAN[(int) $d->format('n')], array_values($bulan)),
             'series' => array_values($series),
         ];
