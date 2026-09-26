@@ -99,14 +99,14 @@
                           @keydown.enter.prevent="$event.shiftKey || ($event.metaKey || $event.ctrlKey) || kirim($event)"
                           style="min-height: 40px; max-height: 120px;"
                           @input="$el.style.height = 'auto'; $el.style.height = Math.min($el.scrollHeight, 120) + 'px'"></textarea>
-                <p class="mt-1.5 text-[11px] text-slate-400">
+                {{-- <p class="mt-1.5 text-[11px] text-slate-400">
                     Enter untuk kirim · Shift+Enter untuk baris baru ·
                     <span class="font-medium text-slate-500">Teks bebas</span>
                     (berlaku dalam 24 jam sesi WA).
-                </p>
+                </p> --}}
             </div>
             <button type="submit" :disabled="sending"
-                    class="inline-flex shrink-0 items-center gap-2 rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50">
+                    class="inline-flex  py-2 shrink-0 items-center gap-2 rounded-xl bg-sky-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50">
                 <svg x-show="sending" x-cloak class="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
                 <svg x-show="!sending" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.126a59.768 59.768 0 0 1 21.323 5.485 57.746 57.746 0 0 1-3.045 5.39M6 12l5.34 2.398M6 12h.008M6 12l3.34 8.25 2.64-4.108M13.5 10.5 21 6.75 20.25 17.25 13.5 10.5Z"/></svg>
                 <span x-text="sending ? 'Mengirim…' : 'Kirim'"></span>

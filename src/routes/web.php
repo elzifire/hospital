@@ -351,7 +351,9 @@ Route::middleware('auth')->group(function () {
         // (akun poli menyetujui bagiannya, admin/superadmin menyetujui semua).
         Route::middleware('can:manage register-pnpp')->group(function () {
             Route::get('register-pnpp', [AdminRegisterPnppController::class, 'index'])->name('register-pnpp.index');
+            Route::get('register-pnpp/{registerPnpp}/edit', [AdminRegisterPnppController::class, 'edit'])->name('register-pnpp.edit');
             Route::get('register-pnpp/{registerPnpp}', [AdminRegisterPnppController::class, 'show'])->name('register-pnpp.show');
+            Route::patch('register-pnpp/{registerPnpp}/jadwal', [AdminRegisterPnppController::class, 'update'])->name('register-pnpp.update');
             Route::patch('register-pnpp/{registerPnpp}/status', [AdminRegisterPnppController::class, 'approve'])->name('register-pnpp.approve');
             Route::patch('register-pnpp/{registerPnpp}/batal-status', [AdminRegisterPnppController::class, 'unapprove'])->name('register-pnpp.unapprove');
             Route::delete('register-pnpp/{registerPnpp}', [AdminRegisterPnppController::class, 'destroy'])->name('register-pnpp.destroy');

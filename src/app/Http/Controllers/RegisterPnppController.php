@@ -142,26 +142,36 @@ class RegisterPnppController extends Controller
             ]);
         }
 
-        // Satker baru tidak ada di daftar → dibuatkan otomatis di tabel satkers.
+        // Satker yang diketik manual dicocokkan dulu dengan data master.
+        // Kalau namanya cocok → pakai satker master itu. Kalau tidak ada di
+        // master → kaitkan ke satker cadangan "Satker Lainnya" dan simpan
+        // nama asli ketikan. Tidak pernah membuat baris baru di tabel master.
         $satkerId = $data['satker_id'] ?? null;
+        $satkerLainnya = null;
         $satkerBaru = trim((string) ($data['satker_baru'] ?? ''));
+
         if ($satkerId === null && $satkerBaru !== '') {
-            $satkerId = Satker::firstOrCreate(
-                ['nama' => $satkerBaru],
-                ['kode' => null],
-            )->id;
+            $cocok = Satker::whereRaw('LOWER(nama) = ?', [mb_strtolower($satkerBaru)])->first();
+
+            if ($cocok !== null) {
+                $satkerId = $cocok->id;
+            } else {
+                $satkerId = Satker::lainnya()->id;
+                $satkerLainnya = $satkerBaru;
+            }
         }
 
         // PENTING: closure DB::transaction() punya scope sendiri — variabel yang
         // dibuat di dalamnya (mis. $register) tidak otomatis tersedia di luar.
         // Jadi model yang dibuat di dalam harus di-return, lalu ditangkap di sini.
-        $register = DB::transaction(function () use ($data, $satkerId): RegisterPnpp {
+        $register = DB::transaction(function () use ($data, $satkerId, $satkerLainnya): RegisterPnpp {
             $register = RegisterPnpp::create([
                 'nama' => $data['nama'],
                 'nik' => ! blank($data['nik'] ?? null) ? MasterRegistry::normalizeDigits($data['nik']) : null,
                 'nip' => ! blank($data['nip'] ?? null) ? MasterRegistry::normalizeDigits($data['nip']) : null,
                 'jabatan' => $data['jabatan'],
                 'satker_id' => $satkerId,
+                'satker_lainnya' => $satkerLainnya,
                 'unit' => $data['unit'] ?? null,
                 'ttl' => $data['ttl'],
                 'alamat' => $data['alamat'],

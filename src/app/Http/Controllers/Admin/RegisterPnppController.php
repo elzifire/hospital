@@ -3,15 +3,18 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\Poli;
+use App\Models\HariLibur;
 use App\Models\Pnpp;
+use App\Models\Poli;
 use App\Models\RegisterPnpp;
 use App\Models\Reminder;
 use App\Services\PencocokPnpp;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class RegisterPnppController extends Controller
@@ -81,6 +84,125 @@ class RegisterPnppController extends Controller
             'batasiPoli' => $this->batasiPoli(),
             'pnppCocok' => PencocokPnpp::cari($registerPnpp),
         ]);
+    }
+
+    /**
+     * Form edit jadwal kunjungan & poli tujuan — hanya admin/superadmin,
+     * dan hanya selama belum ada poli yang disetujui.
+     */
+    public function edit(RegisterPnpp $registerPnpp): View
+    {
+        $this->pastikanJadwalBisaDiedit($registerPnpp);
+        $registerPnpp->load(['satker', 'polis', 'tujuanKunjungans']);
+
+        return view('admin.register-pnpp.edit', [
+            'registerPnpp' => $registerPnpp,
+            'poliAktif' => $this->poliAktif(),
+            'batasiPoli' => $this->batasiPoli(),
+            'polis' => Poli::orderBy('nama')->get(),
+            'hariLibur' => HariLibur::orderBy('tanggal')->get(),
+        ]);
+    }
+
+    /**
+     * Simpan perubahan jadwal kunjungan & poli tujuan. Validasi ulang jam
+     * terhadap jam layanan, tanggal terhadap hari layanan & hari libur
+     * dari poli yang baru dipilih, lalu sinkronkan pivot poli.
+     */
+    public function update(Request $request, RegisterPnpp $registerPnpp): RedirectResponse
+    {
+        $this->pastikanJadwalBisaDiedit($registerPnpp);
+
+        $data = $request->validate([
+            'poli_dituju' => ['required', 'array', 'min:1'],
+            'poli_dituju.*' => ['integer', 'exists:polis,id'],
+            'rencana_tanggal_kunjungan' => ['required', 'date', 'after_or_equal:today'],
+            'rencana_jam_kunjungan' => ['required', 'date_format:H:i'],
+        ]);
+
+        $this->validasiJadwalBaru($data['poli_dituju'], $data['rencana_tanggal_kunjungan'], $data['rencana_jam_kunjungan']);
+
+        DB::transaction(function () use ($registerPnpp, $data): void {
+            $registerPnpp->update([
+                'rencana_tanggal_kunjungan' => $data['rencana_tanggal_kunjungan'],
+                'rencana_jam_kunjungan' => $data['rencana_jam_kunjungan'],
+            ]);
+            $registerPnpp->polis()->sync($data['poli_dituju']);
+        });
+
+        return redirect()
+            ->route('admin.register-pnpp.show', $registerPnpp)
+            ->with('success', "Jadwal & poli tujuan {$registerPnpp->nama} diperbarui.");
+    }
+
+    /**
+     * Guard edit: hanya admin/superadmin (bukan akun poli), dan hanya
+     * selama belum ada poli yang disetujui.
+     */
+    protected function pastikanJadwalBisaDiedit(RegisterPnpp $register): void
+    {
+        abort_if($this->batasiPoli(), 403, 'Akun poli tidak dapat mengubah jadwal pendaftaran.');
+
+        if ($register->approvedPolis()->exists()) {
+            abort(403, 'Jadwal pendaftaran tidak dapat diubah setelah ada poli yang disetujui.');
+        }
+    }
+
+    /**
+     * Validasi ulang jadwal baru terhadap poli yang dipilih: jam harus
+     * dalam jam layanan, tanggal dalam hari layanan, dan bukan hari libur.
+     */
+    protected function validasiJadwalBaru(array $poliIds, string $tanggal, string $jam): void
+    {
+        $poliTujuan = Poli::whereIn('id', $poliIds)->get();
+
+        $diLuarJam = [];
+
+        foreach ($poliTujuan as $poli) {
+            if ($poli->buka24Jam()) {
+                continue;
+            }
+
+            $buka = $poli->jam_buka->format('H:i');
+            $tutup = $poli->jam_tutup->format('H:i');
+
+            if ($jam < $buka || $jam > $tutup) {
+                $diLuarJam[] = "{$poli->nama} ({$buka}–{$tutup})";
+            }
+        }
+
+        if ($diLuarJam !== []) {
+            throw ValidationException::withMessages([
+                'rencana_jam_kunjungan' => "Jam {$jam} berada di luar jam layanan: ".implode(', ', $diLuarJam).'.',
+            ]);
+        }
+
+        $tanggalKunjungan = Carbon::parse($tanggal);
+        $diLuarHari = [];
+
+        foreach ($poliTujuan as $poli) {
+            if (! $poli->hariBuka($tanggalKunjungan)) {
+                $diLuarHari[] = "{$poli->nama} ({$poli->hariLayanan()})";
+            }
+        }
+
+        if ($diLuarHari !== []) {
+            throw ValidationException::withMessages([
+                'rencana_tanggal_kunjungan' => "Tanggal {$tanggal} berada di luar hari layanan: ".implode(', ', $diLuarHari).'.',
+            ]);
+        }
+
+        $libur = HariLibur::where('tanggal', $tanggal)
+            ->where(fn ($q) => $q->whereNull('poli_id')->orWhereIn('poli_id', $poliIds))
+            ->first();
+
+        if ($libur !== null) {
+            $cakupan = $libur->poli_id !== null ? ' khusus poli tujuan' : '';
+
+            throw ValidationException::withMessages([
+                'rencana_tanggal_kunjungan' => "Tanggal {$tanggal} adalah hari libur: {$libur->nama}{$cakupan}. Silakan pilih tanggal lain.",
+            ]);
+        }
     }
 
     /**
@@ -238,6 +360,7 @@ class RegisterPnppController extends Controller
 
         if ($poliAktif !== null) {
             $this->pastikanPoliDituju($register);
+
             return [$poliAktif];
         }
 
@@ -245,6 +368,7 @@ class RegisterPnppController extends Controller
 
         if ($poliId > 0) {
             $this->pastikanPoliDituju($register, $poliId);
+
             return [$poliId];
         }
 

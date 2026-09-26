@@ -53,7 +53,7 @@
                         </div>
                         <div class="sm:col-span-2">
                             <dt class="{{ $labelClass }}">Satker</dt>
-                            <dd class="{{ $valueClass }}">{{ $register->satker?->nama }}</dd>
+                            <dd class="{{ $valueClass }}">{{ $register->satkerNamaTampil() }}</dd>
                         </div>
                         <div>
                             <dt class="{{ $labelClass }}">Rencana Tanggal Kunjungan</dt>

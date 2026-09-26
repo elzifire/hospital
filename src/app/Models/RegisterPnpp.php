@@ -33,6 +33,7 @@ class RegisterPnpp extends Model
         'nip',
         'jabatan',
         'satker_id',
+        'satker_lainnya',
         'unit',
         'ttl',
         'alamat',
@@ -76,5 +77,39 @@ class RegisterPnpp extends Model
     public function tujuanKunjungans(): BelongsToMany
     {
         return $this->belongsToMany(TujuanKunjungan::class, 'register_pnpp_tujuan_kunjungan');
+    }
+
+    /**
+     * Benar bila asal pendaftar dipetakan ke satker cadangan "Satker Lainnya"
+     * (nama yang diketik manual tidak ada di data master).
+     */
+    public function isSatkerLainnya(): bool
+    {
+        return $this->satker !== null && $this->satker->isLainnya();
+    }
+
+    /**
+     * Nama satker siap tampil: "Satker Lainnya" bila dipetakan ke satker
+     * cadangan — beserta nama asli bila sempat diketik oleh pendaftar.
+     */
+    public function satkerNamaTampil(): string
+    {
+        if ($this->isSatkerLainnya()) {
+            return filled($this->satker_lainnya)
+                ? 'Satker Lainnya · '.$this->satker_lainnya
+                : Satker::NAMA_LAINNYA;
+        }
+
+        return $this->satker?->nama ?? '—';
+    }
+
+    /**
+     * Nama asli yang diketik pendaftar saat satker tidak ada di master.
+     */
+    public function satkerNamaAsli(): ?string
+    {
+        return $this->isSatkerLainnya() && filled($this->satker_lainnya)
+            ? $this->satker_lainnya
+            : null;
     }
 }

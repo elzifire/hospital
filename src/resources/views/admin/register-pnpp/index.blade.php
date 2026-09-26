@@ -127,8 +127,13 @@
                                     </div>
                                 </div>
                             </td>
-                            <td class="whitespace-nowrap px-6 py-4">
-                                @if ($r->satker)
+                            <td class="px-6 py-4">
+                                @if ($r->isSatkerLainnya())
+                                    <span class="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700 ring-1 ring-amber-200">Satker Lainnya</span>
+                                    @if ($namaAsli = $r->satkerNamaAsli())
+                                        <span class="mt-1 block text-xs font-semibold text-slate-600">{{ $namaAsli }}</span>
+                                    @endif
+                                @elseif ($r->satker)
                                     <span class="text-sm font-medium text-slate-700">{{ $r->satker->nama }}</span>
                                 @else
                                     <span class="text-xs italic text-slate-400">—</span>
@@ -228,6 +233,12 @@
                                                 </button>
                                             </form>
                                         @endif
+                                    @endif
+                                    @if ($jmlSetuju === 0 && $poliAktif === null)
+                                        <a href="{{ route('admin.register-pnpp.edit', $r) }}" title="Edit Jadwal & Poli"
+                                           class="rounded-lg p-2 text-slate-400 transition-all hover:bg-sky-50 hover:text-sky-600">
+                                            <svg class="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m16.86 7.86-8.02 8.02a2.25 2.25 0 0 1-1.023.57 4.5 4.5 0 0 1-1.646.19 2.25 2.25 0 0 1-1.594-1.594 4.5 4.5 0 0 1 .19-1.646 2.25 2.25 0 0 1 .57-1.023L13.14 4.14a2.25 2.25 0 0 1 3.182 0l.538.538a2.25 2.25 0 0 1 0 3.182ZM15 8.25 8.25 15m7.5-11.25-7.5 7.5M4.5 21h15" /></svg>
+                                        </a>
                                     @endif
                                     <a href="{{ route('admin.register-pnpp.show', $r) }}" title="Lihat Detail"
                                        class="rounded-lg p-2 text-slate-400 transition-all hover:bg-sky-50 hover:text-sky-600">

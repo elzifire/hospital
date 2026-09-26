@@ -301,7 +301,7 @@
                                                 class="rounded-lg bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-600 ring-1 ring-inset ring-rose-200 transition hover:bg-rose-100">
                                             Hapus
                                         </button>
-                                        @if (auth()->user()?->hasRole('superadmin'))
+                                        {{-- @if (auth()->user()?->hasRole('superadmin'))
                                             <button type="button"
                                                     onclick="confirmSubmit('{{ $r['forceHapusUrl'] }}', {
                                                         title: 'Hapus permanen penjadwalan?',
@@ -311,7 +311,7 @@
                                                     class="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white ring-1 ring-inset ring-rose-700 transition hover:bg-rose-700">
                                                 Hapus Permanen
                                             </button>
-                                        @endif
+                                        @endif --}}
                                     </td>
                                 </tr>
                             @endif

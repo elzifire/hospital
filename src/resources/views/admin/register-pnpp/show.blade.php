@@ -66,6 +66,13 @@
                 @endif
             @else
                 {{-- Admin/superadmin: setujui semua atau batalkan semua. --}}
+                @if ($jmlSetuju === 0)
+                    <a href="{{ route('admin.register-pnpp.edit', $registerPnpp) }}"
+                       class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-xs transition hover:bg-slate-50">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m16.86 7.86-8.02 8.02a2.25 2.25 0 0 1-1.023.57 4.5 4.5 0 0 1-1.646.19 2.25 2.25 0 0 1-1.594-1.594 4.5 4.5 0 0 1 .19-1.646 2.25 2.25 0 0 1 .57-1.023L13.14 4.14a2.25 2.25 0 0 1 3.182 0l.538.538a2.25 2.25 0 0 1 0 3.182ZM15 8.25 8.25 15m7.5-11.25-7.5 7.5M4.5 21h15" /></svg>
+                        Edit Jadwal & Poli
+                    </a>
+                @endif
                 @if ($approved)
                     <form method="POST" action="{{ route('admin.register-pnpp.unapprove', $registerPnpp) }}"
                           onsubmit="return confirm('Batalkan persetujuan {{ $registerPnpp->nama }} untuk semua poli?')">
@@ -171,7 +178,16 @@
                 <dl class="space-y-3">
                     <div>
                         <dt class="text-xs font-semibold uppercase tracking-wide text-slate-400">Satker</dt>
-                        <dd class="mt-0.5 text-sm font-bold text-slate-900">{{ $registerPnpp->satker?->nama ?: '—' }}</dd>
+                        @if ($registerPnpp->isSatkerLainnya())
+                            <dd class="mt-1">
+                                <span class="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700 ring-1 ring-amber-200">Satker Lainnya</span>
+                                @if ($namaAsli = $registerPnpp->satkerNamaAsli())
+                                    <span class="mt-1 block text-sm font-bold text-slate-900">{{ $namaAsli }}</span>
+                                @endif
+                            </dd>
+                        @else
+                            <dd class="mt-0.5 text-sm font-bold text-slate-900">{{ $registerPnpp->satker?->nama ?: '—' }}</dd>
+                        @endif
                     </div>
                     @if ($registerPnpp->unit)
                         <div>
