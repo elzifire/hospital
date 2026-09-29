@@ -20,6 +20,11 @@
         'hari' => $p->hariTercentang(),
         'bukaSetiapHari' => $p->bukaSetiapHari(),
         'jadwal' => $p->jadwalRingkas(),
+        'perHari' => collect($p->jadwalPerHari())->map(fn ($h) => [
+            'buka' => $h['buka'],
+            'jamBuka' => $h['jam_buka'],
+            'jamTutup' => $h['jam_tutup'],
+        ])->all(),
     ]])->all();
 
     $hariLiburData = $hariLibur->map(fn ($h) => [
@@ -186,16 +191,26 @@
                 const jam = this.jam;
                 if (!jam) { this.pesanJam = ''; return; }
 
+                const tanggal = this.tanggal;
+                if (!tanggal) { this.pesanJam = ''; return; }
+                const nama = this.namaHari(tanggal);
+
                 const diluar = [];
                 for (const id of this.poliDituju) {
                     const p = this.poliJadwal[id];
-                    if (p && p.buka && p.tutup && (jam < p.buka || jam > p.tutup)) {
-                        diluar.push(`${p.nama} (${p.buka}–${p.tutup})`);
+                    if (!p) continue;
+
+                    const hari = p.perHari && p.perHari[nama] ? p.perHari[nama] : null;
+                    const buka = hari ? hari.jamBuka : p.buka;
+                    const tutup = hari ? hari.jamTutup : p.tutup;
+
+                    if (buka && tutup && (jam < buka || jam > tutup)) {
+                        diluar.push(`${p.nama} (${buka}–${tutup})`);
                     }
                 }
 
                 this.pesanJam = diluar.length
-                    ? `Jam ${jam} berada di luar jam layanan: ${diluar.join(', ')}. Silakan sesuaikan jam atau pilihan poli.`
+                    ? `Jam ${jam} berada di luar jam layanan pada ${nama}: ${diluar.join(', ')}. Silakan sesuaikan jam atau pilihan poli.`
                     : '';
             },
 
@@ -211,8 +226,14 @@
                 const tutup = [];
                 for (const id of idTerpilih) {
                     const p = this.poliJadwal[id];
-                    if (!p || p.bukaSetiapHari || p.hari.includes(nama)) continue;
-                    tutup.push(`${p.nama} (${p.hari.join(', ')})`);
+                    if (!p) continue;
+
+                    const hari = p.perHari && p.perHari[nama] ? p.perHari[nama] : null;
+                    const bukaHari = hari ? hari.buka : (p.bukaSetiapHari || p.hari.includes(nama));
+
+                    if (!bukaHari) {
+                        tutup.push(`${p.nama} (${hari ? (hari.jamBuka && hari.jamTutup ? `${hari.jamBuka}–${hari.jamTutup}` : '24 Jam') : (p.bukaSetiapHari ? 'Setiap Hari' : p.hari.join(', '))})`);
+                    }
                 }
 
                 if (tutup.length) {

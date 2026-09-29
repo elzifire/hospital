@@ -7,10 +7,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Str;
+use App\Models\Concerns\LogsDataChanges;
 
 class MessageTemplate extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsDataChanges;
 
     protected $fillable = [
         'template_category_id',

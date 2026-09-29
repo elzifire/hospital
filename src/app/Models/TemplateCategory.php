@@ -6,10 +6,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
+use App\Models\Concerns\LogsDataChanges;
 
 class TemplateCategory extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsDataChanges;
 
     protected $fillable = [
         'nama',

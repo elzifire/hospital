@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Concerns\LogsDataChanges;
 
 /**
  * Balasan pasien yang dicatat manual atau diimpor dari Excel/CSV
@@ -12,7 +13,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class ResponManual extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsDataChanges;
 
     public const SUMBER_MANUAL = 'manual';
 

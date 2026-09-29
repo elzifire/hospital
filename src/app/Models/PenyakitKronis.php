@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Concerns\LogsDataChanges;
 
 class PenyakitKronis extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsDataChanges;
 
     protected $fillable = [
         'kode',

@@ -28,7 +28,7 @@
     @include('admin.monitoring.partials._stats')
 
     {{-- Tab Data | Grafik — memakai Alpine agar berpindah tanpa reload. --}}
-    <div x-data="monMonitoring({ charts: @json($chartData ?? []), hasData: @json($chartHasData ?? false) })">
+    <div x-data="monMonitoring({ charts: @js($chartData ?? []), hasData: @js($chartHasData ?? false) })">
         <div class="mb-4 inline-flex items-center gap-1 rounded-2xl bg-white p-1 shadow-sm ring-1 ring-slate-200">
             <button type="button" @click="openData()"
                     class="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition"
@@ -54,3 +54,163 @@
         </div>
     </div>
 </div>
+
+{{-- Registrasi komponen Alpine DI LUAR subtree x-data/x-show, agar selalu
+     terdaftar sebelum layout memuat Alpine (pola sama dengan halaman lain). --}}
+<script>
+    document.addEventListener('alpine:init', () => {
+        Alpine.data('monMonitoring', (cfg) => ({
+            tab: 'data',
+            charts: cfg.charts || [],
+            hasData: !!cfg.hasData,
+            inited: false,
+
+            openData() {
+                this.tab = 'data';
+            },
+
+            openGrafik() {
+                this.tab = 'grafik';
+                this.$nextTick(() => {
+                    if (this.inited || !this.hasData) return;
+                    this.inited = true;
+                    (this.charts || []).forEach((c) => {
+                        const el = this.$root.querySelector('#monChart-' + c.key);
+                        if (el && typeof Highcharts !== 'undefined') Highcharts.chart(el, this.chartOptions(c));
+                    });
+                });
+            },
+
+            chartOptions(c) {
+                const unit = c.unit || '';
+                const numberFmt = (v) => Highcharts.numberFormat(v, 0, ',', '.');
+
+                if (c.type === 'pie') {
+                    return {
+                        chart: {
+                            type: 'pie',
+                            height: c.height || 320,
+                            backgroundColor: 'transparent',
+                            spacing: [8, 12, 12, 12],
+                            style: { fontFamily: 'Inter, sans-serif' }
+                        },
+                        title: typeof c.total === 'number'
+                            ? {
+                                text: 'Total<br><b style="font-size:26px;color:#0f172a">' + numberFmt(c.total) + '</b>'
+                                    + (unit ? '<br><span style="font-size:11px;color:#94a3b8">' + unit + '</span>' : ''),
+                                align: 'center',
+                                verticalAlign: 'middle',
+                                useHTML: true,
+                                style: { fontSize: '12px', color: '#64748b' }
+                            }
+                            : { text: null },
+                        credits: { enabled: false },
+                        tooltip: {
+                            pointFormat: '<b>{point.y:,.0f}' + (unit ? ' ' + unit : '') + ' ({point.percentage:.1f}%)</b>',
+                            borderRadius: 10,
+                            shadow: true,
+                            style: { fontSize: '12px' }
+                        },
+                        plotOptions: {
+                            pie: {
+                                innerSize: '68%',
+                                dataLabels: { enabled: false },
+                                showInLegend: true,
+                                borderWidth: 2,
+                                borderColor: '#ffffff',
+                                states: { hover: { brightness: 0.05 } }
+                            }
+                        },
+                        legend: {
+                            enabled: c.legend !== false,
+                            itemStyle: { fontSize: '12px', color: '#334155', fontWeight: 'bold' },
+                            symbolRadius: 6
+                        },
+                        exporting: this.exportMenu(),
+                        series: [{ type: 'pie', data: c.series || [] }]
+                    };
+                }
+
+                const isBar = c.type === 'bar';
+                const all = (c.series || []).flatMap((s) => s.data || []);
+                const maxPoint = Math.max(0, ...all);
+
+                return {
+                    chart: {
+                        type: isBar ? 'bar' : 'column',
+                        height: c.height || 320,
+                        backgroundColor: 'transparent',
+                        spacing: [8, 12, 12, 12],
+                        style: { fontFamily: 'Inter, sans-serif' }
+                    },
+                    colors: c.colors,
+                    title: { text: null },
+                    credits: { enabled: false },
+                    xAxis: {
+                        categories: c.categories || [],
+                        lineColor: '#e2e8f0',
+                        tickColor: '#e2e8f0',
+                        labels: { style: { fontSize: '11px', fontWeight: '600', color: '#475569' } }
+                    },
+                    yAxis: {
+                        min: 0,
+                        gridLineColor: '#f1f5f9',
+                        title: {
+                            text: unit ? unit.charAt(0).toUpperCase() + unit.slice(1) : null,
+                            style: { fontSize: '11px', color: '#94a3b8' }
+                        },
+                        labels: {
+                            formatter() { return numberFmt(this.value); },
+                            style: { fontSize: '10px', color: '#94a3b8' }
+                        }
+                    },
+                    tooltip: {
+                        pointFormat: '<b>{point.y:,.0f}' + (unit ? ' ' + unit : '') + '</b>',
+                        borderRadius: 10,
+                        shadow: true
+                    },
+                    legend: {
+                        enabled: c.legend !== false,
+                        itemStyle: { fontSize: '12px', color: '#334155', fontWeight: 'bold' },
+                        symbolRadius: 6
+                    },
+                    plotOptions: {
+                        column: {
+                            borderRadius: 5,
+                            groupPadding: 0.15,
+                            pointPadding: 0.12,
+                            borderWidth: 0,
+                            dataLabels: {
+                                enabled: maxPoint > 0 && maxPoint <= 40,
+                                style: { fontSize: '10px', fontWeight: 'bold', color: '#64748b', textOutline: 'none' }
+                            }
+                        },
+                        bar: {
+                            colorByPoint: !(c.series || []).some((s) => s.color),
+                            borderRadius: 4,
+                            borderWidth: 0,
+                            dataLabels: {
+                                enabled: maxPoint > 0 && maxPoint <= 40,
+                                style: { fontSize: '10px', fontWeight: 'bold', color: '#64748b', textOutline: 'none' }
+                            }
+                        },
+                        series: { animation: { duration: 500 } }
+                    },
+                    exporting: this.exportMenu(),
+                    series: c.series || []
+                };
+            },
+
+            exportMenu() {
+                return {
+                    enabled: true,
+                    buttons: {
+                        contextButton: {
+                            menuItems: ['viewFullscreen', 'downloadPNG', 'downloadJPEG', 'downloadPDF', 'downloadSVG', 'separator', 'downloadCSV', 'downloadXLS', 'printChart']
+                        }
+                    }
+                };
+            }
+        }));
+    });
+</script>

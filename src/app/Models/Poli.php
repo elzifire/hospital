@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\LogsDataChanges;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Poli extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsDataChanges;
 
     /** Nama hari dalam urutan seminggu (untuk tampilan & form). */
     public const DAFTAR_HARI = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
@@ -41,28 +43,107 @@ class Poli extends Model
     }
 
     /**
-     * Poli dianggap buka 24 jam selama jam buka & tutup tidak diisi.
+     * Nama hari Indonesia sebuah tanggal (1 = Senin ... 7 = Minggu).
      */
-    public function buka24Jam(): bool
+    public static function namaHari(Carbon $tanggal): string
     {
-        return $this->jam_buka === null && $this->jam_tutup === null;
+        $daftar = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
+
+        return $daftar[$tanggal->isoWeekday() - 1];
     }
 
     /**
-     * Label jam layanan, mis. "08:00–12:00" atau "24 Jam".
+     * Jadwal per hari (baris tabel poli_jadwal_hari).
      */
-    public function jamLayanan(): string
+    public function jadwalHari()
     {
-        if ($this->buka24Jam()) {
-            return '24 Jam';
-        }
-
-        $buka = $this->jam_buka?->format('H:i') ?? '00:00';
-        $tutup = $this->jam_tutup?->format('H:i') ?? '23:59';
-
-        return "{$buka}–{$tutup}";
+        return $this->hasMany(PoliJadwalHari::class);
     }
 
+    /**
+     * Apakah poli memakai jadwal per hari (tabel poli_jadwal_hari) —
+     * bila ya, baris tsb menimpa pola lama jam_buka/jam_tutup + hari_*.
+     */
+    public function hasJadwalPerHari(): bool
+    {
+        if ($this->relationLoaded('jadwalHari')) {
+            return $this->jadwalHari->isNotEmpty();
+        }
+
+        return $this->jadwalHari()->exists();
+    }
+
+    /**
+     * Jadwal efektif poli untuk 7 hari dalam seminggu, dengan urutan tetap
+     * Senin–Minggu. Kalau poli memakai jadwal per hari, baris tabel
+     * poli_jadwal_hari jadi sumbernya; kalau tidak, data lama
+     * (jam_buka/jam_tutup + hari_*) diturunkan ke bentuk yang sama.
+     *
+     * Bentuk tiap entri:
+     *   ['buka' => bool, 'jam_buka' => 'H:i'|null, 'jam_tutup' => 'H:i'|null]
+     * buka=true tapi jam kosong = poli buka 24 jam pada hari itu.
+     *
+     * @return array<string, array{buka: bool, jam_buka: ?string, jam_tutup: ?string}>
+     */
+    public function jadwalPerHari(): array
+    {
+        if ($this->hasJadwalPerHari()) {
+            if (! $this->relationLoaded('jadwalHari')) {
+                $this->load('jadwalHari');
+            }
+
+            $rows = $this->jadwalHari->keyBy('hari');
+
+            $hasil = [];
+            foreach (self::DAFTAR_HARI as $hari) {
+                $row = $rows->get($hari);
+
+                $hasil[$hari] = $row !== null ? [
+                    'buka' => (bool) $row->buka,
+                    'jam_buka' => $row->jam_buka?->format('H:i'),
+                    'jam_tutup' => $row->jam_tutup?->format('H:i'),
+                ] : ['buka' => false, 'jam_buka' => null, 'jam_tutup' => null];
+            }
+
+            return $hasil;
+        }
+
+        // ---- Fallback: pola lama. Hari tanpa diceklis = buka setiap hari. ----
+        $buka = $this->jam_buka?->format('H:i');
+        $tutup = $this->jam_tutup?->format('H:i');
+        $tercentang = [];
+
+        foreach (self::KOLOM_HARI as $nama => $kolom) {
+            if ($this->{$kolom}) {
+                $tercentang[] = $nama;
+            }
+        }
+
+        $bukaSetiapHari = $tercentang === [];
+
+        $hasil = [];
+        foreach (self::DAFTAR_HARI as $hari) {
+            $hasil[$hari] = [
+                'buka' => $bukaSetiapHari || in_array($hari, $tercentang, true),
+                'jam_buka' => $buka,
+                'jam_tutup' => $tutup,
+            ];
+        }
+
+        return $hasil;
+    }
+
+    /**
+     * Jadwal efektif satu hari tertentu (lewati null jika hari tidak dikenal).
+     *
+     * @return array{buka: bool, jam_buka: ?string, jam_tutup: ?string}
+     */
+    public function jadwalPada(Carbon $tanggal): array
+    {
+        return $this->jadwalPerHari()[self::namaHari($tanggal)] ?? ['buka' => false, 'jam_buka' => null, 'jam_tutup' => null];
+    }
+
+    /** Relasi dokter. */
     public function dokters()
     {
         return $this->hasMany(Dokter::class);
@@ -79,17 +160,18 @@ class Poli extends Model
     }
 
     /**
-     * Daftar nama hari tempat poli buka (yang diceklis aktif).
+     * Daftar nama hari tempat poli buka berdasarkan jadwal efektif.
      *
      * @return list<string>
      */
     public function hariTercentang(): array
     {
+        $jadwal = $this->jadwalPerHari();
         $tercentang = [];
 
-        foreach (self::KOLOM_HARI as $nama => $kolom) {
-            if ($this->{$kolom}) {
-                $tercentang[] = $nama;
+        foreach (self::DAFTAR_HARI as $hari) {
+            if ($jadwal[$hari]['buka']) {
+                $tercentang[] = $hari;
             }
         }
 
@@ -97,11 +179,11 @@ class Poli extends Model
     }
 
     /**
-     * Poli dianggap buka setiap hari bila tidak ada hari yang diceklis.
+     * Poli dianggap buka setiap hari bila ketujuh hari terbuka.
      */
     public function bukaSetiapHari(): bool
     {
-        return $this->hariTercentang() === [];
+        return count($this->hariTercentang()) === count(self::DAFTAR_HARI);
     }
 
     /**
@@ -117,25 +199,99 @@ class Poli extends Model
     }
 
     /**
-     * Jadwal utuh poli, mis. "Senin, Rabu, Jumat · 09:00–17:00" atau
-     * "Setiap Hari · 24 Jam".
+     * Apakah poli buka 24 jam (tidak ada jam buka & tutup sama sekali) —
+     * hanya bermakna pada pola lama; pada jadwal per hari, 24 jam berarti
+     * hari tsb tidak mengisi jam buka/tutup.
+     */
+    public function buka24Jam(): bool
+    {
+        return $this->jam_buka === null && $this->jam_tutup === null;
+    }
+
+    /**
+     * Label jam layanan pola lama, mis. "08:00–12:00" atau "24 Jam".
+     */
+    public function jamLayanan(): string
+    {
+        if ($this->buka24Jam()) {
+            return '24 Jam';
+        }
+
+        $buka = $this->jam_buka?->format('H:i') ?? '00:00';
+        $tutup = $this->jam_tutup?->format('H:i') ?? '23:59';
+
+        return "{$buka}–{$tutup}";
+    }
+
+    /**
+     * Jadwal utuh poli.
+     *  - pola lama  : "Senin, Rabu, Jumat · 09:00–17:00" / "Setiap Hari · 24 Jam".
+     *  - jadwal per hari : ringkasan per hari yang lebih informatif,
+     *    mis. "Sen–Jum 08:00–12:00 · Sab 09:00–13:00 · Minggu Tutup".
      */
     public function jadwalRingkas(): string
     {
+        if ($this->hasJadwalPerHari()) {
+            return $this->jadwalPerHariRingkas();
+        }
+
         return "{$this->hariLayanan()} · {$this->jamLayanan()}";
     }
 
     /**
-     * Apakah poli buka pada tanggal yang diberikan.
+     * Ringkasan jadwal per hari dengan pengelompokan hari yang bersebelahan
+     * dan berjam sama, mis. "Sen–Jum 08:00–12:00 · Sab–Ming 09:00–13:00".
      */
-    public function hariBuka(\Carbon\Carbon $tanggal): bool
+    public function jadwalPerHariRingkas(): string
     {
-        if ($this->bukaSetiapHari()) {
-            return true;
+        $pendek = ['Senin' => 'Sen', 'Selasa' => 'Sel', 'Rabu' => 'Rab', 'Kamis' => 'Kam', 'Jumat' => 'Jum', 'Sabtu' => 'Sab', 'Minggu' => 'Min'];
+        $jadwal = $this->jadwalPerHari();
+
+        $segmen = [];
+        $terakhir = null;
+
+        foreach (self::DAFTAR_HARI as $hari) {
+            $h = $jadwal[$hari];
+            $label = $h['buka']
+                ? (($h['jam_buka'] && $h['jam_tutup']) ? "{$h['jam_buka']}–{$h['jam_tutup']}" : '24 Jam')
+                : 'Tutup';
+
+            if ($terakhir !== null && $terakhir['label'] === $label) {
+                $terakhir['hari'][] = $hari;
+            } else {
+                if ($terakhir !== null) {
+                    $segmen[] = $terakhir;
+                }
+                $terakhir = ['hari' => [$hari], 'label' => $label];
+            }
         }
 
-        $nama = ['1' => 'Senin', '2' => 'Selasa', '3' => 'Rabu', '4' => 'Kamis', '5' => 'Jumat', '6' => 'Sabtu', '7' => 'Minggu'][(string) $tanggal->isoWeekday()] ?? 'Senin';
+        if ($terakhir !== null) {
+            $segmen[] = $terakhir;
+        }
 
-        return (bool) $this->{self::KOLOM_HARI[$nama]};
+        $bagian = [];
+        foreach ($segmen as $s) {
+            $awal = $pendek[$s['hari'][0]] ?? $s['hari'][0];
+
+            if (count($s['hari']) === 1) {
+                $nama = $s['label'] === 'Tutup' ? "{$awal} Tutup" : "{$awal} {$s['label']}";
+            } else {
+                $akhir = $pendek[$s['hari'][count($s['hari']) - 1]] ?? $s['hari'][count($s['hari']) - 1];
+                $nama = $s['label'] === 'Tutup' ? "{$awal}–{$akhir} Tutup" : "{$awal}–{$akhir} {$s['label']}";
+            }
+
+            $bagian[] = $nama;
+        }
+
+        return implode(' · ', $bagian);
+    }
+
+    /**
+     * Apakah poli buka pada tanggal yang diberikan (berdasarkan jadwal efektif).
+     */
+    public function hariBuka(Carbon $tanggal): bool
+    {
+        return (bool) $this->jadwalPada($tanggal)['buka'];
     }
 }

@@ -6,10 +6,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use App\Models\Concerns\LogsDataChanges;
 
 class RegisterPnpp extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsDataChanges;
 
     protected $table = 'register_pnpp';
 

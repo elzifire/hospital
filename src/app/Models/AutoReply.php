@@ -5,10 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Concerns\LogsDataChanges;
 
 class AutoReply extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsDataChanges;
 
     protected $fillable = [
         'kategori',

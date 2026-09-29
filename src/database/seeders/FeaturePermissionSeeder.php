@@ -43,6 +43,9 @@ class FeaturePermissionSeeder extends Seeder
             'manage respon',
             'manage follow-up',
             'manage template',
+
+            // Audit & sistem
+            'manage activity-log',
         ];
     }
 

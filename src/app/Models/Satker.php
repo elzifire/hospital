@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Concerns\LogsDataChanges;
 
 class Satker extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsDataChanges;
 
     /**
      * Satker cadangan untuk asal yang di luar data master (ketikan manual

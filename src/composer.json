@@ -11,6 +11,7 @@
         "laravel/tinker": "^2.10.1",
         "phpoffice/phpspreadsheet": "^5.9",
         "predis/predis": "2.2",
+        "spatie/laravel-activitylog": "^4.12",
         "spatie/laravel-permission": "^6.25"
     },
     "require-dev": {

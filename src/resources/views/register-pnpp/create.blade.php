@@ -48,7 +48,8 @@
         ];
 
 // ---- Map poli -> jadwal utuh (hari + jam), dipakai untuk cek hidup
-//      tanggal & jam kunjungan di Alpine. ----
+        //      tanggal & jam kunjungan di Alpine. Jadwal per hari diperhatikan
+        //      (buka/tutup/jam bisa berbeda tiap hari; jam kosong = 24 jam). ----
         $poliJadwal = $polis->mapWithKeys(fn ($p) => [$p->id => [
             'nama' => $p->nama,
             'buka' => $p->jam_buka?->format('H:i'),
@@ -56,6 +57,11 @@
             'hari' => $p->hariTercentang(),
             'bukaSetiapHari' => $p->bukaSetiapHari(),
             'jadwal' => $p->jadwalRingkas(),
+            'perHari' => collect($p->jadwalPerHari())->map(fn ($h) => [
+                'buka' => $h['buka'],
+                'jamBuka' => $h['jam_buka'],
+                'jamTutup' => $h['jam_tutup'],
+            ])->all(),
         ]])->all();
 
         // ---- Daftar hari libur untuk cek tanggal live: umum (poli null)
@@ -335,21 +341,34 @@
                 return `${d}-${m}-${y}`;
             },
 
-            // Cek live: jam kunjungan harus dalam jam layanan SEMUA poli terpilih.
+            // Cek live: jam kunjungan harus dalam jam layanan SEMUA poli
+            // terpilih pada hari tersebut (jadwal per hari diperhatikan).
             cekJam() {
                 const jam = this.jam;
                 if (!jam) { this.pesanJam = ''; return; }
 
+                const tanggal = this.tanggal;
+                if (!tanggal) { this.pesanJam = ''; return; }
+                const nama = this.namaHari(tanggal);
+
                 const diluar = [];
                 for (const id of this.poliDituju) {
                     const p = this.poliJadwal[id];
-                    if (p && p.buka && p.tutup && (jam < p.buka || jam > p.tutup)) {
-                        diluar.push(`${p.nama} (${p.buka}–${p.tutup})`);
+                    if (!p) continue;
+
+                    // Ambil jam layanan hari tertentu; jatuh ke bila ada
+                    // jadwal per hari, bila tidak pakai jam legacy polinya.
+                    const hari = p.perHari && p.perHari[nama] ? p.perHari[nama] : null;
+                    const buka = hari ? hari.jamBuka : p.buka;
+                    const tutup = hari ? hari.jamTutup : p.tutup;
+
+                    if (buka && tutup && (jam < buka || jam > tutup)) {
+                        diluar.push(`${p.nama} (${buka}–${tutup})`);
                     }
                 }
 
                 this.pesanJam = diluar.length
-                    ? `Jam ${jam} berada di luar jam layanan: ${diluar.join(', ')}. Silakan sesuaikan jam atau pilihan poli.`
+                    ? `Jam ${jam} berada di luar jam layanan pada ${nama}: ${diluar.join(', ')}. Silakan sesuaikan jam atau pilihan poli.`
                     : '';
             },
 
@@ -367,8 +386,15 @@
                 const tutup = [];
                 for (const id of idTerpilih) {
                     const p = this.poliJadwal[id];
-                    if (!p || p.bukaSetiapHari || p.hari.includes(nama)) continue;
-                    tutup.push(`${p.nama} (${p.hari.join(', ')})`);
+                    if (!p) continue;
+
+                    // Hari tutup per jadwal per hari (atau fallback hari legacy).
+                    const hari = p.perHari && p.perHari[nama] ? p.perHari[nama] : null;
+                    const bukaHari = hari ? hari.buka : (p.bukaSetiapHari || p.hari.includes(nama));
+
+                    if (!bukaHari) {
+                        tutup.push(`${p.nama} (${hari ? (hari.jamBuka && hari.jamTutup ? `${hari.jamBuka}–${hari.jamTutup}` : '24 Jam') : (p.bukaSetiapHari ? 'Setiap Hari' : p.hari.join(', '))})`);
+                    }
                 }
 
                 if (tutup.length) {

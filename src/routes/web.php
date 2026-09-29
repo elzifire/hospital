@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\Admin\AutoReplyController;
 use App\Http\Controllers\Admin\BroadcastLogController;
 use App\Http\Controllers\Admin\DigitalReminderController;
@@ -365,6 +366,12 @@ Route::middleware('auth')->group(function () {
 
         Route::middleware('can:manage jadwal')->group(function () {
             Route::resource('jadwal', JadwalController::class)->except('show');
+        });
+
+        // Jejak perubahan data (before & after) via spatie/laravel-activitylog.
+        Route::middleware('can:manage activity-log')->group(function () {
+            Route::get('activity-log', [ActivityLogController::class, 'index'])->name('activity-log.index');
+            Route::get('activity-log/{activity}', [ActivityLogController::class, 'show'])->name('activity-log.show');
         });
 
         // Import & Export data master: permission per entitas dicek di

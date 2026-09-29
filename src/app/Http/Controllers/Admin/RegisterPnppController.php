@@ -99,7 +99,7 @@ class RegisterPnppController extends Controller
             'registerPnpp' => $registerPnpp,
             'poliAktif' => $this->poliAktif(),
             'batasiPoli' => $this->batasiPoli(),
-            'polis' => Poli::orderBy('nama')->get(),
+            'polis' => Poli::with('jadwalHari')->orderBy('nama')->get(),
             'hariLibur' => HariLibur::orderBy('tanggal')->get(),
         ]);
     }
@@ -156,18 +156,26 @@ class RegisterPnppController extends Controller
     {
         $poliTujuan = Poli::whereIn('id', $poliIds)->get();
 
+        $tanggalKunjungan = Carbon::parse($tanggal);
         $diLuarJam = [];
+        $diLuarHari = [];
 
         foreach ($poliTujuan as $poli) {
-            if ($poli->buka24Jam()) {
+            $jadwal = $poli->jadwalPada($tanggalKunjungan);
+
+            if (! $jadwal['buka']) {
+                $diLuarHari[] = "{$poli->nama} ({$poli->hariLayanan()})";
+
                 continue;
             }
 
-            $buka = $poli->jam_buka->format('H:i');
-            $tutup = $poli->jam_tutup->format('H:i');
+            if ($jadwal['jam_buka'] && $jadwal['jam_tutup']) {
+                $buka = $jadwal['jam_buka'];
+                $tutup = $jadwal['jam_tutup'];
 
-            if ($jam < $buka || $jam > $tutup) {
-                $diLuarJam[] = "{$poli->nama} ({$buka}–{$tutup})";
+                if ($jam < $buka || $jam > $tutup) {
+                    $diLuarJam[] = "{$poli->nama} ({$buka}–{$tutup})";
+                }
             }
         }
 
@@ -175,15 +183,6 @@ class RegisterPnppController extends Controller
             throw ValidationException::withMessages([
                 'rencana_jam_kunjungan' => "Jam {$jam} berada di luar jam layanan: ".implode(', ', $diLuarJam).'.',
             ]);
-        }
-
-        $tanggalKunjungan = Carbon::parse($tanggal);
-        $diLuarHari = [];
-
-        foreach ($poliTujuan as $poli) {
-            if (! $poli->hariBuka($tanggalKunjungan)) {
-                $diLuarHari[] = "{$poli->nama} ({$poli->hariLayanan()})";
-            }
         }
 
         if ($diLuarHari !== []) {

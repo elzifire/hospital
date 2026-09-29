@@ -25,7 +25,7 @@ class RegisterPnppController extends Controller
     {
         return view('register-pnpp.create', [
             'satkers' => Satker::orderBy('nama')->get(),
-            'polis' => Poli::orderBy('nama')->get(),
+            'polis' => Poli::with('jadwalHari')->orderBy('nama')->get(),
             'tujuanKunjungans' => TujuanKunjungan::orderBy('nama')->get(),
             'hariLibur' => HariLibur::orderBy('tanggal')->get(),
         ]);
@@ -84,23 +84,35 @@ class RegisterPnppController extends Controller
         }
 
         // Poli tujuan dipakai untuk cek jam, rentang hari, dan hari libur.
+        // Jam & hari layanan dinilai per tanggal kunjungan (jadwal bisa
+        // berbeda tiap hari); hari tanpa jam pada jadwal per hari / tanpa
+        // jam buka-tutup dianggap buka 24 jam.
         $poliTujuan = Poli::whereIn('id', $data['poli_dituju'])->get();
 
-        // Jam kunjungan harus berada dalam jam layanan setiap poli tujuan
-        // (poli tanpa jam buka/tutup dianggap buka 24 jam).
         $jamKunjungan = $data['rencana_jam_kunjungan'];
+        $tanggal = $data['rencana_tanggal_kunjungan'];
+        $tanggalKunjungan = Carbon::parse($tanggal);
         $diLuarJam = [];
+        $diLuarHari = [];
 
         foreach ($poliTujuan as $poli) {
-            if ($poli->buka24Jam()) {
+            $jadwal = $poli->jadwalPada($tanggalKunjungan);
+
+            // Hari tutup di hari itu → masuk kesalahan "di luar hari layanan".
+            if (! $jadwal['buka']) {
+                $diLuarHari[] = "{$poli->nama} ({$poli->hariLayanan()})";
+
                 continue;
             }
 
-            $buka = $poli->jam_buka->format('H:i');
-            $tutup = $poli->jam_tutup->format('H:i');
+            // Hari buka dengan jam terbatas → jam kunjungan harus di dalamnya.
+            if ($jadwal['jam_buka'] && $jadwal['jam_tutup']) {
+                $buka = $jadwal['jam_buka'];
+                $tutup = $jadwal['jam_tutup'];
 
-            if ($jamKunjungan < $buka || $jamKunjungan > $tutup) {
-                $diLuarJam[] = "{$poli->nama} ({$buka}–{$tutup})";
+                if ($jamKunjungan < $buka || $jamKunjungan > $tutup) {
+                    $diLuarJam[] = "{$poli->nama} ({$buka}–{$tutup})";
+                }
             }
         }
 
@@ -108,18 +120,6 @@ class RegisterPnppController extends Controller
             throw ValidationException::withMessages([
                 'rencana_jam_kunjungan' => "Jam {$jamKunjungan} berada di luar jam layanan: ".implode(', ', $diLuarJam).'.',
             ]);
-        }
-
-        // Tanggal kunjungan harus masuk hari buka setiap poli tujuan
-        // (poli tanpa hari diceklis dianggap buka setiap hari).
-        $tanggal = $data['rencana_tanggal_kunjungan'];
-        $tanggalKunjungan = Carbon::parse($tanggal);
-        $diLuarHari = [];
-
-        foreach ($poliTujuan as $poli) {
-            if (! $poli->hariBuka($tanggalKunjungan)) {
-                $diLuarHari[] = "{$poli->nama} ({$poli->hariLayanan()})";
-            }
         }
 
         if ($diLuarHari !== []) {
