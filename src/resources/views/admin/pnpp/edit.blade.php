@@ -110,7 +110,7 @@
                             <div>
                                 <label for="no_hp" class="mb-1.5 block text-xs font-bold uppercase tracking-wide text-slate-500">No. HP <span class="text-rose-500">*</span></label>
                                 <input type="text" name="no_hp" id="no_hp" value="{{ old('no_hp', $pnpp->no_hp) }}" x-model="noHp" placeholder="cth. 081234567890"
-                                       class="block w-full rounded-xl border-0 py-2.5 px-3.5 text-sm text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-sky-500 transition @error('no_hp') ring-rose-300 focus:ring-rose-500 @enderror" required>
+                                       class="block w-full rounded-xl border-0 py-2.5 px-3.5 text-sm text-slate-900 shadow-xs ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-sky-500 transition @error('no_hp') ring-rose-300 focus:ring-rose-500 @enderror">
                                 @error('no_hp')<p class="mt-1.5 text-xs font-medium text-rose-600">{{ $message }}</p>@enderror
                             </div>
 
