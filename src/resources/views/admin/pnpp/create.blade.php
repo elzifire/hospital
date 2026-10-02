@@ -202,7 +202,8 @@
                     </div>
                 </div>
 
-                {{-- Penyakit Menahun --}}
+                {{-- ===== Penyakit Menahun DITUNDA =====
+                     Disembunyikan sementara — yang dipakai adalah Penyakit Kronis.
                 <div class="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200">
                     <div class="border-b border-slate-100 p-6">
                         <h3 class="text-base font-bold text-slate-900">Penyakit Menahun</h3>
@@ -234,6 +235,7 @@
                         @endif
                     </div>
                 </div>
+                --}}
 
                 {{-- Action bar --}}
                 <div class="flex items-center justify-end gap-3">

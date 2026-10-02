@@ -28,11 +28,20 @@ class KunjunganController extends Controller
      */
     public function index(Request $request)
     {
-        return view('admin.kunjungan.index', app(KunjunganDaftar::class)->dataKunjungan(
+        $data = app(KunjunganDaftar::class)->dataKunjungan(
             $request,
             $this->batasiPoli(),
             $this->poliAktif(),
-        ));
+        );
+
+        $data['totalTrashed'] = Kunjungan::query()
+            ->onlyTrashed()
+            ->when($this->batasiPoli(), fn ($query) => $query->where(
+                fn ($sub) => $sub->whereNull('poli_id')->orWhere('poli_id', $this->poliAktif())
+            ))
+            ->count();
+
+        return view('admin.kunjungan.index', $data);
     }
 
     /**
@@ -208,10 +217,12 @@ class KunjunganController extends Controller
     }
 
     /**
-     * Hapus satu baris poli (ter-scope ke PNPP terkait).
+     * Hapus satu baris poli (ter-scope ke PNPP terkait). Soft delete —
+     * baris tidak dihapus permanen dari database.
      */
     public function destroy(Pnpp $pnpp, Kunjungan $kunjungan)
     {
+        abort_unless($kunjungan->pnpp_id === $pnpp->id, 404);
         $this->pastikanPoli($kunjungan);
 
         $pnpp->kunjungans()->whereKey($kunjungan->id)->delete();
@@ -219,6 +230,64 @@ class KunjunganController extends Controller
         return redirect()
             ->route('admin.pnpp.kunjungan', $pnpp)
             ->with('success', 'Catatan poli berhasil dihapus.');
+    }
+
+    /**
+     * Tong sampah — kunjungan yang dihapus (soft delete). Baris tetap
+     * tersimpan dan bisa dipulihkan ke daftar utama.
+     */
+    public function trash(Request $request)
+    {
+        $q = (string) $request->query('q', '');
+        $qAtas = strtoupper($q);
+        $poliId = (string) $request->query('poli', '');
+        $batasiPoli = $this->batasiPoli();
+
+        $items = Kunjungan::query()
+            ->onlyTrashed()
+            ->when($batasiPoli, fn ($query) => $query->where(
+                fn ($sub) => $sub->whereNull('poli_id')->orWhere('poli_id', $this->poliAktif())
+            ))
+            ->with(['pnpp' => fn ($q2) => $q2->withTrashed()->with('satker:id,nama')], 'poli:id,nama')
+            ->when($q, fn ($query) => $query->whereHas('pnpp', fn ($p) => $p
+                ->whereRaw('UPPER(nama) LIKE ?', ["%{$qAtas}%"])
+                ->orWhere('nip', 'like', "%{$q}%")
+            ))
+            ->when($poliId && ! $batasiPoli, fn ($query) => $query->where('poli_id', $poliId))
+            ->orderByDesc('deleted_at')
+            ->paginate(10)
+            ->withQueryString();
+
+        $queryTrashed = fn ($sistem) => $sistem->when($batasiPoli, fn ($q2) => $q2->where(
+            fn ($sub) => $sub->whereNull('poli_id')->orWhere('poli_id', $this->poliAktif())
+        ));
+
+        return view('admin.kunjungan.trash', [
+            'items' => $items,
+            'totalTrashed' => Kunjungan::query()->tap($queryTrashed)->onlyTrashed()->count(),
+            'totalPasien' => Kunjungan::query()->tap($queryTrashed)->onlyTrashed()->distinct()->count('pnpp_id'),
+            'polis' => $this->daftarPoliAktif(),
+            'batasiPoli' => $batasiPoli,
+            'filters' => ['q' => $q, 'poli' => $poliId],
+        ]);
+    }
+
+    /**
+     * Pulihkan kunjungan yang dihapus (soft delete) ke daftar utama.
+     */
+    public function restore(Kunjungan $kunjungan)
+    {
+        $this->pastikanPoli($kunjungan);
+
+        $nama = $kunjungan->pnpp?->nama;
+
+        if ($kunjungan->trashed()) {
+            $kunjungan->restore();
+        }
+
+        return redirect()
+            ->route('admin.kunjungan.trash')
+            ->with('success', 'Catatan kunjungan untuk "'.$nama.'" berhasil dipulihkan.');
     }
 
     /**

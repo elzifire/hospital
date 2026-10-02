@@ -57,7 +57,7 @@ abstract class ReportController extends Controller
             'pnpp' => PnppController::class,
             'satker' => SatkerController::class,
             'penyakit' => PenyakitController::class,
-            'penyakit-menahun' => PenyakitMenahunController::class,
+            // 'penyakit-menahun' => PenyakitMenahunController::class, // DITUNDA — yang dipakai Penyakit Kronis.
             'poli' => PoliController::class,
             'kunjungan' => KunjunganController::class,
             'digital-reminder' => DigitalReminderController::class,

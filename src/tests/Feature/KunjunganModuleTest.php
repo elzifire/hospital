@@ -165,8 +165,74 @@ class KunjunganModuleTest extends TestCase
         $this->delete(route('admin.pnpp.kunjungan.destroy', [$budi, $target]))
             ->assertRedirect(route('admin.pnpp.kunjungan', $budi));
 
-        $this->assertModelMissing($target);
+        // Soft delete: hilang dari tampilan tetapi tetap ada di database.
+        $this->assertSoftDeleted($target);
         $this->assertSame(1, Kunjungan::where('pnpp_id', $budi->id)->count());
+        $this->assertSame(2, Kunjungan::withTrashed()->where('pnpp_id', $budi->id)->count());
+    }
+
+    #[Test]
+    public function soft_delete_masuk_tong_sampah_dan_tidak_dihitung_di_index(): void
+    {
+        extract($this->pasangan());
+        $this->actingAs($this->superadmin());
+
+        $budi->kunjungans()->createMany([
+            ['poli_id' => $poliUmum->id, 'tanggal_kunjungan' => '2026-09-05'],
+            ['poli_id' => $poliGigi->id, 'tanggal_kunjungan' => '2026-09-05'],
+        ]);
+
+        // Hapus SEMUA baris → pasien tidak boleh tampil di index & riwayat.
+        foreach (Kunjungan::where('pnpp_id', $budi->id)->get() as $kunjungan) {
+            $this->delete(route('admin.pnpp.kunjungan.destroy', [$budi, $kunjungan]))
+                ->assertRedirect(route('admin.pnpp.kunjungan', $budi));
+        }
+
+        // Soft delete: hilang dari tampilan tetapi tetap ada di database.
+        $this->assertSame(0, Kunjungan::count());
+        $this->assertSame(2, Kunjungan::onlyTrashed()->where('pnpp_id', $budi->id)->count());
+
+        // Tidak muncul di daftar index maupun riwayat pasien (empty state).
+        $this->get(route('admin.kunjungan.index'))
+            ->assertOk()
+            ->assertDontSee('Budi Santoso')
+            ->assertSee('Belum ada kunjungan tercatat');
+        $this->get(route('admin.pnpp.kunjungan', $budi))
+            ->assertOk()
+            ->assertSee('Belum ada riwayat kunjungan');
+
+        // Masuk tong sampah.
+        $this->get(route('admin.kunjungan.trash'))
+            ->assertOk()
+            ->assertSee('Budi Santoso');
+    }
+
+    #[Test]
+    public function pulihkan_baris_dari_tong_sampah(): void
+    {
+        extract($this->pasangan());
+        $this->actingAs($this->superadmin());
+
+        $budi->kunjungans()->create([
+            'poli_id' => $poliUmum->id,
+            'tanggal_kunjungan' => '2026-09-05',
+        ]);
+
+        $target = Kunjungan::firstOrFail();
+        $target->delete();
+        $this->assertSoftDeleted($target);
+
+        // Pulihkan lewat tong sampah.
+        $this->post(route('admin.kunjungan.restore', $target->id))
+            ->assertRedirect(route('admin.kunjungan.trash'));
+
+        $this->assertNotSoftDeleted($target);
+        $this->assertSame(1, Kunjungan::count());
+        $this->assertSame(0, Kunjungan::onlyTrashed()->count());
+
+        // Kembali muncul di daftar modul & riwayat pasien.
+        $this->get(route('admin.kunjungan.index'))->assertOk()->assertSee('Budi Santoso');
+        $this->get(route('admin.pnpp.kunjungan', $budi))->assertOk()->assertSee('Poli Umum');
     }
 
     #[Test]

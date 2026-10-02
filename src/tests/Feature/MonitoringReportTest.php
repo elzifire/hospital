@@ -202,7 +202,7 @@ class MonitoringReportTest extends TestCase
         $response->assertSee('Digital Reminder');
         $response->assertSee('Respon');
         $response->assertSee('Follow Up');
-        $response->assertSee('10 laporan aktif'); // semua laporan kini tersedia
+        $response->assertSee('9 laporan aktif'); // Penyakit Menahun disembunyikan; semua laporan lain tersedia
     }
 
     #[Test]
@@ -306,7 +306,7 @@ class MonitoringReportTest extends TestCase
         $hub->assertOk();
         $hub->assertDontSee('/admin/monitoring/dokter');
         $hub->assertDontSee('/admin/monitoring/jadwal');
-        $hub->assertSee('5/5 laporan'); // grup master tanpa dokter & jadwal
+        $hub->assertSee('4/4 laporan'); // grup master tanpa dokter, jadwal, dan penyakit menahun
 
         // Akses langsung laporan & export tetap tertutup (tiada rute/controller)
         $this->get('/admin/monitoring/dokter')->assertNotFound();

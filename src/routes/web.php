@@ -100,6 +100,13 @@ Route::middleware('auth')->group(function () {
             Route::get('kunjungan/create', [KunjunganController::class, 'create'])->name('kunjungan.create');
             Route::post('kunjungan', [KunjunganController::class, 'store'])->name('kunjungan.store');
 
+            // Tong sampah & pulihkan kunjungan yang dihapus (soft delete).
+            // withTrashed() agar baris yang sudah dihapus tetap bisa di-resolve.
+            Route::get('kunjungan/tong-sampah', [KunjunganController::class, 'trash'])->name('kunjungan.trash');
+            Route::post('kunjungan/{kunjungan}/restore', [KunjunganController::class, 'restore'])
+                ->name('kunjungan.restore')
+                ->withTrashed();
+
             // Catat kunjungan dari penjadwalan Digital Reminder (mode
             // "Dari Jadwal" di form tambah kunjungan).
             Route::post('kunjungan/catat', [KunjunganController::class, 'catatDariReminder'])->name('kunjungan.catat');
