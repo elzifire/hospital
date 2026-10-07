@@ -2,10 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\DashboardController;
 use App\Models\Kunjungan;
 use App\Models\MessageLog;
-use App\Models\Poli;
 use App\Models\Pnpp;
+use App\Models\Poli;
 use App\Models\Reminder;
 use App\Models\ResponManual;
 use App\Models\Satker;
@@ -13,6 +14,7 @@ use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
+use ReflectionClass;
 use Tests\TestCase;
 
 /**
@@ -83,7 +85,7 @@ class DashboardTest extends TestCase
         $respon->assertSee('PNPP DALAM DATABASE');
         $respon->assertSee((string) Pnpp::count());
         $respon->assertSee('Polresta Bogor');
-        $respon->assertSee('IGD');
+        $respon->assertSee('Instalasi Gawat Darurat');
         // Chart trend & donut harus menerima JSON series.
         $respon->assertSee('trendChart');
         $respon->assertSee('donutChart');
@@ -156,7 +158,46 @@ class DashboardTest extends TestCase
 
         $respon->assertOk();
         $respon->assertSee('2');
-        $respon->assertSee('IGD');
-        $respon->assertSee('Rawat Jalan');
+        $respon->assertSee('Instalasi Gawat Darurat');
+        $respon->assertSee('Tanpa Poli');
+    }
+
+    #[Test]
+    public function trend_kunjungan_menjadi_total_tunggal_dengan_hardcode_additif(): void
+    {
+        Kunjungan::create([
+            'pnpp_id' => Pnpp::factory()->create()->id,
+            'tanggal_kunjungan' => today(),
+        ]);
+
+        $respon = $this->actingAs($this->superadmin())->get(route('admin.dashboard'));
+
+        $respon->assertOk();
+        // Satu seri tunggal, tanpa pemisahan kategori IGD / Rawat Jalan / Rawat Inap.
+        $respon->assertSee('"name":"Total Kunjungan"', false);
+        $respon->assertDontSee('"name":"Rawat Inap"', false);
+
+        // Nilai hardcode Jan–Sep ditambahkan (additif) di atas database.
+        if (now()->year === 2026) {
+            $respon->assertSee('"data":[70,88,87,122,93,49,104,93,0', false);
+        }
+    }
+
+    #[Test]
+    public function target_pnpp_mengikuti_konstanta_dan_bisa_dioverride(): void
+    {
+        $konstanta = (new ReflectionClass(DashboardController::class))->getConstant('TARGET_PNPP');
+
+        $respon = $this->actingAs($this->superadmin())->get(route('admin.dashboard'));
+
+        $respon->assertOk();
+        $respon->assertSee(number_format($konstanta, 0, ',', '.'));
+
+        // Override lewat config (.env DASHBOARD_TARGET_PNPP) tetap berlaku.
+        config(['dashboard.target_pnpp' => 777]);
+        $respon = $this->actingAs($this->superadmin())->get(route('admin.dashboard'));
+
+        $respon->assertOk();
+        $respon->assertSee('777');
     }
 }

@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Models\Kunjungan;
 use App\Models\MessageLog;
 use App\Models\MessageReply;
-use App\Models\Poli;
 use App\Models\Pnpp;
 use App\Models\Reminder;
 use App\Models\ResponManual;
@@ -14,6 +13,9 @@ use Illuminate\Support\Carbon;
 
 class DashboardController extends Controller
 {
+   
+    protected const TARGET_PNPP = 1025;
+
     /**
      * Bulan pendek bahasa Indonesia untuk judul grafik trend.
      */
@@ -29,7 +31,7 @@ class DashboardController extends Controller
     {
         $user = $request->user();
 
-        $targetPnpp = (int) config('dashboard.target_pnpp', 1025);
+        $targetPnpp = (int) (config('dashboard.target_pnpp') ?? self::TARGET_PNPP);
         $targetMon = (array) config('dashboard.monitoring', []);
 
         // ===================== PONDASI ANGKA =====================
@@ -45,31 +47,30 @@ class DashboardController extends Controller
 
         $totalFollowupTerkirim = (clone $followupTerkirim)->count();
 
+        $digitalReminder = Reminder::query()->whereIn('status', ['terjadwal', 'selesai'])->count();
+
         // ===================== STATISTIK KARTU ATAS =====================
         $stats = [
             ['label' => 'PNPP DALAM DATABASE',  'value' => $totalPnpp,
-             'note' => $this->persen($totalPnpp / max(1, $targetPnpp) * 100).' dari target data',
-             'color' => 'blue', 'icon' => 'users'],
+                'note' => $this->persen($totalPnpp / max(1, $targetPnpp) * 100).' dari target data',
+                'color' => 'blue', 'icon' => 'users'],
             ['label' => 'TARGET PNPP',          'value' => number_format($targetPnpp, 0, ',', '.'),
-             'note' => 'Target data PNPP', 'color' => 'gray', 'icon' => 'target'],
-            ['label' => 'DIGITAL REMINDER',     'value' => $totalFollowupTerkirim,
-             'note' => $this->persen($totalFollowupTerkirim / max(1, $totalPnpp) * 100).' dari target',
-             'color' => 'yellow', 'icon' => 'bell'],
+                'note' => 'Target data PNPP', 'color' => 'gray', 'icon' => 'target'],
+            ['label' => 'DIGITAL REMINDER',     'value' => $digitalReminder,
+                'color' => 'yellow', 'icon' => 'bell'],
             ['label' => 'PNPP DI-OUTREACH',     'value' => $pnppDiOutreach,
-             'note' => $this->persen($pnppDiOutreach / max(1, $targetPnpp) * 100).' dari target',
-             'color' => 'green', 'icon' => 'send'],
+                
+                'color' => 'green', 'icon' => 'send'],
             ['label' => 'RESPON PNPP',          'value' => $respon,
-             'note' => $this->persen($respon / max(1, $totalOutreach) * 100).' dari outreach',
-             'color' => 'orange', 'icon' => 'chat'],
+                'color' => 'orange', 'icon' => 'chat'],
             ['label' => 'FOLLOW-UP',            'value' => $totalFollowupTerkirim,
-             'note' => $this->persen($totalFollowupTerkirim / max(1, $respon) * 100).' dari respons',
-             'color' => 'cyan', 'icon' => 'refresh'],
+                
+                'color' => 'cyan', 'icon' => 'refresh'],
             ['label' => 'KUNJUNGAN PNPP',       'value' => $kunjungan,
-             'note' => 'dari baseline '.$this->persen($kunjungan / max(1, $totalPnpp) * 100),
-             'color' => 'purple', 'icon' => 'hospital'],
+                'color' => 'purple', 'icon' => 'hospital'],
             ['label' => 'CONVERSION RATE',      'value' => $this->persen($kunjungan / max(1, $totalOutreach) * 100),
-             'note' => 'Dari outreach ke kunjungan',
-             'color' => 'red', 'icon' => 'trending'],
+                'note' => 'Dari digital reminder ke kunjungan',
+                'color' => 'red', 'icon' => 'trending'],
         ];
 
         // ===================== TREND KUNJUNGAN 6 BULAN =====================
@@ -101,11 +102,11 @@ class DashboardController extends Controller
         // ===================== ALERT & NOTIFIKASI =====================
         $alerts = [
             ['title' => 'Follow-up Terlambat',
-             'count' => Reminder::query()->terlambatTanpaKunjungan()->count(), 'color' => 'red'],
+                'count' => Reminder::query()->terlambatTanpaKunjungan()->count(), 'color' => 'red'],
             ['title' => 'Data Tidak Lengkap',
-             'count' => Pnpp::query()->whereNull('no_hp')->orWhereNull('tanggal_lahir')->count(), 'color' => 'yellow'],
+                'count' => Pnpp::query()->whereNull('no_hp')->orWhereNull('tanggal_lahir')->count(), 'color' => 'yellow'],
             ['title' => 'Reminder Gagal Terkirim',
-             'count' => MessageLog::query()->status('gagal')->count(), 'color' => 'orange'],
+                'count' => MessageLog::query()->status('gagal')->count(), 'color' => 'orange'],
         ];
 
         return view('dashboard', [
@@ -125,45 +126,34 @@ class DashboardController extends Controller
     }
 
     /**
-     * ⚠️ DATA HARDCODE — BUKAN ANGKA ASLI DARI DATABASE ⚠️
+     * Data hardcode total kunjungan per bulan — DITAMBAHKAN (additif) di atas
+     * hasil hitungan tabel `kunjungans`, bukan pengganti.
      *
-     * Data kunjungan Jan–Jun 2026 per kategori (IGD / Rawat Jalan / Rawat
-     * Inap) untuk mengisi grafik tren kunjungan. Angka di bawah ini adalah
-     * DATA CONTOH, bukan hasil hitungan tabel `kunjungans`.
+     * Jan–Agu 2026: riwayat sebelum aplikasi berjalan (data contoh lama).
+     * Sep 2026: aplikasi beroperasi mulai 15 Sep; nilai 0 berarti grafik
+     * September murni dari database dan siap disetel ulang kapan pun.
      *
-     * Kenapa perlu diganti: grafik ini menampilkan angka operasional RS.
-     * Selagi data contoh masih terpasang, angka di dashboard tidak boleh
-     * dipakai untuk laporan, keputusan, atau Indikator KPI.
-     *
-     * Cara menggantinya (pilih salah satu):
-     * 1. REAL: kosongkan konstanta ini `[]` → grafik otomatis kembali
-     *    100% dari query `kunjungans` (tidak ada kode lain yang diubah).
-     * 2. REAL: isi ulang dengan angka asli dari database per bulan.
-     *
-     * Ingat: hanya bulan ber-key '2026-01' s/d '2026-06' yang terpengaruh;
-     * bulan lain tetap dihitung dari database.
-     *
-     * Key = bulan (Y-m), isi = jumlah kunjungan per kategori sesuai urutan
-     * $seriesAsal: [IGD, Rawat Jalan, Rawat Inap].
+     * Key = bulan (Y-m), isi = angka total kunjungan tambahan.
      */
     protected const TREND_HARDCODE = [
-        '2026-01' => [0, 70, 0],
-        '2026-02' => [0, 88, 0],
-        '2026-03' => [0, 87, 0],
-        '2026-04' => [0, 122, 0],
-        '2026-05' => [0, 93, 0],
-        '2026-06' => [0, 49, 0],
-        '2026-07' => [0, 104, 0],
-        '2026-08' => [0, 93, 0],
+        '2026-01' => 70,
+        '2026-02' => 88,
+        '2026-03' => 87,
+        '2026-04' => 122,
+        '2026-05' => 93,
+        '2026-06' => 49,
+        '2026-07' => 104,
+        '2026-08' => 93,
+        '2026-09' => 0,
     ];
 
     /**
-     * Tren kunjungan 1 tahun (Januari sampai bulan berjalan) per kategori (IGD / Rawat Jalan / Rawat Inap).
+     * Tren kunjungan 1 tahun (Januari sampai bulan berjalan) sebagai satu
+     * garis Total Kunjungan.
      *
-     * Angka bulan Jan–Jun 2026 memakai data hardcode (TREND_HARDCODE);
-     * bulan lain dihitung dari tabel kunjungan. Kategori dipetakan dari
-     * poli tempat kunjungan tercatat; kunjungan tanpa poli diperlakukan
-     * sebagai Rawat Jalan (default).
+     * Nilai tiap bulan = jumlah baris tabel kunjungan + nilai TREND_HARDCODE
+     * (bersifat tambahan/additif). Bulan hardcode (Jan–Agu 2026 dan Sep 2026)
+     * mendapat suntikan angka; bulan lainnya murni hasil database.
      *
      * @return array{year: int, months: string[], series: array<int, array{name: string, color: string, data: int[]}>}
      */
@@ -179,45 +169,38 @@ class DashboardController extends Controller
             $bulan[$date->format('Y-m')] = $date;
         }
 
-        $seriesAsal = [
-            'IGD' => ['label' => 'IGD', 'color' => '#ef4444'],
-            'Rawat Jalan' => ['label' => 'Rawat Jalan', 'color' => '#3b82f6'],
-            'Rawat Inap' => ['label' => 'Rawat Inap', 'color' => '#16a34a'],
-        ];
         $totalMonths = count($bulan);
-        $series = array_map(fn ($s) => ['name' => $s['label'], 'color' => $s['color'], 'data' => array_fill(0, $totalMonths, 0)], $seriesAsal);
+        $data = array_fill(0, $totalMonths, 0);
 
         $kunjungans = Kunjungan::query()
-            ->with('poli:id,kode,nama')
             ->whereDate('tanggal_kunjungan', '>=', $mulai)
             ->whereDate('tanggal_kunjungan', '<=', now()->endOfMonth()->toDateString())
-            ->get(['poli_id', 'tanggal_kunjungan']);
+            ->get(['tanggal_kunjungan']);
 
         foreach ($kunjungans as $k) {
             $key = $k->tanggal_kunjungan->format('Y-m');
-            if (! isset($bulan[$key])) {
-                continue;
-            }
-            $idx = array_search($key, array_keys($bulan), true);
-            $series[$this->kategoriPoli($k->poli)]['data'][$idx]++;
-        }
-
-        // Terapkan angka hardcode (Jan–Jun 2026) pada posisi masing-masing;
-        // bulan di luar rentang itu tetap memakai hasil hitungan database.
-        foreach (self::TREND_HARDCODE as $key => $perKategori) {
             $idx = array_search($key, array_keys($bulan), true);
             if ($idx === false) {
                 continue;
             }
-            foreach (array_keys($seriesAsal) as $i => $kategori) {
-                $series[$kategori]['data'][$idx] = $perKategori[$i];
+            $data[$idx]++;
+        }
+
+        // Suntik (tambahkan) angka hardcode di atas hitungan database.
+        foreach (self::TREND_HARDCODE as $key => $nilai) {
+            $idx = array_search($key, array_keys($bulan), true);
+            if ($idx === false) {
+                continue;
             }
+            $data[$idx] += (int) $nilai;
         }
 
         return [
             'year' => $currentYear,
             'months' => array_map(fn (Carbon $d) => self::BULAN[(int) $d->format('n')], array_values($bulan)),
-            'series' => array_values($series),
+            'series' => [
+                ['name' => 'Total Kunjungan', 'color' => '#0ea5e9', 'data' => $data],
+            ],
         ];
     }
 
@@ -336,20 +319,20 @@ class DashboardController extends Controller
 
         $indikator = [
             ['name' => 'PNPP di-outreach',
-             'aktual' => $pnppDiOutreach / max(1, $totalPnpp) * 100,
-             'target' => $targetMon['outreach'] ?? 65],
+                'aktual' => $pnppDiOutreach / max(1, $totalPnpp) * 100,
+                'target' => $targetMon['outreach'] ?? 65],
             ['name' => 'Respon ke PNPP',
-             'aktual' => $respon / max(1, $totalOutreach) * 100,
-             'target' => $targetMon['respon'] ?? 53],
+                'aktual' => $respon / max(1, $totalOutreach) * 100,
+                'target' => $targetMon['respon'] ?? 53],
             ['name' => 'Digital Reminder',
-             'aktual' => $followupTerkirim / max(1, $totalPnpp) * 100,
-             'target' => $targetMon['digital_reminder'] ?? 52],
+                'aktual' => $followupTerkirim / max(1, $totalPnpp) * 100,
+                'target' => $targetMon['digital_reminder'] ?? 52],
             ['name' => 'Follow-up',
-             'aktual' => $followupTerkirim / max(1, $followupSemua) * 100,
-             'target' => $targetMon['followup'] ?? 92],
+                'aktual' => $followupTerkirim / max(1, $followupSemua) * 100,
+                'target' => $targetMon['followup'] ?? 92],
             ['name' => 'Kunjungan PNPP',
-             'aktual' => $kunjungan / max(1, $totalPnpp) * 100,
-             'target' => $targetMon['kunjungan'] ?? 15],
+                'aktual' => $kunjungan / max(1, $totalPnpp) * 100,
+                'target' => $targetMon['kunjungan'] ?? 15],
         ];
 
         return array_map(function ($row) {
@@ -366,52 +349,40 @@ class DashboardController extends Controller
     }
 
     /**
-     * Kunjungan hari ini dikelompokkan per kategori poli.
+     * Kunjungan hari ini berupa daftar poli — nama poli beserta jumlah
+     * pasiennya, diurutkan dari yang terbanyak. Kunjungan tanpa poli
+     * tercatat sebagai "Tanpa Poli".
      *
      * @return array{total: int, items: array<int, array{label: string, value: int, color: string}>}
      */
     protected function kunjunganHariIni(): array
     {
-        $items = [
-            'IGD' => ['label' => 'IGD', 'value' => 0, 'color' => 'blue'],
-            'Rawat Jalan' => ['label' => 'Rawat Jalan', 'value' => 0, 'color' => 'cyan'],
-            'Rawat Inap' => ['label' => 'Rawat Inap', 'value' => 0, 'color' => 'gray'],
-        ];
-
         $kunjungans = Kunjungan::query()
-            ->with('poli:id,kode,nama')
+            ->with('poli:id,nama')
             ->whereDate('tanggal_kunjungan', today()->toDateString())
             ->get(['poli_id']);
 
-        $total = $kunjungans->count();
+        $perPoli = [];
         foreach ($kunjungans as $k) {
-            $items[$this->kategoriPoli($k->poli)]['value']++;
+            $nama = $k->poli?->nama ?? 'Tanpa Poli';
+            $perPoli[$nama] = ($perPoli[$nama] ?? 0) + 1;
+        }
+        arsort($perPoli);
+
+        $warna = ['blue', 'cyan', 'green', 'orange', 'purple', 'pink', 'yellow', 'navy', 'red', 'gray'];
+
+        $items = [];
+        $i = 0;
+        foreach ($perPoli as $nama => $jumlah) {
+            $items[] = [
+                'label' => $nama,
+                'value' => $jumlah,
+                'color' => $warna[$i % count($warna)],
+            ];
+            $i++;
         }
 
-        return ['total' => $total, 'items' => array_values($items)];
-    }
-
-    /**
-     * Klasifikasi kategori grafik kunjungan dari poli.
-     */
-    protected function kategoriPoli(?Poli $poli): string
-    {
-        if (! $poli) {
-            return 'Rawat Jalan';
-        }
-
-        $kode = strtoupper((string) $poli->kode);
-        $nama = strtolower((string) $poli->nama);
-
-        if (str_contains($kode, 'IGD') || str_contains($nama, 'darurat')) {
-            return 'IGD';
-        }
-
-        if (str_contains($nama, 'rawat inap') || str_contains($kode, 'RANAP') || str_contains($kode, 'INAP')) {
-            return 'Rawat Inap';
-        }
-
-        return 'Rawat Jalan';
+        return ['total' => count($kunjungans), 'items' => $items];
     }
 
     /**
