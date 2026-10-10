@@ -144,7 +144,7 @@ class DashboardController extends Controller
         '2026-06' => 49,
         '2026-07' => 104,
         '2026-08' => 93,
-        '2026-09' => 5,
+        '2026-09' => 51,
     ];
 
     /**
