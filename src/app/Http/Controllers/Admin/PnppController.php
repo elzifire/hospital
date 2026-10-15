@@ -183,8 +183,12 @@ class PnppController extends Controller
             'penyakitMenahun',
             'kunjungans' => fn ($q) => $q
                 ->with('poli:id,nama')
-                ->when($poliId, fn ($u) => $u->where('poli_id', $poliId))
-                ->when($filterPoli, fn ($u) => $u->where('poli_id', $filterPoli))
+                ->when($poliId, fn ($u) => $u->where(
+                    fn ($sub) => $sub->whereNull('poli_id')->orWhere('home_visit', true)->orWhere('poli_id', $poliId)
+                ))
+                ->when($filterPoli, fn ($u) => $u->where(
+                    fn ($sub) => $sub->where('poli_id', $filterPoli)->orWhere('home_visit', true)
+                ))
                 ->when($dari, fn ($u) => $u->whereDate('tanggal_kunjungan', '>=', $dari))
                 ->when($sampai, fn ($u) => $u->whereDate('tanggal_kunjungan', '<=', $sampai))
                 ->orderByDesc('tanggal_kunjungan'),

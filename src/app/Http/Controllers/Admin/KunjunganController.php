@@ -37,7 +37,7 @@ class KunjunganController extends Controller
         $data['totalTrashed'] = Kunjungan::query()
             ->onlyTrashed()
             ->when($this->batasiPoli(), fn ($query) => $query->where(
-                fn ($sub) => $sub->whereNull('poli_id')->orWhere('poli_id', $this->poliAktif())
+                fn ($sub) => $sub->whereNull('poli_id')->orWhere('home_visit', true)->orWhere('poli_id', $this->poliAktif())
             ))
             ->count();
 
@@ -70,7 +70,9 @@ class KunjunganController extends Controller
         // Kandidat jadwal mode "Dari Jadwal": status terjadwal & belum
         // dicatat. User akun poli hanya melihat jadwal polinya sendiri.
         $reminders = Reminder::query()
-            ->when($this->batasiPoli(), fn ($query) => $query->where('poli_id', $this->poliAktif()))
+            ->when($this->batasiPoli(), fn ($query) => $query->where(
+                fn ($sub) => $sub->where('poli_id', $this->poliAktif())->orWhere('home_visit', true)
+            ))
             ->with('pnpp.satker:id,nama', 'poli:id,nama')
             ->when($q || $satkerId, fn ($query) => $query->whereHas('pnpp', fn ($p) => $p
                 ->when($q, fn ($sub) => $sub->where(
@@ -246,20 +248,22 @@ class KunjunganController extends Controller
         $items = Kunjungan::query()
             ->onlyTrashed()
             ->when($batasiPoli, fn ($query) => $query->where(
-                fn ($sub) => $sub->whereNull('poli_id')->orWhere('poli_id', $this->poliAktif())
+                fn ($sub) => $sub->whereNull('poli_id')->orWhere('home_visit', true)->orWhere('poli_id', $this->poliAktif())
             ))
             ->with(['pnpp' => fn ($q2) => $q2->withTrashed()->with('satker:id,nama')], 'poli:id,nama')
             ->when($q, fn ($query) => $query->whereHas('pnpp', fn ($p) => $p
                 ->whereRaw('UPPER(nama) LIKE ?', ["%{$qAtas}%"])
                 ->orWhere('nip', 'like', "%{$q}%")
             ))
-            ->when($poliId && ! $batasiPoli, fn ($query) => $query->where('poli_id', $poliId))
+            ->when($poliId && ! $batasiPoli, fn ($query) => $query->where(
+                fn ($sub) => $sub->where('poli_id', $poliId)->orWhere('home_visit', true)
+            ))
             ->orderByDesc('deleted_at')
             ->paginate(10)
             ->withQueryString();
 
         $queryTrashed = fn ($sistem) => $sistem->when($batasiPoli, fn ($q2) => $q2->where(
-            fn ($sub) => $sub->whereNull('poli_id')->orWhere('poli_id', $this->poliAktif())
+            fn ($sub) => $sub->whereNull('poli_id')->orWhere('home_visit', true)->orWhere('poli_id', $this->poliAktif())
         ));
 
         return view('admin.kunjungan.trash', [
@@ -346,7 +350,7 @@ class KunjunganController extends Controller
 
     protected function bolehAkses(Kunjungan $kunjungan): bool
     {
-        return ! $this->batasiPoli() || ($kunjungan->poli_id === null || (int) $kunjungan->poli_id === $this->poliAktif());
+        return ! $this->batasiPoli() || ($kunjungan->poli_id === null || (bool) $kunjungan->home_visit || (int) $kunjungan->poli_id === $this->poliAktif());
     }
 
     /**
@@ -354,7 +358,7 @@ class KunjunganController extends Controller
      */
     protected function pastikanPoliReminder(Reminder $reminder): void
     {
-        abort_unless(! $this->batasiPoli() || (int) $reminder->poli_id === $this->poliAktif(), 403, 'Anda hanya dapat mengelola data poli Anda sendiri.');
+        abort_unless(! $this->batasiPoli() || (int) $reminder->poli_id === $this->poliAktif() || (bool) $reminder->home_visit, 403, 'Anda hanya dapat mengelola data poli Anda sendiri.');
     }
 
     /**

@@ -35,7 +35,7 @@ class KunjunganController extends ReportController
         ]);
 
         $poliLabels = Poli::orderBy('nama')->pluck('nama', 'id')->all();
-        $perPoli = $this->chartTop($base, 'poli_id', $poliLabels, 8, 'Lainnya', 'Tanpa Poli');
+        $perPoli = $this->chartTop($base, 'poli_id', $poliLabels, 8, 'Lainnya', 'Home Visit');
 
         // Per satker (lewat relasi pnpp) — join agar bisa di-group per satker.
         $columnsSatker = (clone $base)->reorder()
@@ -123,13 +123,13 @@ class KunjunganController extends ReportController
             'icon' => MonitoringIcons::PIN,
             'tone' => 'rose',
             'available' => true,
-            'count' => fn () => Kunjungan::query()->tap(MonitoringSpecs::poliScope())->count(),
+            'count' => fn () => Kunjungan::query()->tap(MonitoringSpecs::poliScopeKunjungan())->count(),
         ];
     }
 
     public static function spec(): array
     {
-        $scopePoli = MonitoringSpecs::poliScope();
+        $scopePoli = MonitoringSpecs::poliScopeKunjungan();
 
         return [
             'model' => Kunjungan::class,
@@ -174,7 +174,7 @@ class KunjunganController extends ReportController
                     'options' => fn () => Poli::query()
                         ->when(auth()->user()?->poliId(), fn ($q, $id) => $q->whereKey($id))
                         ->orderBy('nama')->pluck('nama', 'id')->all(),
-                    'apply' => fn (Builder $q, string $v) => $q->where('poli_id', (int) $v),
+                    'apply' => fn (Builder $q, string $v) => $q->where(fn ($sub) => $sub->where('poli_id', (int) $v)->orWhere('home_visit', true)),
                 ],
                 [
                     'key' => 'satker',

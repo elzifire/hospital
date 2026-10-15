@@ -8,8 +8,10 @@ use App\Models\Poli;
 use App\Models\Reminder;
 use App\Models\Satker;
 use App\Models\User;
+use App\Services\KunjunganDaftar;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -309,5 +311,49 @@ class KunjunganDaftarTest extends TestCase
 
         $this->assertDatabaseHas('kunjungans', ['reminder_id' => $reminderSendiri->id, 'poli_id' => $poliB->id]);
         $this->assertSame('selesai', $reminderSendiri->refresh()->status);
+    }
+
+    /**
+     * Kunjungan home visit (poli_id NULL) wajib ikut terhitung pada kartu
+     * Total Kunjungan — termasuk saat dibuka oleh akun poli, sejalan dengan
+     * KunjunganController::bolehAkses() yang mengizinkan baris poli_id NULL.
+     */
+    #[Test]
+    public function home_visit_ikut_terhitung_di_hitung_kunjungan_untuk_akun_poli(): void
+    {
+        extract($this->pasangan());
+
+        $user = User::create([
+            'name' => 'Petugas Poli A',
+            'email' => 'petugas-a-home@test.dev',
+            'password' => 'rahasia',
+        ]);
+        $user->assignRole('poli');
+        $user->userDetail()->updateOrCreate([], ['poli_id' => $poliA->id]);
+
+        // Satu pasien, satu tanggal: 1 kunjungan di Poli A + 1 home visit
+        // tanpa poli (poli_id NULL).
+        $budi->kunjungans()->createMany([
+            ['poli_id' => $poliA->id, 'tanggal_kunjungan' => today()->format('Y-m-d'), 'keluhan' => 'RS'],
+            ['poli_id' => null, 'home_visit' => true, 'tanggal_kunjungan' => today()->format('Y-m-d'), 'keluhan' => 'Home'],
+        ]);
+
+        $req = Request::create('/admin/kunjungan');
+        $svc = app(KunjunganDaftar::class);
+
+        // Admin: kedua baris masuk hitungan.
+        $superadmin = $this->superadmin();
+        $this->actingAs($superadmin);
+        $sebagaiAdmin = $svc->dataKunjungan($req, $superadmin->poliId() !== null, $superadmin->poliId());
+        $this->assertSame(2, $sebagaiAdmin['total']);
+
+        // Akun poli: home visit tetap ikut terhitung (bukan 1).
+        $this->actingAs($user);
+        $sebagaiPoli = $svc->dataKunjungan($req, $user->poliId() !== null, $user->poliId());
+        $this->assertSame(2, $sebagaiPoli['total']);
+        $this->assertSame(1, $sebagaiPoli['pasien']);
+
+        // Baris grup menandai adanya home visit dan tetap tampil.
+        $this->assertTrue($sebagaiPoli['items']->first()['homeVisit']);
     }
 }

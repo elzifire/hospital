@@ -39,7 +39,9 @@ class DigitalReminderController extends Controller
 
         $data['totalTrashed'] = Reminder::query()
             ->onlyTrashed()
-            ->when($this->batasiPoli(), fn ($q) => $q->where('poli_id', $this->poliAktif()))
+            ->when($this->batasiPoli(), fn ($q) => $q->where(
+                fn ($sub) => $sub->whereNull('poli_id')->orWhere('home_visit', true)->orWhere('poli_id', $this->poliAktif())
+            ))
             ->count();
 
         return view('admin.digital-reminder.index', $data);
@@ -59,7 +61,9 @@ class DigitalReminderController extends Controller
 
         $items = Reminder::query()
             ->onlyTrashed()
-            ->when($batasiPoli, fn ($query) => $query->where('poli_id', $this->poliAktif()))
+            ->when($batasiPoli, fn ($query) => $query->where(
+                fn ($sub) => $sub->whereNull('poli_id')->orWhere('home_visit', true)->orWhere('poli_id', $this->poliAktif())
+            ))
             ->with(['pnpp' => fn ($q2) => $q2->withTrashed()->with('satker:id,nama')], 'poli:id,nama', 'dokter:id,nama')
             ->when($q, fn ($query) => $query->where(
                 fn ($sub) => $sub
@@ -69,13 +73,17 @@ class DigitalReminderController extends Controller
                         ->orWhere('nip', 'like', "%{$q}%"))
             ))
             ->when($status, fn ($query) => $query->where('status', $status))
-            ->when($poliId && ! $batasiPoli, fn ($query) => $query->where('poli_id', $poliId))
+            ->when($poliId && ! $batasiPoli, fn ($query) => $query->where(
+                fn ($sub) => $sub->where('poli_id', $poliId)->orWhere('home_visit', true)
+            ))
             ->orderByDesc('deleted_at')
             ->paginate(10)
             ->withQueryString();
 
         $queryTrashed = fn ($sistem) => $sistem
-            ->when($batasiPoli, fn ($q2) => $q2->where('poli_id', $this->poliAktif()));
+            ->when($batasiPoli, fn ($q2) => $q2->where(
+                fn ($sub) => $sub->whereNull('poli_id')->orWhere('home_visit', true)->orWhere('poli_id', $this->poliAktif())
+            ));
 
         return view('admin.digital-reminder.trash', [
             'items' => $items,
@@ -170,7 +178,9 @@ class DigitalReminderController extends Controller
             ? Kunjungan::with('poli:id,nama')
                 ->where('pnpp_id', $reminder->pnpp_id)
                 ->whereDate('tanggal_kunjungan', $reminder->kunjungan->tanggal_kunjungan)
-                ->when($this->batasiPoli(), fn ($q) => $q->where('poli_id', $reminder->poli_id))
+                ->when($this->batasiPoli(), fn ($q) => $q->where(
+                    fn ($sub) => $sub->where('poli_id', $reminder->poli_id)->orWhere('home_visit', true)
+                ))
                 ->orderBy('poli_id')
                 ->get()
             : collect();
@@ -394,8 +404,7 @@ class DigitalReminderController extends Controller
             'poli_ids' => ['nullable', 'array', Rule::requiredIf(! $request->boolean('home_visit'))],
             'poli_ids.*' => array_merge(['integer', Rule::exists('polis', 'id')], $this->pembatasanPoli()),
             'message_template_id' => $this->aturanTemplate(),
-            // 'tanggal' => ['required', 'date', 'after_or_equal:today'],
-            'tanggal' => ['required', 'date'],
+            'tanggal' => ['required', 'date', 'after_or_equal:today'],
             'jam' => ['required', 'date_format:H:i'],
             'home_visit' => ['nullable', 'boolean'],
             'catatan' => ['nullable', 'string', 'max:500'],
@@ -497,7 +506,7 @@ class DigitalReminderController extends Controller
 
     protected function bolehAkses(Reminder $reminder): bool
     {
-        return ! $this->batasiPoli() || (int) $reminder->poli_id === $this->poliAktif();
+        return ! $this->batasiPoli() || (int) $reminder->poli_id === $this->poliAktif() || (bool) $reminder->home_visit || $reminder->poli_id === null;
     }
 
     /**

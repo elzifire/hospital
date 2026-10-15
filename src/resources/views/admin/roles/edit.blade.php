@@ -250,7 +250,7 @@
                             @foreach ($groupedPermissions as $groupName => $groupPerms)
                                 <optgroup label="{{ $groupName }}">
                                     @foreach ($groupPerms as $perm)
-                                        <option value="{{ $perm->name }}" {{ in_array($perm->name, $selectedPerms) ? 'selected' : '' }}>
+                                        <option value="{{ $perm->name }}" {{ in_array($perm->name, $selectedPerms) ? 'selected checked' : '' }}>
                                             {{ $perm->name }}
                                         </option>
                                     @endforeach

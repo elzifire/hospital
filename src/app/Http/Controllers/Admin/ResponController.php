@@ -1024,7 +1024,9 @@ class ResponController extends Controller
                 'pnpp',
                 fn ($pnpp) => $pnpp->whereHas(
                     'kunjungans',
-                    fn ($kunjungan) => $kunjungan->where('poli_id', $poliId)
+                    fn ($kunjungan) => $kunjungan->where(
+                        fn ($sub) => $sub->where('poli_id', $poliId)->orWhere('home_visit', true)
+                    )
                 )
             )->orWhereIn('no_hp', $this->nomorBlastPoli($poliId));
         });

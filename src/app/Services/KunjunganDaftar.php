@@ -42,7 +42,16 @@ class KunjunganDaftar
         // "7/30 Hari" hanya rentang terpilih (bukan masa depan).
         $sampaiPeriode = $periode !== '' ? today()->toDateString() : null;
 
-        $scopePoli = fn (Builder $t) => $t->when($batasiPoli, fn ($u) => $u->where('poli_id', $poliAktif));
+        $scopePoli = fn (Builder $t) => $t->when($batasiPoli, fn ($u) => $u->where(
+            fn ($sub) => $sub->whereNull('poli_id')->orWhere('home_visit', true)->orWhere('poli_id', $poliAktif)
+        ));
+
+        // Kunjungan home visit tidak punya poli (poli_id NULL) — tetap
+        // disertakan agar terhitung, sejalan dengan scope tong sampah dan
+        // KunjunganController::bolehAkses().
+        $scopeKunjungan = fn (Builder $t) => $t->when($batasiPoli, fn ($u) => $u->where(
+            fn ($sub) => $sub->whereNull('poli_id')->orWhere('home_visit', true)->orWhere('poli_id', $poliAktif)
+        ));
 
         // ---- Baris penjadwalan (reminder) ----
         $reminders = Reminder::query()
@@ -58,7 +67,9 @@ class KunjunganDaftar
             ))
             ->when($status && $status !== 'tercatat', fn ($query) => $query->where('status', $status))
             ->when($status === 'tercatat', fn ($query) => $query->whereRaw('1 = 0'))
-            ->when($poliId && ! $batasiPoli, fn ($query) => $query->where('poli_id', $poliId))
+            ->when($poliId && ! $batasiPoli, fn ($query) => $query->where(
+                fn ($sub) => $sub->where('poli_id', $poliId)->orWhere('home_visit', true)
+            ))
             ->when($dari, fn ($query) => $query->whereDate('tanggal', '>=', $dari))
             ->when($sampai, fn ($query) => $query->whereDate('tanggal', '<=', $sampai))
             ->when($mulai, fn ($query) => $query->whereDate('tanggal', '>=', $mulai))
@@ -71,7 +82,7 @@ class KunjunganDaftar
         // ---- Grup kunjungan manual (tanpa jadwal) ----
         $grupManual = Kunjungan::query()
             ->whereNull('reminder_id')
-            ->tap($scopePoli)
+            ->tap($scopeKunjungan)
             ->with(['pnpp' => fn ($q) => $q->withTrashed()->with('satker:id,nama')], 'poli:id,nama')
             ->when($q, fn ($query) => $query->whereHas('pnpp', fn ($p) => $p
                 ->whereRaw('UPPER(nama) LIKE ?', ["%{$qAtas}%"])
@@ -84,9 +95,9 @@ class KunjunganDaftar
             ->orderByDesc('tanggal_kunjungan')
             ->get()
             ->groupBy(fn ($k) => $k->pnpp_id.'|'.$k->tanggal_kunjungan->format('Y-m-d'))
-            // Filter poli diterapkan per grup (satu pasien bisa beberapa poli).
+            // Filter poli diterapkan per grup (satu pasien bisa beberapa poli); home visit selalu disertakan.
             ->when(! $batasiPoli && $poliId !== '', fn (Collection $grup) => $grup
-                ->filter(fn (Collection $baris) => $baris->contains(fn ($k) => (int) $k->poli_id === (int) $poliId)))
+                ->filter(fn (Collection $baris) => $baris->contains(fn ($k) => (int) $k->poli_id === (int) $poliId || (bool) $k->home_visit)))
             ->map(fn (Collection $grup) => $this->barisManual($grup));
 
         // ---- Gabung, urutkan by tanggal menurun, lalu paginate ----
@@ -164,7 +175,11 @@ class KunjunganDaftar
             default => null,
         };
 
-        $scopePoli = fn (Builder $t) => $t->when($batasiPoli, fn ($u) => $u->where('poli_id', $poliAktif));
+        // Sertakan home visit (poli_id NULL atau home_visit true) agar ikut terhitung untuk akun
+        // poli — konsisten dengan KunjunganController::bolehAkses().
+        $scopePoli = fn (Builder $t) => $t->when($batasiPoli, fn ($u) => $u->where(
+            fn ($sub) => $sub->whereNull('poli_id')->orWhere('home_visit', true)->orWhere('poli_id', $poliAktif)
+        ));
 
         $grup = Kunjungan::query()
             ->with(['pnpp' => fn ($q) => $q->withTrashed()->with('satker:id,nama')], 'poli:id,nama')
@@ -180,9 +195,9 @@ class KunjunganDaftar
             ->get()
             ->groupBy(fn ($k) => $k->pnpp_id.'|'.$k->tanggal_kunjungan->format('Y-m-d'));
 
-        // Filter poli diterapkan per grup (satu pasien bisa beberapa poli).
+        // Filter poli diterapkan per grup (satu pasien bisa beberapa poli); home visit selalu disertakan.
         if (! $batasiPoli && $poliId !== '') {
-            $grup = $grup->filter(fn (Collection $baris) => $baris->contains(fn ($k) => (int) $k->poli_id === (int) $poliId));
+            $grup = $grup->filter(fn (Collection $baris) => $baris->contains(fn ($k) => (int) $k->poli_id === (int) $poliId || (bool) $k->home_visit));
         }
 
         // Filter home visit per grup: '1' → hanya home visit, '0' → kunjungan RS.

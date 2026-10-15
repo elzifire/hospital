@@ -145,7 +145,7 @@ class DigitalReminderController extends ReportController
                     'options' => fn () => Poli::query()
                         ->when(auth()->user()?->poliId(), fn ($q, $id) => $q->whereKey($id))
                         ->orderBy('nama')->pluck('nama', 'id')->all(),
-                    'apply' => fn (Builder $q, string $v) => $q->where('poli_id', (int) $v),
+                    'apply' => fn (Builder $q, string $v) => $q->where(fn ($sub) => $sub->where('poli_id', (int) $v)->orWhere('home_visit', true)),
                 ],
                 [
                     'key' => 'home_visit',

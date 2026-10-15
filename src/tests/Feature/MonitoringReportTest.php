@@ -538,4 +538,66 @@ class MonitoringReportTest extends TestCase
             ->assertOk()
             ->assertDontSee('monChart-trend');
     }
+
+    /**
+     * Laporan & counting kunjungan: kunjungan Home Visit (poli_id NULL) wajib
+     * ikut masuk untuk akun poli — sejalan dengan KunjunganController::bolehAkses()
+     * yang mengizinkan baris poli_id NULL bagi akun poli.
+     */
+    #[Test]
+    public function laporan_kunjungan_menyertakan_home_visit_untuk_akun_poli(): void
+    {
+        $poli = Poli::create(['kode' => 'HVUJI', 'nama' => 'Poli Home Visit Uji']);
+        $satker = Satker::create(['kode' => 'HVSK', 'nama' => 'Satker Home Visit Uji']);
+        $pasien = Pnpp::create(['nama' => 'Hesti Homevisit', 'nip' => '7711', 'satker_id' => $satker->id]);
+
+        $user = User::create([
+            'name' => 'Petugas Home',
+            'email' => 'petugas-home@test.dev',
+            'password' => 'rahasia',
+        ]);
+        $user->assignRole('poli');
+        $user->userDetail()->updateOrCreate([], ['poli_id' => $poli->id]);
+
+        // Satu pasien, satu tanggal: 1 kunjungan di polinya + 1 home visit
+        // yang tidak punya poli (poli_id NULL).
+        Kunjungan::create(['pnpp_id' => $pasien->id, 'poli_id' => $poli->id, 'tanggal_kunjungan' => '2026-09-25', 'keluhan' => 'RS']);
+        Kunjungan::create(['pnpp_id' => $pasien->id, 'poli_id' => null, 'home_visit' => true, 'tanggal_kunjungan' => '2026-09-25', 'keluhan' => 'Home']);
+
+        $this->actingAs($user);
+
+        // Kartu "counting" di hub monitoring memakai cakupan poli yang
+        // menyertakan home visit (poli_id NULL).
+        $diharapkan = Kunjungan::query()
+            ->where(fn ($q) => $q->whereNull('poli_id')->orWhere('poli_id', $poli->id))
+            ->count();
+        $this->assertGreaterThanOrEqual(2, $diharapkan);
+        $this->assertSame(
+            $diharapkan,
+            \App\Http\Controllers\Admin\Monitoring\Kunjungan\KunjunganController::meta()['count'](),
+        );
+
+        // Tabel laporan dengan filter "Home Visit" menampilkan kunjungan
+        // tanpa poli milik pasien ini untuk akun poli (sebelum perbaikan,
+        // baris ini tersaring keluar oleh scope poli).
+        $this->get(route('admin.monitoring.kunjungan', ['home' => '1']))
+            ->assertOk()
+            ->assertSee('Hesti Homevisit');
+
+        // Menu Kunjungan juga memunculkan pasien home visit tersebut.
+        $this->get(route('admin.kunjungan.index', ['q' => 'Hesti Homevisit']))
+            ->assertOk()
+            ->assertSee('Hesti Homevisit')
+            ->assertSee('Home Visit');
+
+        // Filter poli juga tetap menyertakan data home visit
+        $this->get(route('admin.monitoring.kunjungan', ['poli' => $poli->id]))
+            ->assertOk()
+            ->assertSee('Hesti Homevisit');
+
+        $this->actingAs($this->superadmin())
+            ->get(route('admin.kunjungan.index', ['poli' => $poli->id]))
+            ->assertOk()
+            ->assertSee('Hesti Homevisit');
+    }
 }

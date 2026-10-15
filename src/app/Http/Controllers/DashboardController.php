@@ -360,11 +360,11 @@ class DashboardController extends Controller
         $kunjungans = Kunjungan::query()
             ->with('poli:id,nama')
             ->whereDate('tanggal_kunjungan', today()->toDateString())
-            ->get(['poli_id']);
+            ->get(['poli_id', 'home_visit']);
 
         $perPoli = [];
         foreach ($kunjungans as $k) {
-            $nama = $k->poli?->nama ?? 'Tanpa Poli';
+            $nama = $k->home_visit ? 'Home Visit' : ($k->poli?->nama ?? 'Tanpa Poli');
             $perPoli[$nama] = ($perPoli[$nama] ?? 0) + 1;
         }
         arsort($perPoli);

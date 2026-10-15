@@ -32,7 +32,25 @@ class MonitoringSpecs
             $poliId = auth()->user()?->poliId();
 
             if ($poliId !== null) {
-                $query->where('poli_id', $poliId);
+                $query->where(fn ($sub) => $sub->where('poli_id', $poliId)->orWhere('home_visit', true)->orWhereNull('poli_id'));
+            }
+        };
+    }
+
+    /**
+     * Pembatasan per poli untuk laporan kunjungan, dengan tambahan:
+     * kunjungan Home Visit tidak punya poli (poli_id NULL atau home_visit true) dan tetap ikut
+     * terhitung/tampil untuk akun poli. Sejalan dengan
+     * KunjunganController::bolehAkses() dan scope tong sampah kunjungan
+     * yang memang mengizinkan baris poli_id NULL bagi akun poli.
+     */
+    public static function poliScopeKunjungan(): \Closure
+    {
+        return function (Builder $query): void {
+            $poliId = auth()->user()?->poliId();
+
+            if ($poliId !== null) {
+                $query->where(fn ($q) => $q->whereNull('poli_id')->orWhere('home_visit', true)->orWhere('poli_id', $poliId));
             }
         };
     }
