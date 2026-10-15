@@ -14,7 +14,7 @@ use Illuminate\Support\Carbon;
 class DashboardController extends Controller
 {
    
-    protected const TARGET_PNPP = 1025;
+    protected const TARGET_PNPP = 1053;
 
     /**
      * Bulan pendek bahasa Indonesia untuk judul grafik trend.
@@ -144,7 +144,7 @@ class DashboardController extends Controller
         '2026-06' => 49,
         '2026-07' => 104,
         '2026-08' => 93,
-        '2026-09' => 0,
+        '2026-09' => 49,
     ];
 
     /**
